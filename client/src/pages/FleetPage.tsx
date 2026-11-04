@@ -217,20 +217,20 @@ export default function FleetPage(p: FleetPageProps) {
             servers={filteredServers}
             alertsFor={(s) => alertsFor(s)}
             onManage={(s, tab) => openManageServer(s, tab || 'overview')}
-            onOpenTerminal={(s) => setTerminalServer(s)}
+            onOpenTerminal={(s) => openManageServer(s, 'terminal')}
             onOpenFiles={(s) => setFilesServer(s)}
           />
         ) : view === 'topology' ? (
           <TopologyVisualizer
             servers={filteredServers}
             onSelectServer={(s) => openManageServer(s, 'overview')}
-            onOpenTerminal={(s) => setTerminalServer(s)}
+            onOpenTerminal={(s) => openManageServer(s, 'terminal')}
           />
         ) : view === 'matrix' ? (
           <CyberMatrixVisualizer
             servers={filteredServers}
             onManage={(s, tab) => openManageServer(s, tab || 'overview')}
-            onOpenTerminal={(s) => setTerminalServer(s)}
+            onOpenTerminal={(s) => openManageServer(s, 'terminal')}
           />
         ) : (
           <div key={`${view}:${selectedTag}`} className="stagger grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4">
@@ -239,7 +239,7 @@ export default function FleetPage(p: FleetPageProps) {
                 key={server.id}
                 server={server}
                 onManage={(s, tab) => openManageServer(s, tab || 'overview')}
-                onOpenTerminal={(s) => setTerminalServer(s)}
+                onOpenTerminal={(s) => openManageServer(s, 'terminal')}
                 onOpenProcesses={(s) => setProcessServer(s)}
                 onEdit={p.onEditServer}
                 onDelete={handleDeleteServer}

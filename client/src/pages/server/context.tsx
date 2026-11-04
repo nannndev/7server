@@ -5,12 +5,15 @@ import React, { createContext, useContext } from 'react';
 import type { ServerItem, ServerMetrics } from '@/features/servers/types';
 import type { HistoryPoint } from '@/features/servers/api';
 import type { ServerTab } from '@/app/router';
+import type { Thresholds } from '@/features/monitoring/api';
 
 export type LogsTarget = { type: 'service' | 'docker' | 'pm2' | 'supervisor'; name: string };
 
 export interface ServerPageCtx {
   server: ServerItem;
   history: HistoryPoint[];
+  /** Alert thresholds from the monitor; charts draw them as a reference line. */
+  thresholds?: Thresholds;
   activeTab: ServerTab;
   setActiveTab: (t: ServerTab) => void;
   onMetricsUpdated: (id: string, m: ServerMetrics) => void;

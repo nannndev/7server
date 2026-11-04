@@ -7,7 +7,12 @@ const AUDIT_FILE = dataFile('audit.log');
 const MAX_BYTES = 5 * 1024 * 1024;
 
 // Only these body fields are recorded; credentials and file contents never are.
-const SAFE_FIELDS = ['command', 'action', 'pid', 'serviceName', 'containerId', 'name', 'path', 'host', 'serverIds', 'project', 'workingDir', 'what', 'image', 'target', 'configFiles', 'query', 'database', 'engine', 'allowWrite'];
+const SAFE_FIELDS = [
+  'command', 'action', 'pid', 'serviceName', 'containerId', 'name', 'path', 'host',
+  'serverIds', 'project', 'workingDir', 'what', 'image', 'target', 'configFiles',
+  'query', 'database', 'engine', 'allowWrite',
+  'templateName', 'templateId', 'preset', 'installed', 'skipped'
+];
 
 export function auditSummary(body: any): string {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return Array.isArray(body) ? `items=${body.length}` : '';

@@ -10,6 +10,7 @@ import {
   FileText,
   Box
 } from 'lucide-react';
+import { BrandIcon } from '@/shared/ui/brand-icon';
 import type { ProcessInfo, SystemService, DockerContainerInfo } from '@/features/processes/types';
 import { fetchProcesses, fetchServices, killProcess, controlService } from '@/features/processes/api';
 import { Button } from '@/shared/ui/button';
@@ -157,7 +158,7 @@ export default function ServicesTab() {
                 <tbody className="divide-y divide-[var(--border)] bg-[var(--card)] font-mono text-xs">
                   {filteredServices.map((s) => (
                     <tr key={s.unit} className="hover:bg-[var(--muted)]/50 transition">
-                      <td className="py-1.5 px-3 text-[var(--foreground)]">{s.unit}</td>
+                      <td className="py-1.5 px-3 text-[var(--foreground)]"><span className="inline-flex items-center gap-1.5"><BrandIcon name={s.unit.replace(/\.service$/, '')} className="w-3.5 h-3.5" fallback={<span className="w-3.5" />} />{s.unit}</span></td>
                       <td className="py-1.5 px-3">
                         <Badge
                           variant={

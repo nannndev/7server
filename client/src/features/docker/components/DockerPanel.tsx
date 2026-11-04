@@ -4,6 +4,7 @@ import {
   RefreshCw, Play, Square, RotateCw, Pause, Trash2, ScrollText, Terminal as TermIcon, Info, ChevronDown, ChevronRight,
   Box, HardDrive, Layers, Download, X, FolderOpen, AlertTriangle
 } from 'lucide-react';
+import { BrandIcon } from '@/shared/ui/brand-icon';
 import { fetchDocker, inspectDocker, dockerContainerAction, dockerComposeAction, dockerPrune, dockerRemoveImage, DockerOverview, DockerContainer, DockerInspect } from '@/features/docker/api';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
@@ -275,7 +276,7 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
                                   <span className={`w-2 h-2 rounded-full shrink-0 ${stateColor(c)}`} aria-hidden />
                                   <div className="min-w-0">
                                     <div className="font-semibold font-mono truncate">{c.name}</div>
-                                    <div className="text-[10px] text-[var(--muted-foreground)] font-mono truncate max-w-xs" title={c.image}>{c.image}</div>
+                                    <div className="text-[10px] text-[var(--muted-foreground)] font-mono truncate max-w-xs flex items-center gap-1" title={c.image}><BrandIcon name={c.image} className="w-3 h-3" />{c.image}</div>
                                   </div>
                                 </div>
                               </td>
@@ -373,7 +374,7 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
                 const ref = img.repo === '<none>' ? img.id : `${img.repo}:${img.tag}`;
                 return (
                   <tr key={img.id + img.tag}>
-                    <td className="py-1.5 px-3 max-w-sm truncate" title={img.repo}>{img.repo}</td>
+                    <td className="py-1.5 px-3 max-w-sm truncate" title={img.repo}><span className="inline-flex items-center gap-1.5"><BrandIcon name={img.repo} className="w-3.5 h-3.5" />{img.repo}</span></td>
                     <td className="py-1.5 px-3 text-[var(--muted-foreground)]">{img.tag}</td>
                     <td className="py-1.5 px-3 text-right">{img.size}</td>
                     <td className="py-1.5 px-3 text-[var(--muted-foreground)] font-sans">{img.createdSince}</td>

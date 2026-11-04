@@ -1,6 +1,6 @@
 // Single source for the per-server sections: the sidebar renders them, the server page uses the labels.
 import type { ElementType } from 'react';
-import { Activity, Network, Globe, Zap, Box, Database, Layers, Server, Radio, Terminal } from 'lucide-react';
+import { Activity, Network, Globe, Zap, Box, Database, Layers, Server, Radio, Terminal, Sparkles } from 'lucide-react';
 import { ServerTab } from '@/app/router';
 import type { MessageKey } from '@/shared/i18n';
 
@@ -17,6 +17,7 @@ export const SERVER_SECTION_GROUPS: { title: MessageKey; items: ServerSection[] 
   {
     title: 'section.group.apps',
     items: [
+      { id: 'templates', label: 'section.templates', icon: Sparkles },
       { id: 'webapps', label: 'section.webapps', icon: Globe },
       { id: 'pm2', label: 'section.pm2', icon: Zap },
       { id: 'docker', label: 'section.docker', icon: Box },

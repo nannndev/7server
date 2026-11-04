@@ -99,7 +99,7 @@ export default function CommandPalette({ servers, navigate, openManageServer, se
                 label: t('palette.terminal', { name: srv.name }),
                 sub: `${srv.username}@${srv.host}`,
                 icon: Terminal,
-                action: () => setTerminalServer(srv)
+                action: () => openManageServer(srv, 'terminal')
               },
               {
                 label: t('palette.files', { name: srv.name }),

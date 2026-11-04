@@ -4,6 +4,7 @@ import {
   ShieldCheck, ShieldAlert, Container, Server as ServerIcon, ChevronRight, Sparkles, SquareTerminal, PanelLeftClose, PanelLeftOpen, Layers,
   Network, Info
 } from 'lucide-react';
+import { BrandIcon } from '@/shared/ui/brand-icon';
 import { fetchDbEngines, discoverDbs, fetchDbConnections, createDbConnection, updateDbConnection, deleteDbConnection, pingDb, fetchDbDatabases, fetchDbObjects, dumpDb, fetchDbSchema, DbEngine, DbConnection, DiscoveredDb, DbObject, QueryResult, DbSchema } from '@/features/databases/api';
 import { cacheGet, cacheSet } from '@/shared/lib/cache';
 import ConnectionForm, { FormState, emptyForm } from '@/features/databases/components/ConnectionForm';
@@ -298,7 +299,7 @@ export default function DatabasePanel({ serverId }: { serverId: string }) {
               const Loc = c.location.kind === 'container' ? Container : ServerIcon;
               return (
                 <div key={c.id}>
-                  <Row depth={0} open={open} icon={Loc} label={c.name}
+                  <Row depth={0} open={open} icon={Loc} brand={c.engine} label={c.name}
                     tone={st?.error ? 'text-red-500' : st?.version ? 'text-emerald-500' : undefined}
                     onToggle={() => toggle(c.id, () => loadConn(c))}
                     onContext={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, connId: c.id }); }}
@@ -380,7 +381,7 @@ export default function DatabasePanel({ serverId }: { serverId: string }) {
                 {pending.map((d) => (
                   <button key={`${d.engine}:${JSON.stringify(d.location)}`} onClick={() => addDiscovered(d)}
                     className="w-full text-left flex items-start gap-2 px-2 py-1.5 rounded-md hover:bg-[var(--sidebar-hover)] text-[12px] group">
-                    <Plus className="w-3.5 h-3.5 mt-0.5 shrink-0 text-[var(--accent-brand)]" />
+                    <BrandIcon name={d.engine} className="w-3.5 h-3.5 mt-0.5" fallback={<Plus className="w-3.5 h-3.5 mt-0.5 shrink-0 text-[var(--accent-brand)]" />} />
                     <span className="min-w-0">
                       <span className="block truncate font-mono">{d.name}</span>
                       <span className="block truncate text-[10px] text-[var(--muted-foreground)]">{engineOf(d.engine)?.label} · {d.location.kind === 'container' ? 'docker' : 'host'}</span>
@@ -539,8 +540,8 @@ export default function DatabasePanel({ serverId }: { serverId: string }) {
 }
 
 // Tree row. Module-level on purpose: defined inside the panel it would remount on every state change.
-function Row({ depth, open, onToggle, onClick, icon: Icon, label, meta, active: isActive, chevron = true, tone, onContext, children }: {
-  depth: number; open?: boolean; onToggle?: () => void; onClick?: () => void; icon: React.ElementType; label: string; meta?: React.ReactNode;
+function Row({ depth, open, onToggle, onClick, icon: Icon, brand, label, meta, active: isActive, chevron = true, tone, onContext, children }: {
+  depth: number; open?: boolean; onToggle?: () => void; onClick?: () => void; icon: React.ElementType; brand?: string; label: string; meta?: React.ReactNode;
   active?: boolean; chevron?: boolean; tone?: string; onContext?: (e: React.MouseEvent) => void; children?: React.ReactNode;
 }) {
 return (
@@ -567,7 +568,7 @@ return (
     >
       <ChevronRight className={`w-3 h-3 transition-transform duration-150 ${open ? 'rotate-90' : ''}`} />
     </span>
-    <Icon className={`w-3.5 h-3.5 shrink-0 ${tone || 'text-[var(--muted-foreground)]'}`} />
+    <BrandIcon name={brand} className="w-3.5 h-3.5" fallback={<Icon className={`w-3.5 h-3.5 shrink-0 ${tone || 'text-[var(--muted-foreground)]'}`} />} />
     <span className="truncate flex-1 font-mono">{label}</span>
     {meta}
     {children}

@@ -12,6 +12,7 @@ import {
   Wrench,
   ChevronDown
 } from 'lucide-react';
+import { BrandIcon } from '@/shared/ui/brand-icon';
 import type { WebAppInfo } from '@/features/webapps/types';
 import { fetchWebApps } from '@/features/webapps/api';
 import { Button } from '@/shared/ui/button';
@@ -186,8 +187,9 @@ export default function WebAppsTab() {
                             ? 'default'
                             : 'secondary'
                         }
-                        className="text-[10px]"
+                        className="text-[10px] gap-1"
                       >
+                        <BrandIcon name={app.type} mono className="w-3 h-3" />
                         {app.type}
                       </Badge>
                     </td>

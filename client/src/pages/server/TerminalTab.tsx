@@ -1,19 +1,18 @@
 import React from 'react';
-import TerminalModal from '@/features/terminal/components/TerminalModal';
+import TerminalView from '@/features/terminal/components/TerminalView';
 import { useServerPage } from './context';
 
 export default function TerminalTab() {
   const ctx = useServerPage();
+
   return (
-    <div className="h-[75vh]">
-      <TerminalModal
+    <div className="w-full">
+      <TerminalView
         key={ctx.terminalCmd || 'default'}
         server={ctx.server}
         initialCommand={ctx.terminalCmd}
-        onClose={() => {
-          ctx.clearTerminalCmd();
-          ctx.setActiveTab('overview');
-        }}
+        onClearCommand={ctx.clearTerminalCmd}
+        mode="page"
       />
     </div>
   );

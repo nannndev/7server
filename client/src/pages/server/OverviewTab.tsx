@@ -11,11 +11,13 @@ import {
   Send,
   Network
 } from 'lucide-react';
+import { BrandIcon } from '@/shared/ui/brand-icon';
 import { Button } from '@/shared/ui/button';
 import { Card } from '@/shared/ui/card';
 import { Progress } from '@/shared/ui/progress';
 import { Input } from '@/shared/ui/input';
-import Sparkline from '@/features/servers/components/Sparkline';
+import TelemetryChart from '@/features/servers/components/TelemetryChart';
+import SoftwareCard from '@/features/servers/components/SoftwareCard';
 import { useServerPage, formatMB } from './context';
 import { useT } from '@/shared/i18n';
 import { OverviewGaugesSkeleton } from '@/shared/ui/skeleton';
@@ -160,7 +162,7 @@ export default function OverviewTab() {
               </div>
               <div className="py-2 flex justify-between">
                 <span className="text-[var(--muted-foreground)] font-sans">{t('overview.os')}</span>
-                <span className="text-[var(--foreground)]">{metrics?.os || 'Linux'}</span>
+                <span className="text-[var(--foreground)] inline-flex items-center gap-1.5"><BrandIcon name={metrics?.os || 'Linux'} className="w-3.5 h-3.5" />{metrics?.os || 'Linux'}</span>
               </div>
               <div className="py-2 flex justify-between">
                 <span className="text-[var(--muted-foreground)] font-sans">{t('overview.kernel')}</span>
@@ -288,16 +290,14 @@ export default function OverviewTab() {
               <Network className="w-3.5 h-3.5" /> {t('overview.openTopology')}
             </Button>
           </div>
-          <Sparkline
-            points={ctx.history}
-            currentMetrics={{
-              cpu: metrics?.cpuUsagePercent || 0,
-              mem: metrics?.memory?.usedPercent || 0,
-              disk: metrics?.disk?.usedPercent || 0
-            }}
-            height={110}
-          />
+          <TelemetryChart points={ctx.history} thresholds={ctx.thresholds} height={220} />
         </Card>
+
+        <SoftwareCard
+          serverId={server.id}
+          onOpenTemplates={() => ctx.setActiveTab('templates')}
+          onOpenTerminal={(cmd) => ctx.openTerminal(cmd)}
+        />
       </div>
     </>
   );

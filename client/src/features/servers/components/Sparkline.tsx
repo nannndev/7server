@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { HistoryPoint } from '@/features/servers/api';
 
 const SERIES = [
-  { key: 'cpu', label: 'CPU', color: '#38bdf8', gradId: 'grad-cpu' },
-  { key: 'mem', label: 'RAM', color: '#a78bfa', gradId: 'grad-mem' },
-  { key: 'disk', label: 'Disk', color: '#fbbf24', gradId: 'grad-disk' }
+  { key: 'cpu', label: 'CPU', color: '#0284c7', gradId: 'grad-cpu' },
+  { key: 'mem', label: 'RAM', color: '#db2777', gradId: 'grad-mem' },
+  { key: 'disk', label: 'Disk', color: '#b45309', gradId: 'grad-disk' }
 ] as const;
 
 interface SparklineProps {

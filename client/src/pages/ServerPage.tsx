@@ -4,6 +4,7 @@ import { Terminal as TermIcon, Settings, RefreshCw, Check, Copy, FolderOpen } fr
 import type { ServerItem, ServerMetrics } from '@/features/servers/types';
 import { fetchServerMetrics, type HistoryPoint } from '@/features/servers/api';
 import { apiFetch } from '@/shared/api/client';
+import type { Thresholds } from '@/features/monitoring/api';
 import { Button } from '@/shared/ui/button';
 import FileManagerModal from '@/features/files/components/FileManagerModal';
 import LogsModal from '@/features/logs/components/LogsModal';
@@ -12,6 +13,7 @@ import type { ServerTab } from '@/app/router';
 import { ServerPageProvider, type LogsTarget, type ServerPageCtx } from './server/context';
 import OverviewTab from './server/OverviewTab';
 import TopologyTab from './server/TopologyTab';
+import TemplatesTab from './server/TemplatesTab';
 import WebAppsTab from './server/WebAppsTab';
 import Pm2Tab from './server/Pm2Tab';
 import DockerTab from './server/DockerTab';
@@ -25,6 +27,7 @@ import { useT } from '@/shared/i18n';
 const TABS: Record<ServerTab, React.FC> = {
   overview: OverviewTab,
   topology: TopologyTab,
+  templates: TemplatesTab,
   webapps: WebAppsTab,
   pm2: Pm2Tab,
   docker: DockerTab,
@@ -40,11 +43,12 @@ interface ServerPageProps {
   tab: ServerTab;
   onTabChange: (t: ServerTab) => void;
   history?: HistoryPoint[];
+  thresholds?: Thresholds;
   onEdit: (server: ServerItem) => void;
   onMetricsUpdated: (id: string, metrics: ServerMetrics) => void;
 }
 
-export default function ServerPage({ server, tab, onTabChange, history = [], onEdit, onMetricsUpdated }: ServerPageProps) {
+export default function ServerPage({ server, tab, onTabChange, history = [], thresholds, onEdit, onMetricsUpdated }: ServerPageProps) {
   const [refreshing, setRefreshing] = useState(false);
   const t = useT();
   const [copied, setCopied] = useState(false);
@@ -88,6 +92,7 @@ export default function ServerPage({ server, tab, onTabChange, history = [], onE
   const ctx: ServerPageCtx = {
     server,
     history,
+    thresholds,
     activeTab: tab,
     setActiveTab: onTabChange,
     onMetricsUpdated,

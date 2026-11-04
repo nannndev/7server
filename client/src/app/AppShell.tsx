@@ -132,6 +132,7 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
                 tab={route.tab}
                 onTabChange={(t) => navigate({ page: 'server', id: managedServer.id, tab: t })}
                 history={history[managedServer.id] || []}
+                thresholds={monitor.thresholds}
                 onEdit={openEdit}
                 onMetricsUpdated={onMetricsUpdated}
               />
