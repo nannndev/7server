@@ -1,0 +1,32 @@
+# --- Secrets & runtime data (NEVER commit) ---
+# servers.json holds encrypted SSH creds; secret.key decrypts them; plus dashboard password,
+# Discord webhook (monitor.json), audit log, metrics/uptime history.
+server/data/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Plaintext VPS root passwords + server reports (real IPs, ports, infra layout)
+docs/.private/
+docs/vps_yubi.txt
+docs/VPS-*
+
+# --- Dependencies & build output ---
+node_modules/
+dist/
+*.tsbuildinfo
+
+# --- Logs & temp ---
+*.log
+npm-debug.log*
+*.tmp
+server/src/__probe*.ts
+
+# --- Editor / OS / tooling ---
+.DS_Store
+.vscode/
+.idea/
+.claude/
+graphify-out/

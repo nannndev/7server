@@ -1,0 +1,217 @@
+@import "tailwindcss";
+@import "@xterm/xterm/css/xterm.css";
+
+/* Privacy mode (toggle in the top bar): blur IPs, domains, paths so the screen can be shared. */
+html.privacy .sensitive { filter: blur(5px); user-select: none; }
+
+:root {
+  --background: #09090b;
+  --foreground: #f4f4f5;
+  --card: #121215;
+  --card-border: #232328;
+  --muted: #18181b;
+  --muted-foreground: #a1a1aa;
+  --accent: #27272a;
+  --primary: #f4f4f5;
+  --primary-foreground: #09090b;
+  --border: #27272a;
+  --radius: 0.5rem;
+  --ring: #a1a1aa;
+  --accent-brand: #38bdf8;
+  --sidebar-bg: #0c0c0f;
+  --sidebar-hover: #17171b;
+  --sidebar-active: #1f1f24;
+  --ease-out: cubic-bezier(.2, .7, .2, 1);
+}
+
+html.light {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-border: #e2e8f0;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --accent: #f1f5f9;
+  --primary: #0f172a;
+  --primary-foreground: #ffffff;
+  --border: #e2e8f0;
+  --ring: #64748b;
+  --accent-brand: #0284c7;
+  --sidebar-bg: #ffffff;
+  --sidebar-hover: #f1f5f9;
+  --sidebar-active: #e8eef6;
+
+  /* Components hardcode zinc-* for dark mode; invert the scale so they follow light mode too. */
+  --color-zinc-50: #09090b;
+  --color-zinc-100: #18181b;
+  --color-zinc-200: #27272a;
+  --color-zinc-300: #3f3f46;
+  --color-zinc-400: #52525b;
+  --color-zinc-500: #71717a;
+  --color-zinc-600: #a1a1aa;
+  --color-zinc-700: #d4d4d8;
+  --color-zinc-800: #e4e4e7;
+  --color-zinc-900: #f4f4f5;
+  --color-zinc-950: #ffffff;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-feature-settings: "rlig" 1, "calt" 1;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}
+
+/* Focus styles: no ring on mouse focus for text inputs, visible ring for keyboard users everywhere. */
+input:focus, textarea:focus, select:focus {
+  outline: none;
+}
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* ---------------- Motion ---------------- */
+/* Small, fast, transform/opacity only. Everything is disabled for users who ask for reduced motion. */
+
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(-4px) scale(.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes tooltip-in {
+  from { opacity: 0; transform: translate(-4px, -50%); }
+  to { opacity: 1; transform: translate(0, -50%); }
+}
+@keyframes icon-swap {
+  from { opacity: 0; transform: rotate(-90deg) scale(.6); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes expand-in {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.shimmer-effect {
+  position: relative;
+  overflow: hidden;
+}
+.shimmer-effect::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.04) 30%,
+    rgba(255, 255, 255, 0.10) 50%,
+    rgba(255, 255, 255, 0.04) 70%,
+    transparent 100%
+  );
+  animation: shimmer 1.8s infinite ease-in-out;
+}
+html.light .shimmer-effect::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(0, 0, 0, 0.03) 30%,
+    rgba(0, 0, 0, 0.07) 50%,
+    rgba(0, 0, 0, 0.03) 70%,
+    transparent 100%
+  );
+}
+
+.page-enter { animation: page-in .28s var(--ease-out) both; }
+.fade-in { animation: fade-in .18s ease-out both; }
+.pop-in { animation: pop-in .18s var(--ease-out) both; }
+.tooltip-in { animation: tooltip-in .12s var(--ease-out) both; }
+.icon-swap { display: inline-flex; animation: icon-swap .3s var(--ease-out) both; }
+.nav-expand > * { animation: expand-in .2s var(--ease-out) both; }
+.nav-expand > *:nth-child(2) { animation-delay: .03s; }
+.nav-expand > *:nth-child(3) { animation-delay: .06s; }
+.nav-expand > *:nth-child(4) { animation-delay: .09s; }
+
+/* Staggered entrance for grids of cards. */
+.stagger > * { animation: page-in .32s var(--ease-out) both; }
+.stagger > *:nth-child(2) { animation-delay: .03s; }
+.stagger > *:nth-child(3) { animation-delay: .06s; }
+.stagger > *:nth-child(4) { animation-delay: .09s; }
+.stagger > *:nth-child(5) { animation-delay: .12s; }
+.stagger > *:nth-child(n+6) { animation-delay: .15s; }
+
+/* Old modal markup used a non-existent "animate-in fade-in" pair; give it a real animation. */
+.animate-in { animation: fade-in .18s ease-out both; }
+
+.sidebar-scroll { scrollbar-width: thin; }
+.sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------------- ER diagram (React Flow) ---------------- */
+.er-flow .react-flow {
+  --xy-background-color: var(--background);
+  --xy-background-pattern-color: var(--border);
+  --xy-minimap-background-color: var(--card);
+  --xy-minimap-mask-background-color: color-mix(in srgb, var(--background) 70%, transparent);
+  --xy-controls-button-background-color: var(--card);
+  --xy-controls-button-background-color-hover: var(--sidebar-hover);
+  --xy-controls-button-color: var(--foreground);
+  --xy-controls-button-border-color: var(--border);
+  --xy-edge-label-background-color: var(--card);
+  --xy-edge-label-color: var(--foreground);
+  --xy-node-boxshadow-selected: none;
+}
+.er-flow .react-flow__node { cursor: grab; }
+.er-flow .react-flow__node.dragging { cursor: grabbing; }
+.er-flow .react-flow__minimap { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.er-flow .react-flow__controls { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; box-shadow: none; }
+
+.er-edge .react-flow__edge-path {
+  stroke: color-mix(in srgb, var(--accent-brand) 55%, var(--muted-foreground));
+  stroke-width: 1.25;
+  transition: stroke .2s, stroke-width .2s, opacity .2s;
+}
+.er-edge-inferred .react-flow__edge-path { stroke: #f59e0b; stroke-dasharray: 5 4; }
+.er-edge-active .react-flow__edge-path { stroke: var(--accent-brand); stroke-width: 2.25; }
+.er-edge-inferred.er-edge-active .react-flow__edge-path { stroke: #f59e0b; }
+.er-edge-dim { opacity: .08; }
+/* Labels would be noise with dozens of edges: only the highlighted ones show theirs. */
+.er-edge .react-flow__edge-textwrapper { opacity: 0; transition: opacity .15s; }
+.er-edge-active .react-flow__edge-textwrapper { opacity: 1; }
+.er-edge .react-flow__edge-text { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; }
+.er-edge marker path, .react-flow__arrowhead polyline { stroke: currentColor; }
