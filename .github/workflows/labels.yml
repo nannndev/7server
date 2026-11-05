@@ -21,7 +21,7 @@ jobs:
             const lines = require('fs').readFileSync('.github/labels.yml', 'utf8').split('\n');
             let cur = null; const out = [];
             for (const l of lines) {
-              const m = l.match(/^- name: (.+)$/); if (m) { cur = { name: m[1].trim() }; out.push(cur); continue; }
+              const m = l.match(/^- name: (.+)$/); if (m) { cur = { name: m[1].trim().replace(/^\"|\"$/g, '') }; out.push(cur); continue; }
               const k = l.match(/^  (color|description): (.+)$/); if (k && cur) cur[k[1]] = k[2].trim().replace(/^\"|\"$/g, '');
             }
             for (const x of out) console.log([x.name, x.color, x.description || ''].join('\t'));
