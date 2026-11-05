@@ -18,7 +18,8 @@ const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vpshub-contract-'));
 fs.writeFileSync(path.join(dataDir, 'servers.json'), '[]');
 fs.writeFileSync(path.join(dataDir, 'monitor.json'), JSON.stringify({ enabled: false }));
 const port = 5200 + Math.floor(Math.random() * 300);
-const child = spawn('npx', ['tsx', ENTRY], {
+// node directly (not npx): kill() must reach the server itself, or it outlives the test and holds its pipes.
+const child = spawn(process.execPath, ['--import', 'tsx', ENTRY], {
   env: { ...process.env, PORT: String(port), DASHBOARD_PASSWORD: 'contract-pw', VPSHUB_DATA_DIR: dataDir },
   stdio: ['ignore', 'pipe', 'pipe']
 });
