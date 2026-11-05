@@ -6,6 +6,7 @@ import {
   addUsageLog
 } from './store.js';
 import type { VirtualApiKey, AiProviderId } from './types.js';
+import { resolveModel, subscriptionChat, subscriptionModels, UpstreamError } from './subscription.js';
 
 export function authenticateVirtualKey(req: Request): VirtualApiKey | null {
   const authHeader = req.headers['authorization'];
@@ -268,6 +269,32 @@ export async function handleOpenAiChatCompletions(req: Request, res: Response): 
     return;
   }
 
+  // 9Router-style "alias/model" (cc/, cx/, gh/, gc/) → logged-in subscription account.
+  const sub = resolveModel(req.body?.model);
+  if (sub) {
+    if (key.allowedProviders && !key.allowedProviders.includes(sub.provider as AiProviderId)) {
+      res.status(403).json({ error: { message: `This 7Server virtual key does not have permission to access provider ${sub.provider}.`, type: 'invalid_request_error' } });
+      return;
+    }
+    try {
+      if (!Array.isArray(req.body?.messages) || req.body.messages.length === 0) {
+        res.status(400).json({ error: { message: 'messages is required', type: 'invalid_request_error' } });
+        return;
+      }
+      const out = await subscriptionChat(req, res, req.body, sub);
+      recordKeyUsage(key.id, out.inTok, out.outTok);
+      addUsageLog({ keyId: key.id, keyName: key.name, provider: sub.provider as AiProviderId, model: req.body.model, inputTokens: out.inTok, outputTokens: out.outTok,
+        durationMs: Date.now() - startTime, status: 'success', statusCode: 200, streaming: !!req.body.stream, ip: clientIp });
+    } catch (err: any) {
+      const status = err instanceof UpstreamError ? err.status : 502;
+      addUsageLog({ keyId: key.id, keyName: key.name, provider: sub.provider as AiProviderId, model: String(req.body?.model), inputTokens: 0, outputTokens: 0,
+        durationMs: Date.now() - startTime, status: 'error', statusCode: status, error: String(err.message).slice(0, 250), streaming: !!req.body?.stream, ip: clientIp });
+      if (!res.headersSent) res.status(status).json({ error: { message: err.message, type: 'api_error' } });
+      else res.end();
+    }
+    return;
+  }
+
   const cfg = getInternalConfig();
   const model = req.body?.model || 'gpt-4o';
   let targetProviderId: AiProviderId = 'openai';
@@ -486,8 +513,12 @@ export async function handleOpenAiChatCompletions(req: Request, res: Response): 
   }
 }
 
-export function handleListModels(req: Request, res: Response): void {
-  const models = [
+export async function handleListModels(req: Request, res: Response): Promise<void> {
+  if (!authenticateVirtualKey(req)) {
+    res.status(401).json({ error: { message: 'Invalid, expired, or disabled 7Server Virtual API Key.', type: 'invalid_request_error', code: 'invalid_api_key' } });
+    return;
+  }
+  const staticModels = [
     { id: 'claude-3-7-sonnet-20250219', object: 'model', owned_by: 'anthropic' },
     { id: 'claude-3-5-sonnet-20241022', object: 'model', owned_by: 'anthropic' },
     { id: 'claude-3-5-haiku-20241022', object: 'model', owned_by: 'anthropic' },
@@ -502,9 +533,11 @@ export function handleListModels(req: Request, res: Response): void {
     { id: 'gemini-1.5-pro', object: 'model', owned_by: 'google' }
   ];
 
+  const cfg = getInternalConfig();
+  const connected = new Set(Object.entries(cfg.providers).filter(([, p]) => p?.connected).map(([id]) => (id === 'gemini' ? 'google' : id)));
   res.json({
     object: 'list',
-    data: models
+    data: [...(await subscriptionModels()), ...staticModels.filter((m) => connected.has(m.owned_by))]
   });
 }
 

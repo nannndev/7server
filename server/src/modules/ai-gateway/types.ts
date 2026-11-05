@@ -1,4 +1,6 @@
-export type AiProviderId = 'anthropic' | 'openai' | 'gemini' | 'deepseek' | 'ollama' | 'openrouter';
+export type AiProviderId = 'anthropic' | 'openai' | 'gemini' | 'deepseek' | 'ollama' | 'openrouter'
+  // logged-in subscription accounts (OAuth)
+  | 'claude' | 'codex' | 'copilot' | 'gemini-cli';
 
 export interface VirtualApiKey {
   id: string;

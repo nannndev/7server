@@ -6,6 +6,11 @@ import {
 } from './service.js';
 import { handleCopilotChat } from './copilot.js';
 import { verifyProviderConnection } from './verifier.js';
+import { internalOnly } from './internalOnly.js';
+import { startLogin, completeLogin, pollDeviceLogin, isOAuthProvider } from './oauth.js';
+import { listAccounts, saveAccount, removeAccount, getCredential } from './accounts.js';
+import { MODELS } from './subscription.js';
+import { listenForCallback } from './callbackServer.js';
 import {
   getAllKeys,
   createVirtualKey,
@@ -23,6 +28,8 @@ import {
 // ------------------- PUBLIC AI GATEWAY PROXY ROUTES -------------------
 // Mounted at /api/ai (Before requireAuth, protected by Virtual API Key)
 export const aiGatewayPublicRoutes = Router();
+// Only callers inside the 7Server system (loopback, private nets, registered VPS hosts) may use the proxy.
+aiGatewayPublicRoutes.use(internalOnly);
 
 aiGatewayPublicRoutes.get('/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', service: '7Server AI Gateway', timestamp: new Date().toISOString() });
@@ -45,7 +52,7 @@ aiGatewayPublicRoutes.post(
 aiGatewayPublicRoutes.get(
   ['/v1/models', '/models', '/v1/v1/models'],
   (req: Request, res: Response) => {
-    handleListModels(req, res);
+    handleListModels(req, res).catch((e) => res.status(500).json({ error: { message: e.message } }));
   }
 );
 
@@ -132,6 +139,56 @@ aiGatewayManagementRoutes.delete('/ai-gateway/usage', (req: Request, res: Respon
 aiGatewayManagementRoutes.get('/ai-gateway/stats', (req: Request, res: Response) => {
   const stats = getGatewayStats();
   res.json({ stats });
+});
+
+// ------------------- SUBSCRIPTION ACCOUNTS (OAuth login, 9Router style) -------------------
+const oauthProvider = (req: Request, res: Response) => {
+  const p = String(req.params.provider);
+  if (!isOAuthProvider(p)) { res.status(400).json({ error: `Provider login tidak dikenal: ${p}` }); return null; }
+  return p;
+};
+
+aiGatewayManagementRoutes.get('/ai-gateway/accounts', (_req: Request, res: Response) => {
+  res.json({ accounts: listAccounts(), models: MODELS });
+});
+
+aiGatewayManagementRoutes.post('/ai-gateway/accounts/:provider/start', async (req: Request, res: Response) => {
+  const p = oauthProvider(req, res); if (!p) return;
+  try {
+    const r = await startLogin(p);
+    const autoCallback = r.kind === 'redirect' ? await listenForCallback(r.sessionId, r.redirectUri) : false;
+    res.json({ ...r, autoCallback });
+  } catch (e: any) { res.status(502).json({ error: e.message }); }
+});
+
+aiGatewayManagementRoutes.post('/ai-gateway/accounts/:provider/complete', async (req: Request, res: Response) => {
+  const p = oauthProvider(req, res); if (!p) return;
+  try {
+    const { provider, cred } = await completeLogin(String(req.body?.sessionId || ''), String(req.body?.callback || ''));
+    if (provider !== p) { res.status(400).json({ error: 'Sesi login milik provider lain' }); return; }
+    saveAccount(provider, cred);
+    res.json({ accounts: listAccounts() });
+  } catch (e: any) { res.status(400).json({ error: e.message }); }
+});
+
+aiGatewayManagementRoutes.post('/ai-gateway/accounts/:provider/poll', async (req: Request, res: Response) => {
+  const p = oauthProvider(req, res); if (!p) return;
+  try {
+    const r = await pollDeviceLogin(String(req.body?.sessionId || ''));
+    if (r.status === 'done') { saveAccount(p, r.cred); res.json({ status: 'done', accounts: listAccounts() }); }
+    else res.json({ status: 'pending' });
+  } catch (e: any) { res.status(400).json({ error: e.message }); }
+});
+
+aiGatewayManagementRoutes.post('/ai-gateway/accounts/:provider/test', async (req: Request, res: Response) => {
+  const p = oauthProvider(req, res); if (!p) return;
+  try { await getCredential(p); res.json({ ok: true, accounts: listAccounts() }); } catch (e: any) { res.status(400).json({ error: e.message }); }
+});
+
+aiGatewayManagementRoutes.delete('/ai-gateway/accounts/:provider', (req: Request, res: Response) => {
+  const p = oauthProvider(req, res); if (!p) return;
+  removeAccount(p);
+  res.json({ accounts: listAccounts() });
 });
 
 // In-Dashboard AI Copilot Chat Endpoint (SSE Streaming)
