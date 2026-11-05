@@ -1,3 +1,4 @@
+import type { OAuthProviderId, SubscriptionAccount, LoginStart } from './types';
 import { API_BASE, apiFetch, jsonPost, unwrap } from '@/shared/api/client';
 import type {
   VirtualApiKey,
@@ -118,3 +119,24 @@ export async function disconnectProviderApi(providerId: AiProviderId): Promise<A
   return data.config;
 }
 
+
+// ---- Subscription accounts (OAuth login per provider)
+
+const acct = (p: OAuthProviderId, action = '') => `${API_BASE}/ai-gateway/accounts/${encodeURIComponent(p)}${action ? `/${action}` : ''}`;
+async function body<T>(res: Response, fallback: string): Promise<T> {
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || fallback);
+  return data;
+}
+
+export const fetchAccounts = async () =>
+  body<{ accounts: SubscriptionAccount[]; models: Record<OAuthProviderId, string[]> }>(await apiFetch(`${API_BASE}/ai-gateway/accounts`), 'Failed to fetch accounts');
+export const startAccountLogin = async (p: OAuthProviderId) => body<LoginStart>(await apiFetch(acct(p, 'start'), jsonPost({})), 'Failed to start login');
+export const completeAccountLogin = async (p: OAuthProviderId, sessionId: string, callback: string) =>
+  (await body<{ accounts: SubscriptionAccount[] }>(await apiFetch(acct(p, 'complete'), jsonPost({ sessionId, callback })), 'Login failed')).accounts;
+export const pollAccountLogin = async (p: OAuthProviderId, sessionId: string) =>
+  body<{ status: 'pending' | 'done'; accounts?: SubscriptionAccount[] }>(await apiFetch(acct(p, 'poll'), jsonPost({ sessionId })), 'Login failed');
+export const testAccount = async (p: OAuthProviderId) =>
+  (await body<{ accounts: SubscriptionAccount[] }>(await apiFetch(acct(p, 'test'), jsonPost({})), 'Token invalid')).accounts;
+export const disconnectAccount = async (p: OAuthProviderId) =>
+  (await body<{ accounts: SubscriptionAccount[] }>(await apiFetch(acct(p), { method: 'DELETE' }), 'Failed to disconnect')).accounts;

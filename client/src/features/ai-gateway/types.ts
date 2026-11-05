@@ -65,3 +65,17 @@ export interface AiGatewayStats {
   activeKeysCount: number;
   connectedProvidersCount: number;
 }
+
+// Subscription accounts logged in via OAuth (9Router style). Model ids are `alias/model`.
+export type OAuthProviderId = 'claude' | 'codex' | 'copilot' | 'gemini-cli';
+export interface SubscriptionAccount {
+  provider: OAuthProviderId;
+  email?: string;
+  connectedAt: string;
+  refreshedAt?: string;
+  expiresAt?: number;
+  lastError?: string;
+}
+export type LoginStart =
+  | { kind: 'redirect'; sessionId: string; authUrl: string; redirectUri: string; autoCallback?: boolean }
+  | { kind: 'device'; sessionId: string; userCode: string; verificationUri: string; interval: number; expiresIn: number };

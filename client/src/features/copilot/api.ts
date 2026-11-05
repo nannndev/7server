@@ -1,11 +1,12 @@
-import { API_BASE, getToken } from '@/shared/api/client';
+import { API_BASE, apiFetch, getToken, jsonPost, unwrap } from '@/shared/api/client';
 import type { ChatMessage, CopilotContext } from './types';
 
 export async function streamCopilotChat(
   messages: ChatMessage[],
   context: CopilotContext | undefined,
   onDelta: (text: string) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  model?: string
 ): Promise<void> {
   const token = getToken();
   const res = await fetch(`${API_BASE}/ai-copilot/chat`, {
@@ -16,7 +17,8 @@ export async function streamCopilotChat(
     },
     body: JSON.stringify({
       messages: messages.map((m) => ({ role: m.role, content: m.content })),
-      context
+      context,
+      model
     }),
     signal
   });
@@ -69,3 +71,9 @@ export async function streamCopilotChat(
   }
 }
 
+
+/** Runs one command on a server over SSH (same endpoint as the terminal quick actions; audited server-side). */
+export async function execOnServer(serverId: string, command: string): Promise<{ stdout: string; stderr: string; code: number | null }> {
+  const res = await apiFetch(`${API_BASE}/servers/${encodeURIComponent(serverId)}/exec`, jsonPost({ command }));
+  return unwrap(res, 'Command failed');
+}

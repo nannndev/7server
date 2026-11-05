@@ -37,7 +37,9 @@ import { Modal } from '@/shared/ui/modal';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { toast } from '@/shared/ui/toast';
 import { confirmModal } from '@/shared/ui/confirm-dialog';
-import { useT } from '@/shared/i18n';
+import { useI18n, useT, type MessageKey } from '@/shared/i18n';
+import { BrandIcon } from '@/shared/ui/brand-icon';
+import { SubscriptionAccounts } from '@/features/ai-gateway/SubscriptionAccounts';
 import type { AiGatewayTab } from '@/app/router';
 import {
   fetchGatewayKeys,
@@ -69,11 +71,13 @@ interface AiGatewayPageProps {
 interface ProviderMeta {
   id: AiProviderId;
   name: string;
-  tagline: string;
-  badge: string;
+  /** i18n keys */
+  tagline: MessageKey;
+  badge: MessageKey;
   color: string;
   models: string[];
   defaultUrl: string;
+  /** literal key format, or an i18n key (Ollama) */
   keyPlaceholder: string;
   docsUrl: string;
 }
@@ -82,8 +86,8 @@ const PROVIDERS_META: ProviderMeta[] = [
   {
     id: 'anthropic',
     name: 'Anthropic Claude',
-    tagline: 'Claude 3.7 Sonnet, Claude 3.5 Sonnet & Haiku (Native Claude Code CLI target)',
-    badge: 'Claude Code',
+    tagline: 'aiGw.p.anthropic.tagline',
+    badge: 'aiGw.p.anthropic.badge',
     color: 'from-amber-500/20 to-orange-500/10 text-amber-500 border-amber-500/30',
     models: ['claude-3-7-sonnet-20250219', 'claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022'],
     defaultUrl: 'https://api.anthropic.com',
@@ -93,8 +97,8 @@ const PROVIDERS_META: ProviderMeta[] = [
   {
     id: 'openai',
     name: 'OpenAI',
-    tagline: 'GPT-4o, GPT-4o-mini, o1, o3-mini reasoning models',
-    badge: 'OpenAI API',
+    tagline: 'aiGw.p.openai.tagline',
+    badge: 'aiGw.p.openai.badge',
     color: 'from-emerald-500/20 to-teal-500/10 text-emerald-500 border-emerald-500/30',
     models: ['gpt-4o', 'gpt-4o-mini', 'o1', 'o3-mini'],
     defaultUrl: 'https://api.openai.com/v1',
@@ -104,8 +108,8 @@ const PROVIDERS_META: ProviderMeta[] = [
   {
     id: 'deepseek',
     name: 'DeepSeek',
-    tagline: 'DeepSeek-V3 and DeepSeek-R1 open reasoning models with ultra-low cost',
-    badge: 'High Performance',
+    tagline: 'aiGw.p.deepseek.tagline',
+    badge: 'aiGw.p.deepseek.badge',
     color: 'from-blue-500/20 to-cyan-500/10 text-blue-500 border-blue-500/30',
     models: ['deepseek-chat', 'deepseek-reasoner'],
     defaultUrl: 'https://api.deepseek.com',
@@ -115,8 +119,8 @@ const PROVIDERS_META: ProviderMeta[] = [
   {
     id: 'openrouter',
     name: 'OpenRouter',
-    tagline: 'Unified gateway routing to 100+ LLMs with a single account and subscription',
-    badge: 'Universal Hub',
+    tagline: 'aiGw.p.openrouter.tagline',
+    badge: 'aiGw.p.openrouter.badge',
     color: 'from-purple-500/20 to-pink-500/10 text-purple-400 border-purple-500/30',
     models: ['anthropic/claude-3.7-sonnet', 'openai/gpt-4o', 'deepseek/deepseek-r1'],
     defaultUrl: 'https://openrouter.ai/api/v1',
@@ -126,8 +130,8 @@ const PROVIDERS_META: ProviderMeta[] = [
   {
     id: 'gemini',
     name: 'Google Gemini',
-    tagline: 'Gemini 2.0 Flash, Gemini 1.5 Pro & multimodal capabilities',
-    badge: 'Google Cloud',
+    tagline: 'aiGw.p.gemini.tagline',
+    badge: 'aiGw.p.gemini.badge',
     color: 'from-red-500/20 to-amber-500/10 text-red-500 border-red-500/30',
     models: ['gemini-2.0-flash', 'gemini-1.5-pro'],
     defaultUrl: 'https://generativelanguage.googleapis.com',
@@ -137,18 +141,33 @@ const PROVIDERS_META: ProviderMeta[] = [
   {
     id: 'ollama',
     name: 'Ollama (Local LLM)',
-    tagline: 'Self-hosted open models running on your server or local hardware',
-    badge: '100% Private',
+    tagline: 'aiGw.p.ollama.tagline',
+    badge: 'aiGw.p.ollama.badge',
     color: 'from-zinc-500/20 to-stone-500/10 text-zinc-300 border-zinc-500/30',
     models: ['llama3.2', 'deepseek-r1:8b', 'mistral', 'qwen2.5-coder'],
     defaultUrl: 'http://localhost:11434',
-    keyPlaceholder: 'No API key needed for local Ollama',
+    keyPlaceholder: 'aiGw.ollamaNoKey',
     docsUrl: 'https://ollama.com'
   }
 ];
 
-export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) {
+function ModalCard({ title, icon, onClose, children }: { title: string; icon?: React.ReactNode; onClose: () => void; children: React.ReactNode }) {
   const t = useT();
+  return (
+    <div role="dialog" aria-modal="true" aria-label={title} className="rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-2xl animate-[pop-in_180ms_ease-out]">
+      <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-[var(--border)]">
+        <h2 className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">{icon}{title}</h2>
+        <button type="button" onClick={onClose} aria-label={t('common.close')} className="p-1 rounded-md text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]">
+          <XCircle className="w-4 h-4" />
+        </button>
+      </div>
+      <div className="p-5">{children}</div>
+    </div>
+  );
+}
+
+export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) {
+  const { t, locale } = useI18n();
 
   const [loading, setLoading] = useState(true);
   const [keys, setKeys] = useState<VirtualApiKey[]>([]);
@@ -257,22 +276,20 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
   };
 
   const handleDisconnect = async (providerId: AiProviderId) => {
-    confirmModal({
+    if (!(await confirmModal({
       title: t('aiGateway.disconnectProvider'),
-      message: `Putuskan sambungan ke provider ${providerId}? Kredensial akan dihapus dari server.`,
+      message: t('aiGw.disconnectConfirm', { name: providerId }),
       confirmText: t('aiGateway.disconnectProvider'),
-      danger: true,
-      onConfirm: async () => {
-        try {
-          const updated = await disconnectProviderApi(providerId);
-          setConfig(updated);
-          toast.success(t('aiGateway.disconnectedNotice'));
-          setConnectingProvider(null);
-        } catch (err: any) {
-          toast.error(err.message || 'Failed to disconnect');
-        }
-      }
-    });
+      variant: 'danger'
+    }))) return;
+    try {
+      const updated = await disconnectProviderApi(providerId);
+      setConfig(updated);
+      toast.success(t('aiGateway.disconnectedNotice'));
+      setConnectingProvider(null);
+    } catch (err: any) {
+      toast.error(err.message || t('aiGw.errDisconnect'));
+    }
   };
 
   const handleCreateKey = async (e: React.FormEvent) => {
@@ -288,54 +305,50 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
       setNewKeyProviders([]);
       toast.success(t('aiGateway.keyCreatedTitle'));
     } catch (err: any) {
-      toast.error(err.message || 'Failed to create virtual key');
+      toast.error(err.message || t('aiGw.errCreateKey'));
     }
   };
 
-  const handleDeleteKey = (key: VirtualApiKey) => {
-    confirmModal({
+  const handleDeleteKey = async (key: VirtualApiKey) => {
+    if (!(await confirmModal({
       title: t('aiGateway.revokeKey'),
       message: t('aiGateway.revokeConfirm', { name: key.name }),
       confirmText: t('aiGateway.revokeKey'),
-      danger: true,
-      onConfirm: async () => {
-        try {
-          await deleteGatewayKey(key.id);
-          setKeys((prev) => prev.filter((k) => k.id !== key.id));
-          toast.success('Virtual key revoked successfully');
-        } catch (err: any) {
-          toast.error(err.message || 'Failed to revoke key');
-        }
-      }
-    });
+      variant: 'danger'
+    }))) return;
+    try {
+      await deleteGatewayKey(key.id);
+      setKeys((prev) => prev.filter((k) => k.id !== key.id));
+      toast.success(t('aiGw.keyRevoked'));
+    } catch (err: any) {
+      toast.error(err.message || t('aiGw.errRevoke'));
+    }
   };
 
   const handleToggleKey = async (key: VirtualApiKey) => {
     try {
       const updated = await toggleGatewayKey(key.id, !key.enabled);
       setKeys((prev) => prev.map((k) => (k.id === key.id ? updated : k)));
-      toast.success(`Key ${updated.enabled ? 'enabled' : 'disabled'}`);
+      toast.success(updated.enabled ? t('aiGw.keyEnabled') : t('aiGw.keyDisabled'));
     } catch (err: any) {
-      toast.error(err.message || 'Failed to update key status');
+      toast.error(err.message || t('aiGw.errToggle'));
     }
   };
 
-  const handleClearUsage = () => {
-    confirmModal({
+  const handleClearUsage = async () => {
+    if (!(await confirmModal({
       title: t('aiGateway.clearLogs'),
       message: t('aiGateway.clearLogsConfirm'),
       confirmText: t('aiGateway.clearLogs'),
-      danger: true,
-      onConfirm: async () => {
-        try {
-          await clearGatewayUsage();
-          setUsage([]);
-          toast.success('Usage logs cleared');
-        } catch (err: any) {
-          toast.error(err.message || 'Failed to clear logs');
-        }
-      }
-    });
+      variant: 'danger'
+    }))) return;
+    try {
+      await clearGatewayUsage();
+      setUsage([]);
+      toast.success(t('aiGw.logsCleared'));
+    } catch (err: any) {
+      toast.error(err.message || t('aiGw.errClearLogs'));
+    }
   };
 
   const gatewayBaseUrl = useMemo(() => {
@@ -382,11 +395,11 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                   }`}
                 >
                   <span className={`w-1.5 h-1.5 rounded-full ${connectedCount > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-                  {connectedCount > 0 ? `${connectedCount} Provider Active` : 'No Providers Connected'}
+                  {connectedCount > 0 ? t('aiGw.providersActive', { n: connectedCount }) : t('aiGw.noProviders')}
                 </Badge>
               </h1>
               <p className="text-xs text-[var(--muted-foreground)]">
-                Hubungkan akun provider AI Anda, lalu gunakan 1 Kunci Universal untuk Claude Code, Cursor, dan Copilot.
+                {t('aiGw.subtitle')}
               </p>
             </div>
           </div>
@@ -397,12 +410,12 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
           <div className="px-3.5 py-1.5 rounded-lg bg-[var(--card)] border border-[var(--border)] flex items-center gap-3 text-xs">
             <div>
               <div className="text-[10px] text-[var(--muted-foreground)] uppercase font-semibold">{t('aiGateway.connectedProviders')}</div>
-              <div className="font-bold font-mono text-emerald-400">{connectedCount} Active</div>
+              <div className="font-bold font-mono text-emerald-400">{t('aiGw.nActive', { n: connectedCount })}</div>
             </div>
             <div className="w-px h-6 bg-[var(--border)]" />
             <div>
               <div className="text-[10px] text-[var(--muted-foreground)] uppercase font-semibold">{t('aiGateway.statsActiveKeys')}</div>
-              <div className="font-bold font-mono text-purple-400">{keys.filter((k) => k.enabled).length} Keys</div>
+              <div className="font-bold font-mono text-purple-400">{t('aiGw.nKeys', { n: keys.filter((k) => k.enabled).length })}</div>
             </div>
             <div className="w-px h-6 bg-[var(--border)]" />
             <div>
@@ -412,7 +425,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
               </div>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={loadData} disabled={loading} title="Refresh Gateway">
+          <Button variant="outline" size="sm" onClick={loadData} disabled={loading} title={t('aiGw.refresh')}>
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           </Button>
         </div>
@@ -487,20 +500,27 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
               </div>
               <div className="space-y-0.5">
                 <div className="text-xs font-semibold text-[var(--foreground)]">
-                  Langkah 1: Hubungkan Akun / Provider AI Anda
+                  {t('aiGw.step1Title')}
                 </div>
                 <div className="text-[11px] text-[var(--muted-foreground)]">
-                  Setelah provider diverifikasi dan tersambung, Anda bisa membuat <strong>Kunci API Universal</strong> di tab sebelah untuk digunakan di semua tools coding Anda (Claude Code, Cursor, Cline, dll).
+                  {t('aiGw.step1Desc')}
                 </div>
               </div>
             </div>
             {connectedCount > 0 ? (
               <Button size="sm" onClick={() => onTabChange('keys')} className="bg-purple-600 hover:bg-purple-700 text-white shrink-0">
-                Lanjut: Buat Kunci Universal
+                {t('aiGw.step1Next')}
               </Button>
             ) : null}
           </div>
 
+          <div className="space-y-1">
+            <h3 className="text-sm font-semibold text-[var(--foreground)]">{t('aiGw.subsTitle')}</h3>
+            <p className="text-[11px] text-[var(--muted-foreground)]">{t('aiGw.subsDesc')} <code className="font-mono">alias/model</code> · <code className="font-mono">cc/claude-sonnet-5</code> · <code className="font-mono">/v1/chat/completions</code></p>
+          </div>
+          <SubscriptionAccounts />
+
+          <h3 className="text-sm font-semibold text-[var(--foreground)] pt-2">{t('aiGw.apiKeyTitle')}</h3>
           {/* Providers Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {PROVIDERS_META.map((p) => {
@@ -520,33 +540,33 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2.5">
                         <div className={`w-9 h-9 rounded-xl border flex items-center justify-center font-bold text-sm shadow-sm bg-gradient-to-br ${p.color}`}>
-                          {p.name.slice(0, 1)}
+                          <BrandIcon name={p.id} className="w-[18px] h-[18px]" fallback={p.name.slice(0, 1)} />
                         </div>
                         <div>
                           <div className="font-semibold text-xs text-[var(--foreground)]">{p.name}</div>
-                          <div className="text-[10px] text-[var(--muted-foreground)] font-mono">{p.badge}</div>
+                          <div className="text-[10px] text-[var(--muted-foreground)] font-mono">{t(p.badge)}</div>
                         </div>
                       </div>
 
                       {isConnected ? (
                         <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-500 border-emerald-500/30 flex items-center gap-1 font-mono">
                           <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                          Connected
+                          {t('aiGw.connected')}
                           {provConfig?.latencyMs ? ` (${provConfig.latencyMs}ms)` : ''}
                         </Badge>
                       ) : (
                         <Badge variant="outline" className="text-[10px] text-[var(--muted-foreground)] bg-[var(--muted)]/50">
-                          Disconnected
+                          {t('aiGw.disconnected')}
                         </Badge>
                       )}
                     </div>
 
                     <p className="text-[11px] text-[var(--muted-foreground)] line-clamp-2 min-h-[32px]">
-                      {p.tagline}
+                      {t(p.tagline)}
                     </p>
 
                     <div className="space-y-1 pt-1">
-                      <div className="text-[10px] font-medium text-[var(--muted-foreground)] uppercase">Supported Models:</div>
+                      <div className="text-[10px] font-medium text-[var(--muted-foreground)] uppercase">{t('aiGw.supportedModels')}</div>
                       <div className="flex flex-wrap gap-1">
                         {p.models.slice(0, 2).map((m) => (
                           <span key={m} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--muted)] text-[var(--foreground)]">
@@ -555,7 +575,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                         ))}
                         {p.models.length > 2 && (
                           <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--muted)] text-[var(--muted-foreground)]">
-                            +{p.models.length - 2} more
+                            {t('aiGw.nMore', { n: p.models.length - 2 })}
                           </span>
                         )}
                       </div>
@@ -570,7 +590,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                           className="text-[11px] text-red-500 hover:text-red-600 transition-colors flex items-center gap-1"
                         >
                           <Unplug className="w-3 h-3" />
-                          Disconnect
+                          {t('aiGw.disconnect')}
                         </button>
                         <Button
                           variant="outline"
@@ -578,7 +598,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                           onClick={() => openConnectModal(p)}
                           className="h-7 text-xs border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10"
                         >
-                          Configure
+                          {t('aiGw.configure')}
                         </Button>
                       </>
                     ) : (
@@ -589,7 +609,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                           rel="noreferrer"
                           className="text-[11px] text-[var(--muted-foreground)] hover:text-purple-400 transition-colors flex items-center gap-1"
                         >
-                          Get API Key <ExternalLink className="w-2.5 h-2.5" />
+                          {t('aiGw.getKey')} <ExternalLink className="w-2.5 h-2.5" />
                         </a>
                         <Button
                           size="sm"
@@ -597,7 +617,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                           className="h-7 text-xs bg-purple-600 hover:bg-purple-700 text-white"
                         >
                           <Plug className="w-3 h-3 mr-1" />
-                          Connect
+                          {t('aiGw.connect')}
                         </Button>
                       </>
                     )}
@@ -622,7 +642,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                   {t('aiGateway.universalKeyNotice')}
                 </div>
                 <div className="text-[11px] text-[var(--muted-foreground)]">
-                  Kunci ini otomatis merutekan ke provider yang terhubung ({connectedCount} aktif). Jika Anda memanggil model Claude, diteruskan ke Anthropic. Jika memanggil model DeepSeek atau GPT-4o, diteruskan ke provider terkait.
+                  {t('aiGw.keysDesc', { n: connectedCount })}
                 </div>
               </div>
             </div>
@@ -654,14 +674,14 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                 <table className="w-full text-left text-xs">
                   <thead className="bg-[var(--muted)]/50 border-b border-[var(--border)] text-[var(--muted-foreground)] font-medium">
                     <tr>
-                      <th className="py-2.5 px-3">Name / Label</th>
-                      <th className="py-2.5 px-3">Universal API Key</th>
-                      <th className="py-2.5 px-3">Connected Upstreams</th>
-                      <th className="py-2.5 px-3 text-right">Requests</th>
-                      <th className="py-2.5 px-3 text-right">Total Tokens</th>
-                      <th className="py-2.5 px-3">Last Used</th>
-                      <th className="py-2.5 px-3 text-center">Status</th>
-                      <th className="py-2.5 px-3 text-right">Actions</th>
+                      <th className="py-2.5 px-3">{t('aiGw.colName')}</th>
+                      <th className="py-2.5 px-3">{t('aiGw.colKey')}</th>
+                      <th className="py-2.5 px-3">{t('aiGw.colUpstreams')}</th>
+                      <th className="py-2.5 px-3 text-right">{t('aiGw.colRequests')}</th>
+                      <th className="py-2.5 px-3 text-right">{t('aiGw.colTokens')}</th>
+                      <th className="py-2.5 px-3">{t('aiGw.colLastUsed')}</th>
+                      <th className="py-2.5 px-3 text-center">{t('aiGw.colStatus')}</th>
+                      <th className="py-2.5 px-3 text-right">{t('aiGw.colActions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--border)]">
@@ -680,7 +700,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                               <button
                                 onClick={() => copyToClipboard(k.key, k.id)}
                                 className="p-1 hover:text-[var(--foreground)]"
-                                title="Copy Key"
+                                title={t('aiGw.copyKey')}
                               >
                                 {copiedSection === k.id ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
                               </button>
@@ -695,7 +715,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                               </Badge>
                             ))}
                             {connectedCount === 0 && (
-                              <span className="text-[10px] text-amber-500">None connected</span>
+                              <span className="text-[10px] text-amber-500">{t('aiGw.noneConnected')}</span>
                             )}
                           </div>
                         </td>
@@ -704,7 +724,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                           {formatTokens((k.totalInputTokens || 0) + (k.totalOutputTokens || 0))}
                         </td>
                         <td className="py-3 px-3 text-[var(--muted-foreground)]">
-                          {k.lastUsedAt ? new Date(k.lastUsedAt).toLocaleDateString() : 'Never'}
+                          {k.lastUsedAt ? new Date(k.lastUsedAt).toLocaleDateString(locale) : t('aiGw.never')}
                         </td>
                         <td className="py-3 px-3 text-center">
                           <button
@@ -715,7 +735,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                                 : 'bg-zinc-500/10 text-zinc-500 hover:bg-zinc-500/20'
                             }`}
                           >
-                            {k.enabled ? 'Active' : 'Disabled'}
+                            {k.enabled ? t('aiGw.active') : t('aiGw.disabled')}
                           </button>
                         </td>
                         <td className="py-3 px-3 text-right">
@@ -749,7 +769,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
               </div>
               <div>
                 <div className="text-xs font-semibold text-[var(--foreground)]">{t('aiGateway.selectKey')}</div>
-                <div className="text-[11px] text-[var(--muted-foreground)]">Pilih kunci virtual untuk mengisi sampel kode di bawah secara otomatis</div>
+                <div className="text-[11px] text-[var(--muted-foreground)]">{t('aiGw.selectKeyDesc')}</div>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -778,14 +798,14 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
           <Card className="p-5 bg-[var(--card)] border border-[var(--border)] space-y-4">
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center shrink-0 font-bold text-sm">
-                  C
+                <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center shrink-0">
+                  <BrandIcon name="claude" className="w-[18px] h-[18px]" />
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
                     {t('aiGateway.claudeCodeTitle')}
                     <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-500 border-amber-500/30">
-                      Claude Code CLI Compatible
+                      {t('aiGw.claudeCompatible')}
                     </Badge>
                   </h3>
                   <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
@@ -807,10 +827,10 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
             </div>
 
             <div className="relative rounded-xl bg-zinc-950 p-4 font-mono text-xs text-zinc-100 border border-zinc-800 space-y-2">
-              <div className="text-zinc-500 select-none"># 1. Install Claude Code CLI (jika belum terpasang)</div>
+              <div className="text-zinc-500 select-none"># 1. {t('aiGw.cc1')}</div>
               <div className="text-emerald-400">npm install -g @anthropic-ai/claude-code</div>
 
-              <div className="text-zinc-500 select-none pt-2"># 2. Arahkan Base URL ke 7Server & masukkan Universal Virtual Key</div>
+              <div className="text-zinc-500 select-none pt-2"># 2. {t('aiGw.cc2')}</div>
               <div>
                 <span className="text-purple-400">export</span> <span className="text-amber-300">ANTHROPIC_BASE_URL</span>=<span className="text-emerald-300">"{gatewayBaseUrl}"</span>
               </div>
@@ -818,7 +838,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                 <span className="text-purple-400">export</span> <span className="text-amber-300">ANTHROPIC_API_KEY</span>=<span className="text-emerald-300">"{activeKeyForQuickstart}"</span>
               </div>
 
-              <div className="text-zinc-500 select-none pt-2"># 3. Jalankan Claude Code</div>
+              <div className="text-zinc-500 select-none pt-2"># 3. {t('aiGw.cc3')}</div>
               <div className="text-emerald-400">claude</div>
             </div>
           </Card>
@@ -863,7 +883,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    const curlCmd = `curl -X POST ${gatewayBaseUrl}/v1/messages \\\n  -H "x-api-key: ${activeKeyForQuickstart}" \\\n  -H "anthropic-version: 2023-06-01" \\\n  -H "content-type: application/json" \\\n  -d '{"model":"claude-3-7-sonnet-20250219","max_tokens":100,"messages":[{"role":"user","content":"Hello 7Server AI!"}]}'`;
+                    const curlCmd = `curl ${gatewayBaseUrl}/v1/chat/completions \\\n  -H "Authorization: Bearer ${activeKeyForQuickstart}" \\\n  -H "content-type: application/json" \\\n  -d '{"model":"cc/claude-sonnet-5","messages":[{"role":"user","content":"Hello 7Server AI!"}]}'`;
                     copyToClipboard(curlCmd, 'curl');
                   }}
                 >
@@ -871,10 +891,10 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                 </Button>
               </div>
               <p className="text-[11px] text-[var(--muted-foreground)]">
-                Kirim permintaan pengujian langsung dari terminal Anda untuk memverifikasi streaming dan otentikasi.
+                {t('aiGw.curlDesc')}
               </p>
               <div className="p-2.5 rounded-lg bg-[var(--background)] border border-[var(--border)] font-mono text-[10px] text-zinc-400 truncate">
-                curl -X POST {gatewayBaseUrl}/v1/messages -H "x-api-key: {activeKeyForQuickstart.slice(0, 10)}..."
+                curl {gatewayBaseUrl}/v1/chat/completions -H "Authorization: Bearer {activeKeyForQuickstart.slice(0, 10)}..." -d '{'{'}"model":"cc/claude-sonnet-5",…{'}'}'
               </div>
             </Card>
           </div>
@@ -891,7 +911,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                 <Input
                   value={usageSearch}
                   onChange={(e) => setUsageSearch(e.target.value)}
-                  placeholder="Filter by model, key, or IP..."
+                  placeholder={t('aiGw.filterPlaceholder')}
                   className="pl-8 h-8 text-xs w-56"
                 />
               </div>
@@ -900,7 +920,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                 onChange={(e) => setProviderFilter(e.target.value)}
                 className="h-8 px-2.5 text-xs rounded-lg bg-[var(--background)] border border-[var(--border)] text-[var(--foreground)]"
               >
-                <option value="all">All Providers</option>
+                <option value="all">{t('aiGw.allProviders')}</option>
                 <option value="anthropic">Anthropic</option>
                 <option value="openai">OpenAI</option>
                 <option value="deepseek">DeepSeek</option>
@@ -932,22 +952,22 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                 <table className="w-full text-left text-xs">
                   <thead className="bg-[var(--muted)]/50 border-b border-[var(--border)] text-[var(--muted-foreground)] font-medium">
                     <tr>
-                      <th className="py-2.5 px-3">Time</th>
-                      <th className="py-2.5 px-3">Status</th>
+                      <th className="py-2.5 px-3">{t('aiGw.colTime')}</th>
+                      <th className="py-2.5 px-3">{t('aiGw.colStatus')}</th>
                       <th className="py-2.5 px-3">Provider</th>
                       <th className="py-2.5 px-3">Model</th>
-                      <th className="py-2.5 px-3">Virtual Key</th>
+                      <th className="py-2.5 px-3">{t('aiGw.colVirtualKey')}</th>
                       <th className="py-2.5 px-3 text-right">Prompt</th>
                       <th className="py-2.5 px-3 text-right">Completion</th>
                       <th className="py-2.5 px-3 text-right">Total</th>
-                      <th className="py-2.5 px-3 text-right">Duration</th>
+                      <th className="py-2.5 px-3 text-right">{t('aiGw.colDuration')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--border)]">
                     {usage.map((log) => (
                       <tr key={log.id} className="hover:bg-[var(--muted)]/30 transition-colors">
                         <td className="py-2.5 px-3 font-mono text-[11px] text-[var(--muted-foreground)]">
-                          {new Date(log.timestamp).toLocaleTimeString()}
+                          {new Date(log.timestamp).toLocaleTimeString(locale)}
                         </td>
                         <td className="py-2.5 px-3">
                           <span
@@ -1002,25 +1022,23 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
 
       {/* ----------------- CONNECT PROVIDER MODAL ----------------- */}
       {connectingProvider && (
-        <Modal
-          title={`Connect to ${connectingProvider.name}`}
-          onClose={() => setConnectingProvider(null)}
-        >
+        <Modal onClose={() => setConnectingProvider(null)} className="max-w-md">
+          <ModalCard title={t('aiGw.connectTo', { name: connectingProvider.name })} icon={<BrandIcon name={connectingProvider.id} className="w-4 h-4" />} onClose={() => setConnectingProvider(null)}>
           <form onSubmit={handleVerifyAndConnect} className="space-y-4">
             <div className="p-3 rounded-lg bg-purple-500/5 border border-purple-500/20 text-xs text-[var(--foreground)] space-y-1">
               <div className="font-semibold flex items-center gap-1.5 text-purple-400">
                 <Sparkles className="w-3.5 h-3.5" />
-                Live Connection Verification
+                {t('aiGw.liveVerify')}
               </div>
               <p className="text-[11px] text-[var(--muted-foreground)]">
-                Kredensial Anda akan diverifikasi langsung ke server upstream {connectingProvider.name}. Jika valid, kunci akan dienkripsi dengan AES-256-GCM.
+                {t('aiGw.liveVerifyDesc', { name: connectingProvider.name })}
               </p>
             </div>
 
             {connectingProvider.id !== 'ollama' && (
               <div>
                 <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">
-                  API Key / Token
+                  {t('aiGw.apiKeyLabel')}
                 </label>
                 <div className="relative">
                   <Input
@@ -1028,7 +1046,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                     type={revealedKey ? 'text' : 'password'}
                     value={connectApiKey}
                     onChange={(e) => setConnectApiKey(e.target.value)}
-                    placeholder={connectingProvider.keyPlaceholder}
+                    placeholder={connectingProvider.keyPlaceholder.startsWith('aiGw.') ? t(connectingProvider.keyPlaceholder as MessageKey) : connectingProvider.keyPlaceholder}
                     className="font-mono text-xs pr-8"
                   />
                   <button
@@ -1044,7 +1062,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
 
             <div>
               <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1">
-                Base URL Endpoint (Opsional)
+                {t('aiGw.baseUrlLabel')}
               </label>
               <Input
                 value={connectBaseUrl}
@@ -1066,14 +1084,14 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                     <span>
-                      Koneksi Berhasil! Terverifikasi dalam {verificationResult.latencyMs}ms.
+                      {t('aiGw.verifyOk', { ms: verificationResult.latencyMs ?? 0 })}
                     </span>
                   </div>
                 ) : (
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 font-semibold">
                       <XCircle className="w-4 h-4 text-red-400 shrink-0" />
-                      <span>Verifikasi Gagal</span>
+                      <span>{t('aiGw.verifyFailed')}</span>
                     </div>
                     <div className="text-[11px] opacity-90 pl-6">
                       {verificationResult.error}
@@ -1092,7 +1110,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                   className="text-red-500 hover:text-red-600 hover:bg-red-500/10 text-xs"
                 >
                   <Unplug className="w-3.5 h-3.5 mr-1" />
-                  Disconnect
+                  {t('aiGw.disconnect')}
                 </Button>
               ) : <div />}
 
@@ -1120,18 +1138,24 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
               </div>
             </div>
           </form>
+          </ModalCard>
         </Modal>
       )}
 
       {/* ----------------- CREATE VIRTUAL KEY MODAL ----------------- */}
       {showNewKeyModal && (
         <Modal
-          title={createdKeySecret ? t('aiGateway.keyCreatedTitle') : t('aiGateway.createKey')}
+          className="max-w-md"
           onClose={() => {
             setShowNewKeyModal(false);
             setCreatedKeySecret(null);
           }}
         >
+          <ModalCard
+            title={createdKeySecret ? t('aiGateway.keyCreatedTitle') : t('aiGateway.createKey')}
+            icon={<Key className="w-4 h-4 text-purple-500" />}
+            onClose={() => { setShowNewKeyModal(false); setCreatedKeySecret(null); }}
+          >
           {createdKeySecret ? (
             <div className="space-y-4">
               <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-500 text-xs flex items-start gap-2">
@@ -1141,7 +1165,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
 
               <div>
                 <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">
-                  Your Universal Virtual API Key
+                  {t('aiGw.yourKey')}
                 </label>
                 <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 font-mono text-xs text-emerald-400 break-all select-all flex items-center justify-between gap-2">
                   <span>{createdKeySecret}</span>
@@ -1163,7 +1187,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                   }}
                   className="bg-purple-600 hover:bg-purple-700 text-white"
                 >
-                  Done
+                  {t('aiGw.done')}
                 </Button>
               </div>
             </div>
@@ -1185,7 +1209,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
 
               <div>
                 <label className="block text-xs font-medium text-[var(--foreground)] mb-1.5">
-                  Allowed Providers (kosongkan untuk akses ke semua provider yang terhubung)
+                  {t('aiGw.allowedProviders')}
                 </label>
                 <div className="space-y-2">
                   {PROVIDERS_META.map((prov) => {
@@ -1204,9 +1228,10 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                           }}
                           className="rounded border-[var(--border)] text-purple-600 focus:ring-purple-500"
                         />
-                        <span className="capitalize font-medium">{prov.name}</span>
+                        <BrandIcon name={prov.id} className="w-3.5 h-3.5" />
+                        <span className="font-medium">{prov.name}</span>
                         {config?.providers?.[prov.id]?.connected && (
-                          <span className="text-[10px] text-emerald-400">✓ Connected</span>
+                          <span className="text-[10px] text-emerald-400">✓ {t('aiGw.connected')}</span>
                         )}
                       </label>
                     );
@@ -1224,6 +1249,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
               </div>
             </form>
           )}
+          </ModalCard>
         </Modal>
       )}
     </div>

@@ -173,6 +173,31 @@ html.light .shimmer-effect::after {
 .sidebar-scroll { scrollbar-width: thin; }
 .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
 
+/* Copilot drawer: spring-ish slide + fade, children cascade in after the panel lands. */
+.copilot-drawer {
+  transform: translateX(104%);
+  opacity: .6;
+  transition: transform 340ms cubic-bezier(.32,.72,0,1), opacity 240ms ease, width 260ms cubic-bezier(.32,.72,0,1);
+  will-change: transform;
+}
+.copilot-drawer.is-open { transform: none; opacity: 1; }
+.copilot-drawer > * {
+  opacity: 0;
+  transform: translateX(14px);
+  transition: opacity 260ms ease, transform 380ms cubic-bezier(.32,.72,0,1);
+}
+.copilot-drawer.is-open > * { opacity: 1; transform: none; }
+.copilot-drawer.is-open > :nth-child(1) { transition-delay: 70ms; }
+.copilot-drawer.is-open > :nth-child(2) { transition-delay: 120ms; }
+.copilot-drawer.is-open > :nth-child(3) { transition-delay: 170ms; }
+.copilot-drawer.is-open > :nth-child(4) { transition-delay: 220ms; }
+/* new messages slide up softly */
+.copilot-msg { animation: copilot-msg-in 320ms cubic-bezier(.32,.72,0,1) both; }
+@keyframes copilot-msg-in {
+  from { opacity: 0; transform: translateY(8px) scale(.99); }
+  to { opacity: 1; transform: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: .01ms !important;
