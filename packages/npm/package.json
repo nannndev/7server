@@ -1,0 +1,35 @@
+{
+  "name": "7server",
+  "version": "0.1.0",
+  "description": "Self-hosted dashboard for your VPS fleet: monitoring, browser terminal, Docker, Nginx, cron, backups, databases and an AI copilot. Agentless, over SSH.",
+  "type": "module",
+  "bin": {
+    "7server": "bin/7server.js"
+  },
+  "files": [
+    "bin/",
+    "dist/",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "keywords": [
+    "vps",
+    "server-management",
+    "ssh",
+    "dashboard",
+    "self-hosted",
+    "docker",
+    "monitoring",
+    "ai-gateway"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nannndev/7server.git"
+  },
+  "homepage": "https://github.com/nannndev/7server#readme",
+  "dependencies": {
+    "ssh2": "^1.17.0"
+  }
+}

@@ -47,6 +47,16 @@ Dashboard akan otomatis aktif di:
 
 ---
 
+## 📦 npm (`npm install -g 7server`)
+
+```bash
+npm install -g 7server      # butuh Node.js 22.13+
+7server                     # http://127.0.0.1:5001, data di ~/.7server
+7server --port 8080 --host 0.0.0.0 --data /srv/7server --no-open
+```
+
+Paketnya dibuat dari repo ini: `npm run build:npm` (server di-bundle esbuild jadi satu file + UI hasil build) lalu `cd packages/npm && npm publish`. Detail ada di [packages/npm/README.md](packages/npm/README.md).
+
 ## 🐳 Docker (VPS / server lokal)
 
 Satu container berisi dashboard, API, dan AI Gateway di satu port. Data (`7server.db` + `secret.key`) ada di volume `7server-data`.

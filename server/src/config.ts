@@ -18,6 +18,8 @@ export const dataFile = (name: string) => path.join(DATA_DIR, name);
 
 export const config = {
   port: Number(process.env.PORT) || 5001,
+  /** Bind address. Empty = all interfaces (dev, Docker). The npm CLI passes 127.0.0.1. */
+  host: process.env.HOST || '',
   corsOrigin: process.env.CORS_ORIGIN || '',
   dashboardPassword: process.env.DASHBOARD_PASSWORD || '',
   /**

@@ -9,6 +9,6 @@ const server = http.createServer(createApp());
 attachTerminalWs(server);
 startMonitor();
 
-server.listen(config.port, () => {
-  console.log(`VPS Management Backend (TypeScript) is running on http://localhost:${config.port}`);
-});
+const onListen = () => console.log(`7Server is running on http://${config.host || 'localhost'}:${config.port}`);
+if (config.host) server.listen(config.port, config.host, onListen);
+else server.listen(config.port, onListen);

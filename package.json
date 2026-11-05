@@ -10,6 +10,8 @@
     "build:landing": "cd landing && npm run build",
     "dev:all": "node start.js --all",
     "start": "node start.js",
-    "dev": "node start.js"
+    "dev": "node start.js",
+    "build:npm": "node packages/npm/build.mjs",
+    "pack:npm": "node packages/npm/build.mjs && cd packages/npm && npm pack"
   }
 }

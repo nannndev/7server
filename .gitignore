@@ -31,3 +31,6 @@ server/src/__probe*.ts
 .idea/
 .claude/
 graphify-out/
+
+# npm package build output
+*.tgz
