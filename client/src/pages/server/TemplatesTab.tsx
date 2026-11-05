@@ -87,7 +87,7 @@ export default function TemplatesTab() {
         force
       );
     } catch (err: any) {
-      setErrorSoftware(err.message || 'Gagal memindai software');
+      setErrorSoftware(err.message || 'Failed to scan installed software');
     }
   };
 

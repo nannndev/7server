@@ -7,6 +7,7 @@ import type { Route } from '@/app/router';
 import { sectionLabel } from '@/app/serverNav';
 import { exportServers, importServers } from '@/features/servers/api';
 import { Button } from '@/shared/ui/button';
+import { toast } from '@/shared/ui/toast';
 import { useI18n, LANGS, type Lang } from '@/shared/i18n';
 
 interface TopBarProps {
@@ -38,10 +39,10 @@ export default function TopBar({ route, navigate, managedServer, serverCount, mo
     if (!file) return;
     try {
       const n = await importServers(JSON.parse(await file.text()));
-      alert(t('top.imported', { n }));
+      toast.success(t('top.imported', { n }));
       onImported();
     } catch (err: any) {
-      alert(t('top.importFailed', { error: err.message }));
+      toast.error(t('top.importFailed', { error: err.message }));
     }
   };
 
@@ -153,7 +154,7 @@ export default function TopBar({ route, navigate, managedServer, serverCount, mo
                   </Button>
                 )}
                 <div className="flex gap-2 pt-2 border-t border-[var(--border)]">
-                  <Button variant="outline" size="sm" className="flex-1 gap-1" onClick={() => exportServers().catch((e) => alert(e.message))}>
+                  <Button variant="outline" size="sm" className="flex-1 gap-1" onClick={() => exportServers().catch((e) => toast.error(e.message))}>
                     <Download className="w-3.5 h-3.5" /> {t('top.export')}
                   </Button>
                   <Button variant="outline" size="sm" className="flex-1 gap-1" onClick={() => importRef.current?.click()}>

@@ -23,6 +23,9 @@ import { ServerItem } from '@/features/servers';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { Badge } from '@/shared/ui/badge';
+import { Modal } from '@/shared/ui/modal';
+import { toast } from '@/shared/ui/toast';
+import { confirmModal } from '@/shared/ui/confirm-dialog';
 import { FileTableSkeleton } from '@/shared/ui/skeleton';
 import FileViewer, { classifyFile } from '@/features/files/components/FileViewer';
 import { useT } from '@/shared/i18n';
@@ -117,13 +120,23 @@ export default function FileManagerModal({
     e.target.value = '';
     if (!file) return;
     const target = join(dir, file.name);
-    if (files.some((f) => f.name === file.name) && !window.confirm(`${file.name} sudah ada. Timpa?`)) return;
+    if (files.some((f) => f.name === file.name)) {
+      const ok = await confirmModal({
+        title: 'Timpa File',
+        message: `File "${file.name}" sudah ada di folder ini. Timpa file dengan versi baru?`,
+        variant: 'warning',
+        confirmText: 'Timpa File'
+      });
+      if (!ok) return;
+    }
     setLoading(true);
     try {
       await uploadFile(server.id, target, file);
+      toast.success(`Uploaded ${file.name}`);
       await load();
     } catch (err: any) {
       setError(err.message);
+      toast.error(`Failed to upload file: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -134,8 +147,8 @@ export default function FileManagerModal({
   );
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-in fade-in">
-      <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl w-full max-w-5xl h-[88vh] flex flex-col overflow-hidden shadow-2xl">
+    <Modal onClose={onClose} className="max-w-5xl h-[88vh]">
+      <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl w-full h-full flex flex-col overflow-hidden shadow-2xl">
         {/* If a file is selected, render the adaptive FileViewer */}
         {activeFile ? (
           <FileViewer
@@ -341,6 +354,6 @@ export default function FileManagerModal({
           </>
         )}
       </div>
-    </div>
+    </Modal>
   );
 }

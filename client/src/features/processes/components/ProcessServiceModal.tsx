@@ -24,6 +24,9 @@ import { Button } from '@/shared/ui/button';
 import { Badge } from '@/shared/ui/badge';
 import { Input } from '@/shared/ui/input';
 import { RowsSkeleton } from '@/shared/ui/skeleton';
+import { Modal } from '@/shared/ui/modal';
+import { toast } from '@/shared/ui/toast';
+import { confirmModal } from '@/shared/ui/confirm-dialog';
 
 interface ProcessServiceModalProps {
   server: ServerItem;
@@ -68,39 +71,48 @@ export default function ProcessServiceModal({ server, onClose }: ProcessServiceM
   }, [server.id, activeTab]);
 
   const handleKillProcess = async (pid: number, comm: string) => {
-    if (!window.confirm(`Yakin ingin mematikan (kill) proses ${comm} (PID: ${pid})?`)) return;
+    const ok = await confirmModal({
+      title: 'Matikan Proses',
+      message: `Yakin ingin mematikan (kill) proses "${comm}" (PID: ${pid})?`,
+      variant: 'danger',
+      confirmText: 'Matikan (Kill)'
+    });
+    if (!ok) return;
     try {
       await killProcess(server.id, pid, 'kill');
-      setActionMessage(`Proses ${comm} (PID: ${pid}) berhasil di-kill.`);
+      toast.success(`Process ${comm} (PID: ${pid}) terminated successfully.`);
+      setActionMessage(`Process ${comm} (PID: ${pid}) terminated.`);
       setTimeout(() => setActionMessage(null), 3500);
       loadData();
     } catch (err: any) {
-      alert(`Gagal mematikan proses: ${err.message}`);
+      toast.error(`Failed to kill process: ${err.message}`);
     }
   };
 
   const handleServiceControl = async (serviceName: string, action: string) => {
     try {
-      setActionMessage(`Menjalankan '${action}' pada ${serviceName}...`);
+      setActionMessage(`Executing '${action}' on ${serviceName}...`);
       await controlService(server.id, serviceName, action);
-      setActionMessage(`Service ${serviceName} berhasil di-${action}.`);
+      toast.success(`Service ${serviceName} action '${action}' completed.`);
+      setActionMessage(`Service ${serviceName} action '${action}' completed.`);
       setTimeout(() => setActionMessage(null), 3500);
       loadData();
     } catch (err: any) {
-      alert(`Gagal mengontrol service: ${err.message}`);
+      toast.error(`Failed to control service: ${err.message}`);
       setActionMessage(null);
     }
   };
 
   const handleDockerControl = async (containerId: string, name: string, action: string) => {
     try {
-      setActionMessage(`Menjalankan '${action}' pada container ${name}...`);
+      setActionMessage(`Executing '${action}' on container ${name}...`);
       await controlDocker(server.id, containerId, action);
-      setActionMessage(`Container ${name} berhasil di-${action}.`);
+      toast.success(`Container ${name} action '${action}' completed.`);
+      setActionMessage(`Container ${name} action '${action}' completed.`);
       setTimeout(() => setActionMessage(null), 3500);
       loadData();
     } catch (err: any) {
-      alert(`Gagal mengontrol container: ${err.message}`);
+      toast.error(`Failed to control container: ${err.message}`);
       setActionMessage(null);
     }
   };
@@ -134,9 +146,10 @@ export default function ProcessServiceModal({ server, onClose }: ProcessServiceM
   });
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-in fade-in">
-      <div className="bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col overflow-hidden">
-        {/* Header */}
+    <>
+      <Modal onClose={onClose} className="max-w-5xl h-[85vh]">
+        <div className="bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl w-full h-full flex flex-col overflow-hidden">
+          {/* Header */}
         <div className="px-5 py-3 bg-zinc-950 border-b border-zinc-800/80 flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
@@ -493,9 +506,10 @@ export default function ProcessServiceModal({ server, onClose }: ProcessServiceM
           )}
         </div>
       </div>
-      {logsTarget && (
-        <LogsModal serverId={server.id} type={logsTarget.type} name={logsTarget.name} onClose={() => setLogsTarget(null)} />
-      )}
-    </div>
-  );
+    </Modal>
+    {logsTarget && (
+      <LogsModal serverId={server.id} type={logsTarget.type} name={logsTarget.name} onClose={() => setLogsTarget(null)} />
+    )}
+  </>
+);
 }

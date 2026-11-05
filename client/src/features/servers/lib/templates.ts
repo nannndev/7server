@@ -583,7 +583,7 @@ export function analyzeTemplate(
   const scriptLines: string[] = [
     '#!/usr/bin/env bash',
     '# ============================================================',
-    `#  VPS Hub — Setup Template: ${preset.name}`,
+    `#  7Server — Setup Template: ${preset.name}`,
     `#  Generated on: ${new Date().toLocaleString()}`,
     '# ============================================================',
     'set -e',
@@ -650,7 +650,7 @@ export function generateSingleToolScript(tool: MarketplaceTool, version?: string
   return [
     '#!/usr/bin/env bash',
     '# ============================================================',
-    `#  VPS Hub 1-Click Install: ${tool.name}${chosenVersion ? ` (${chosenVersion})` : ''}`,
+    `#  7Server 1-Click Install: ${tool.name}${chosenVersion ? ` (${chosenVersion})` : ''}`,
     `#  Generated on: ${new Date().toLocaleString()}`,
     '# ============================================================',
     'set -e',

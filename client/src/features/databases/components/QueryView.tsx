@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Play, RefreshCw, Download, History, Trash2, ShieldCheck, ShieldAlert, WrapText } from 'lucide-react';
 import { runDbQuery, QueryResult, DbConnection, DbEngine } from '@/features/databases/api';
 import DataGrid, { downloadResult } from '@/features/databases/components/DataGrid';
+import { confirmModal } from '@/shared/ui/confirm-dialog';
 
 const PLACEHOLDER: Record<string, string> = {
   sql: 'SELECT * FROM users\nWHERE created_at > NOW() - INTERVAL 7 DAY\nLIMIT 100;',
@@ -42,8 +43,15 @@ export default function QueryView({ conn, engine, database, text, onTextChange, 
     const ta = taRef.current;
     const sel = ta && ta.selectionStart !== ta.selectionEnd ? ta.value.slice(ta.selectionStart, ta.selectionEnd) : text;
     if (!sel.trim()) return;
-    if (conn.allowWrite && engine.kind !== 'keyvalue' && !/^\s*(select|show|explain|describe|desc|with|values|table|pragma)\b/i.test(sel) &&
-      !window.confirm('Mode tulis aktif. Query ini bisa mengubah data. Jalankan?')) return;
+    if (conn.allowWrite && engine.kind !== 'keyvalue' && !/^\s*(select|show|explain|describe|desc|with|values|table|pragma)\b/i.test(sel)) {
+      const ok = await confirmModal({
+        title: 'Eksekusi Query Mode Tulis',
+        message: 'Mode tulis sedang aktif. Query ini dapat mengubah atau menghapus data database. Apakah Anda yakin ingin menjalankannya?',
+        variant: 'warning',
+        confirmText: 'Jalankan Query'
+      });
+      if (!ok) return;
+    }
     setRunning(true); setError(null);
     try {
       const r = await runDbQuery(conn.id, sel, database);
@@ -117,7 +125,7 @@ export default function QueryView({ conn, engine, database, text, onTextChange, 
                         </button>
                       ))}
                       <button onClick={() => { setHist([]); try { localStorage.removeItem(histKey(conn.id)); } catch {} }}
-                        className="w-full px-3 py-1.5 text-[11px] text-red-500 flex items-center gap-1 hover:bg-red-500/10"><Trash2 className="w-3 h-3" /> Hapus riwayat</button>
+                        className="w-full px-3 py-1.5 text-[11px] text-red-500 flex items-center gap-1 hover:bg-red-500/10"><Trash2 className="w-3 h-3" /> Clear history</button>
                     </>
                   )}
                 </div>
@@ -138,12 +146,12 @@ export default function QueryView({ conn, engine, database, text, onTextChange, 
           onChange={(e) => onTextChange(e.target.value)}
           onKeyDown={onKey}
           spellCheck={false}
-          aria-label="Editor query"
+          aria-label="Query editor"
           placeholder={PLACEHOLDER[engine.queryLanguage] || ''}
           className={`flex-1 resize-none bg-transparent py-2.5 pr-3 outline-none placeholder:text-[var(--muted-foreground)]/50 ${wrap ? '' : 'whitespace-pre overflow-x-auto'}`}
         />
       </div>
-      <div onPointerDown={startDrag} role="separator" aria-orientation="horizontal" aria-label="Ubah tinggi editor"
+      <div onPointerDown={startDrag} role="separator" aria-orientation="horizontal" aria-label="Resize editor"
         className="shrink-0 h-1.5 cursor-row-resize border-y border-[var(--border)] bg-[var(--muted)] hover:bg-[var(--accent-brand)]/30 transition-colors" />
 
       {/* Results */}

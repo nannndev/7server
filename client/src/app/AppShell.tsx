@@ -21,6 +21,8 @@ import TopBar from './TopBar';
 import CommandPalette from './CommandPalette';
 import { useRoute, type FleetView, type ServerTab } from './router';
 import { useT } from '@/shared/i18n';
+import { toast } from '@/shared/ui/toast';
+import { confirmModal } from '@/shared/ui/confirm-dialog';
 
 const VIEW_KEY = 'vps_hub_view';
 const readView = (): FleetView => {
@@ -68,13 +70,19 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
   };
 
   const handleDeleteServer = async (id: string) => {
-    if (!window.confirm(t('fleet.deleteConfirm'))) return;
+    if (!(await confirmModal({
+      title: t('fleet.deleteServer'),
+      message: t('fleet.deleteConfirm'),
+      variant: 'danger',
+      confirmText: t('common.delete')
+    }))) return;
     try {
       await deleteServer(id);
       if (managedServerId === id) navigate({ page: 'fleet' }, { replace: true });
+      toast.success(t('fleet.deleted') || 'Server berhasil dihapus');
       reload();
     } catch (err: any) {
-      alert(t('fleet.deleteFailed', { error: err.message }));
+      toast.error(t('fleet.deleteFailed', { error: err.message }));
     }
   };
 

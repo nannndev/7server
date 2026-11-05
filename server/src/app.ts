@@ -17,6 +17,10 @@ import { dockerRoutes } from './modules/docker/routes.js';
 import { databasesRoutes } from './modules/databases/routes.js';
 import { execRoutes } from './modules/exec/routes.js';
 import { softwareRoutes } from './modules/software/routes.js';
+import { cronRoutes } from './modules/cron/routes.js';
+import { certificateRoutes } from './modules/certificates/routes.js';
+import { securityRoutes } from './modules/security/routes.js';
+import { backupRoutes } from './modules/backups/routes.js';
 
 export function createApp() {
   const app = express();
@@ -32,7 +36,7 @@ export function createApp() {
   // Order matters where paths overlap (e.g. /servers/test and /servers/batch-exec vs /servers/:id):
   // this is the order the routes had in the old single-file server.
   app.use('/api', monitoringRoutes, transferRoutes, serversRoutes, diagnosticsRoutes, metricsRoutes, processesRoutes,
-    logsRoutes, filesRoutes, dockerRoutes, databasesRoutes, execRoutes, softwareRoutes);
+    logsRoutes, filesRoutes, dockerRoutes, databasesRoutes, execRoutes, softwareRoutes, cronRoutes, certificateRoutes, securityRoutes, backupRoutes);
 
   app.use(errorHandler);
   return app;

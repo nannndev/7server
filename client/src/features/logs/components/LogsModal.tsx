@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { X, RefreshCw, Terminal as TermIcon, Copy, Check } from 'lucide-react';
 import { fetchLogs } from '@/features/logs/api';
 import { Button } from '@/shared/ui/button';
+import { Modal } from '@/shared/ui/modal';
 
 interface LogsModalProps {
   serverId: string;
@@ -57,8 +58,8 @@ export default function LogsModal({ serverId, type, name, onClose }: LogsModalPr
   };
 
   return (
-    <div className="fixed inset-0 z-[60] bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-in fade-in">
-      <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl w-full max-w-5xl h-[82vh] flex flex-col overflow-hidden shadow-2xl">
+    <Modal onClose={onClose} className="max-w-5xl h-[82vh]">
+      <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl w-full h-full flex flex-col overflow-hidden shadow-2xl">
         <div className="px-4 py-2.5 border-b border-[var(--border)] flex items-center gap-2 bg-[var(--background)]">
           <TermIcon className="w-3.5 h-3.5 text-[var(--muted-foreground)] shrink-0" />
           <span className="font-mono text-xs text-[var(--foreground)] truncate flex-1 font-medium">
@@ -105,6 +106,6 @@ export default function LogsModal({ serverId, type, name, onClose }: LogsModalPr
           {logs || (loading ? 'Memuat log dari server…' : '(Tidak ada output log)')}
         </pre>
       </div>
-    </div>
+    </Modal>
   );
 }

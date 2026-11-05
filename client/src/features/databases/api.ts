@@ -72,12 +72,12 @@ export interface ObjectStructure { columns: ColumnInfo[]; indexes: { name: strin
 export const browseDb = async (
   cid: string,
   p: { object: string; database?: string; limit: number; offset: number; orderBy?: string; dir?: 'asc' | 'desc'; where?: string }
-) => unwrap<BrowseResult>(await apiFetch(dbq(cid, '/browse'), jsonPost(p)), 'Gagal memuat data');
+) => unwrap<BrowseResult>(await apiFetch(dbq(cid, '/browse'), jsonPost(p)), 'Failed to load data');
 
 export const fetchDbStructure = async (cid: string, object: string, database?: string) =>
   unwrap<ObjectStructure>(
     await apiFetch(dbq(cid, `/structure?object=${encodeURIComponent(object)}${database ? `&database=${encodeURIComponent(database)}` : ''}`)),
-    'Gagal memuat struktur'
+    'Failed to load structure'
   );
 
 export interface SchemaColumn { name: string; type: string; nullable: boolean; pk: boolean }
@@ -99,4 +99,4 @@ export interface DbSchema {
 }
 
 export const fetchDbSchema = async (cid: string, database?: string) =>
-  unwrap<DbSchema>(await apiFetch(dbq(cid, `/schema${database ? `?database=${encodeURIComponent(database)}` : ''}`)), 'Gagal membaca schema');
+  unwrap<DbSchema>(await apiFetch(dbq(cid, `/schema${database ? `?database=${encodeURIComponent(database)}` : ''}`)), 'Failed to read schema');

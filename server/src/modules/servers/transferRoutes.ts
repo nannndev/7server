@@ -4,7 +4,7 @@ import { exportServers, importServers } from './store.js';
 export const transferRoutes = Router();
 
 transferRoutes.get('/export', (_req: Request, res: Response) => {
-  res.setHeader('Content-Disposition', 'attachment; filename="vps-hub-servers.json"');
+  res.setHeader('Content-Disposition', 'attachment; filename="7server-servers.json"');
   res.json(exportServers());
 });
 

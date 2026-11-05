@@ -4,6 +4,8 @@ import { testConnection } from '@/features/servers/api';
 import { ServerItem } from '@/features/servers/types';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
+import { Modal } from '@/shared/ui/modal';
+import { toast } from '@/shared/ui/toast';
 import { useT } from '@/shared/i18n';
 
 interface AddServerModalProps {
@@ -41,7 +43,7 @@ export default function AddServerModal({ server, onSave, onClose }: AddServerMod
 
   const handleTestConnection = async () => {
     if (!formData.host) {
-      alert('Mohon isi IP atau Hostname server terlebih dahulu');
+      toast.warning('Mohon isi IP atau Hostname server terlebih dahulu');
       return;
     }
     setTesting(true);
@@ -59,7 +61,7 @@ export default function AddServerModal({ server, onSave, onClose }: AddServerMod
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.host) {
-      alert('Host wajib diisi!');
+      toast.warning('Host wajib diisi!');
       return;
     }
 
@@ -70,17 +72,18 @@ export default function AddServerModal({ server, onSave, onClose }: AddServerMod
         port: parseInt(String(formData.port), 10) || 22,
         name: formData.name.trim() || formData.host.trim()
       });
+      toast.success(isEditing ? 'Server changes saved' : 'Server added successfully');
       onClose();
     } catch (err: any) {
-      alert(`Gagal menyimpan: ${err.message}`);
+      toast.error(`Failed to save: ${err.message}`);
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-      <div className="bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
+    <Modal onClose={onClose} className="max-w-lg">
+      <div className="bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl w-full overflow-hidden flex flex-col">
         {/* Header */}
         <div className="px-5 py-3.5 bg-zinc-950 border-b border-zinc-800/80 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -303,6 +306,6 @@ export default function AddServerModal({ server, onSave, onClose }: AddServerMod
           </div>
         </form>
       </div>
-    </div>
+    </Modal>
   );
 }

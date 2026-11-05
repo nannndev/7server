@@ -8,6 +8,11 @@ const cases: [string, Route][] = [
   ['#/fleet/rack', { page: 'fleet', view: 'rack' }],
   ['#/servers/abc-123', { page: 'server', id: 'abc-123', tab: 'overview' }],
   ['#/servers/abc-123/docker', { page: 'server', id: 'abc-123', tab: 'docker' }],
+  ['#/servers/abc-123/cron', { page: 'server', id: 'abc-123', tab: 'cron' }],
+  ['#/servers/abc-123/ssl', { page: 'server', id: 'abc-123', tab: 'ssl' }],
+  ['#/servers/abc-123/security', { page: 'server', id: 'abc-123', tab: 'security' }],
+  ['#/servers/abc-123/backups', { page: 'server', id: 'abc-123', tab: 'backups' }],
+  ['#/servers/abc-123/audit', { page: 'server', id: 'abc-123', tab: 'audit' }],
   ['#/monitoring', { page: 'monitoring', tab: 'alerts' }],
   ['#/monitoring/audit', { page: 'monitoring', tab: 'audit' }]
 ];

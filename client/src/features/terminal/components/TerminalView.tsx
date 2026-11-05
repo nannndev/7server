@@ -23,6 +23,7 @@ import type { ServerItem } from '@/features/servers';
 import { Button } from '@/shared/ui/button';
 import { Badge } from '@/shared/ui/badge';
 import { Card } from '@/shared/ui/card';
+import { Modal } from '@/shared/ui/modal';
 import { useT, type MessageKey } from '@/shared/i18n';
 import {
   TERMINAL_THEMES,
@@ -867,8 +868,8 @@ export default function TerminalView({
 
       {/* Add Custom Shortcut Dialog Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-          <Card className="w-full max-w-md p-5 bg-zinc-950 border-zinc-800 space-y-4">
+        <Modal isOpen={showAddModal} onClose={() => setShowAddModal(false)} className="max-w-md">
+          <Card className="w-full p-5 bg-zinc-950 border-zinc-800 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
                 <Plus className="w-4 h-4 text-[var(--primary)]" />
@@ -919,7 +920,7 @@ export default function TerminalView({
                   onClick={() => setShowAddModal(false)}
                   className="text-xs"
                 >
-                  Batal
+                  {t('common.cancel')}
                 </Button>
                 <Button
                   type="submit"
@@ -931,7 +932,7 @@ export default function TerminalView({
               </div>
             </form>
           </Card>
-        </div>
+        </Modal>
       )}
     </div>
   );

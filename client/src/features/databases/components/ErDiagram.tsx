@@ -306,23 +306,23 @@ function ErCanvas({ schema, storageKey, loading, onRefresh, onOpenTable }: ErDia
         <div className="flex-1 min-w-[12rem] max-w-sm h-7 px-2 flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--background)] focus-within:border-[var(--muted-foreground)]">
           <Search className="w-3 h-3 text-[var(--muted-foreground)]" />
           <input value={filter.search} onChange={(e) => setFilter((f) => ({ ...f, search: e.target.value }))}
-            placeholder="Filter tabel: order*, user" aria-label="Filter tabel" className="flex-1 min-w-0 bg-transparent text-[11px] font-mono" />
-          {filter.search && <button onClick={() => setFilter((f) => ({ ...f, search: '' }))} aria-label="Hapus filter"><X className="w-3 h-3" /></button>}
+            placeholder="Filter tables: order*, user" aria-label="Filter tables" className="flex-1 min-w-0 bg-transparent text-[11px] font-mono" />
+          {filter.search && <button onClick={() => setFilter((f) => ({ ...f, search: '' }))} aria-label="Clear filter"><X className="w-3 h-3" /></button>}
         </div>
 
         {filter.focus && (
           <div className="h-7 pl-2 pr-1 flex items-center gap-1.5 rounded-md bg-[var(--accent-brand)]/12 text-[11px] border border-[var(--accent-brand)]/30 fade-in">
             <Focus className="w-3 h-3 text-[var(--accent-brand)]" />
             <span className="font-mono font-semibold">{filter.focus}</span>
-            <span className="text-[var(--muted-foreground)]">kedalaman</span>
-            <button onClick={() => setFilter((f) => ({ ...f, depth: Math.max(0, f.depth - 1) }))} className="p-0.5 rounded hover:bg-[var(--sidebar-hover)]" aria-label="Kurangi kedalaman"><Minus className="w-3 h-3" /></button>
+            <span className="text-[var(--muted-foreground)]">depth</span>
+            <button onClick={() => setFilter((f) => ({ ...f, depth: Math.max(0, f.depth - 1) }))} className="p-0.5 rounded hover:bg-[var(--sidebar-hover)]" aria-label="Decrease depth"><Minus className="w-3 h-3" /></button>
             <span className="font-mono w-3 text-center">{filter.depth}</span>
-            <button onClick={() => setFilter((f) => ({ ...f, depth: Math.min(6, f.depth + 1) }))} className="p-0.5 rounded hover:bg-[var(--sidebar-hover)]" aria-label="Tambah kedalaman"><Plus className="w-3 h-3" /></button>
-            <button onClick={() => setFilter((f) => ({ ...f, focus: null }))} className="p-0.5 rounded hover:bg-[var(--sidebar-hover)]" aria-label="Hapus fokus"><X className="w-3 h-3" /></button>
+            <button onClick={() => setFilter((f) => ({ ...f, depth: Math.min(6, f.depth + 1) }))} className="p-0.5 rounded hover:bg-[var(--sidebar-hover)]" aria-label="Increase depth"><Plus className="w-3 h-3" /></button>
+            <button onClick={() => setFilter((f) => ({ ...f, focus: null }))} className="p-0.5 rounded hover:bg-[var(--sidebar-hover)]" aria-label="Clear focus"><X className="w-3 h-3" /></button>
           </div>
         )}
 
-        <Seg value={density} onChange={setDensity} label="Detail kolom"
+        <Seg value={density} onChange={setDensity} label="Column details"
           options={[['full', 'Semua', Rows3], ['keys', 'Kunci', KeyRound], ['name', 'Nama', Table2]]} />
         <Seg value={dir} onChange={setDir} label="Arah layout"
           options={[['LR', 'Kiri→kanan', Columns3], ['TB', 'Atas→bawah', Rows3]]} />

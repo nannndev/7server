@@ -3,6 +3,8 @@ import React, { useEffect, useState } from 'react';
 import { getToken, setToken } from '@/shared/api/client';
 import LoginScreen from '@/features/auth/components/LoginScreen';
 import AppShell from './AppShell';
+import { ToastContainer } from '@/shared/ui/toast';
+import { ConfirmDialogContainer } from '@/shared/ui/confirm-dialog';
 
 export default function App() {
   const [authed, setAuthed] = useState(() => !!getToken());
@@ -13,6 +15,15 @@ export default function App() {
     return () => window.removeEventListener('vps-hub-logout', onLogout);
   }, []);
 
-  if (!authed) return <LoginScreen onLoggedIn={() => setAuthed(true)} />;
-  return <AppShell onLogout={() => { setToken(''); setAuthed(false); }} />;
+  return (
+    <>
+      {!authed ? (
+        <LoginScreen onLoggedIn={() => setAuthed(true)} />
+      ) : (
+        <AppShell onLogout={() => { setToken(''); setAuthed(false); }} />
+      )}
+      <ToastContainer />
+      <ConfirmDialogContainer />
+    </>
+  );
 }

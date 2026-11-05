@@ -40,7 +40,7 @@ export function useMonitorSettings(servers: ServerItem[]) {
         if (notified.current.has(key)) continue;
         notified.current.add(key);
         if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification(`VPS Hub: ${s.name}`, { body: `${a} melewati batas` });
+          new Notification(`7Server: ${s.name}`, { body: `${a} melewati batas` });
         }
       }
       const active = new Set(alerts.map((a) => `${s.id}:${a.split(' ')[0]}`));

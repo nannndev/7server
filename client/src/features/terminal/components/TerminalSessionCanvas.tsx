@@ -184,7 +184,7 @@ export const TerminalSessionCanvas = forwardRef<TerminalSessionHandle, TerminalS
       const proposed = fitAddon.proposeDimensions();
       if (proposed) onDimensionsChange?.(proposed);
 
-      term.writeln(`\x1b[1;30m[VPS Hub Web SSH]\x1b[0m \x1b[1;36mSession established to ${server.name} (${server.username}@${server.host}:${server.port || 22})...\x1b[0m\r\n`);
+      term.writeln(`\x1b[1;30m[7Server Web SSH]\x1b[0m \x1b[1;36mSession established to ${server.name} (${server.username}@${server.host}:${server.port || 22})...\x1b[0m\r\n`);
 
       connectWebSocket(term, fitAddon);
 

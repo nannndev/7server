@@ -11,7 +11,8 @@ const SAFE_FIELDS = [
   'command', 'action', 'pid', 'serviceName', 'containerId', 'name', 'path', 'host',
   'serverIds', 'project', 'workingDir', 'what', 'image', 'target', 'configFiles',
   'query', 'database', 'engine', 'allowWrite',
-  'templateName', 'templateId', 'preset', 'installed', 'skipped'
+  'templateName', 'templateId', 'preset', 'installed', 'skipped',
+  'cronSchedule', 'cronCommand', 'domain', 'keyComment', 'keyType', 'ip', 'dryRun'
 ];
 
 export function auditSummary(body: any): string {

@@ -232,7 +232,7 @@ export default function Sidebar(p: SidebarProps) {
             className="w-8 h-8 rounded-lg bg-[var(--primary)] text-[var(--primary-foreground)] flex items-center justify-center font-bold text-sm shadow-sm shrink-0 transition-transform hover:scale-105 active:scale-95"
             aria-label={t('nav.toFleet')}
           >
-            ⌘
+            7
           </button>
           {!rail && (
             <div className="min-w-0 flex-1">

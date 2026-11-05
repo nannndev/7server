@@ -1,6 +1,23 @@
 // Single source for the per-server sections: the sidebar renders them, the server page uses the labels.
 import type { ElementType } from 'react';
-import { Activity, Network, Globe, Zap, Box, Database, Layers, Server, Radio, Terminal, Sparkles } from 'lucide-react';
+import {
+  Activity,
+  Network,
+  Globe,
+  Zap,
+  Box,
+  Database,
+  Layers,
+  Server,
+  Radio,
+  Terminal,
+  Sparkles,
+  Clock,
+  ShieldCheck,
+  KeyRound,
+  Archive,
+  History
+} from 'lucide-react';
 import { ServerTab } from '@/app/router';
 import type { MessageKey } from '@/shared/i18n';
 
@@ -21,7 +38,8 @@ export const SERVER_SECTION_GROUPS: { title: MessageKey; items: ServerSection[] 
       { id: 'webapps', label: 'section.webapps', icon: Globe },
       { id: 'pm2', label: 'section.pm2', icon: Zap },
       { id: 'docker', label: 'section.docker', icon: Box },
-      { id: 'databases', label: 'section.databases', icon: Database }
+      { id: 'databases', label: 'section.databases', icon: Database },
+      { id: 'cron', label: 'section.cron', icon: Clock }
     ]
   },
   {
@@ -29,7 +47,11 @@ export const SERVER_SECTION_GROUPS: { title: MessageKey; items: ServerSection[] 
     items: [
       { id: 'services', label: 'section.services', icon: Layers },
       { id: 'nginx', label: 'section.nginx', icon: Server },
+      { id: 'ssl', label: 'section.ssl', icon: ShieldCheck },
       { id: 'ports', label: 'section.ports', icon: Radio },
+      { id: 'security', label: 'section.security', icon: KeyRound },
+      { id: 'backups', label: 'section.backups', icon: Archive },
+      { id: 'audit', label: 'section.audit', icon: History },
       { id: 'terminal', label: 'section.terminal', icon: Terminal }
     ]
   }

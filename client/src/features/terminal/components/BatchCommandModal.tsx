@@ -5,6 +5,8 @@ import { ServerItem } from '@/features/servers';
 import { BatchResultItem } from '@/features/terminal/types';
 import { Button } from '@/shared/ui/button';
 import { Badge } from '@/shared/ui/badge';
+import { Modal } from '@/shared/ui/modal';
+import { toast } from '@/shared/ui/toast';
 import { useT } from '@/shared/i18n';
 
 interface BatchCommandModalProps {
@@ -34,16 +36,23 @@ export default function BatchCommandModal({ servers, onClose }: BatchCommandModa
   };
 
   const handleRun = async () => {
-    if (!command.trim()) return alert('Command cannot be empty');
-    if (selectedIds.length === 0) return alert('Pilih minimal satu VPS');
+    if (!command.trim()) {
+      toast.warning('Perintah tidak boleh kosong');
+      return;
+    }
+    if (selectedIds.length === 0) {
+      toast.warning('Pilih minimal satu server VPS');
+      return;
+    }
 
     setIsRunning(true);
     setResults(null);
     try {
       const res = await executeBatchCommand(selectedIds, command);
       setResults(res);
+      toast.success(`Successfully executed command on ${selectedIds.length} servers`);
     } catch (err: any) {
-      alert(`Batch execution error: ${err.message}`);
+      toast.error(`Batch execution error: ${err.message}`);
     } finally {
       setIsRunning(false);
     }
@@ -59,8 +68,8 @@ export default function BatchCommandModal({ servers, onClose }: BatchCommandModa
   ];
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-in fade-in">
-      <div className="bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden">
+    <Modal onClose={onClose} className="max-w-4xl h-[85vh]">
+      <div className="bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl w-full h-full flex flex-col overflow-hidden">
         {/* Header */}
         <div className="px-5 py-3 bg-zinc-950 border-b border-zinc-800/80 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -221,6 +230,6 @@ export default function BatchCommandModal({ servers, onClose }: BatchCommandModa
           )}
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

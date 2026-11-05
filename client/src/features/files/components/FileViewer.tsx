@@ -106,7 +106,7 @@ export default function FileViewer({ server, path, onClose, onSaved }: FileViewe
         })
         .catch((err: any) => {
           if (active) {
-            setError(err.message || 'Gagal memuat media file');
+            setError(err.message || 'Failed to load file media');
             setLoading(false);
           }
         });
@@ -120,7 +120,7 @@ export default function FileViewer({ server, path, onClose, onSaved }: FileViewe
         })
         .catch((err: any) => {
           if (active) {
-            setError(err.message || 'Gagal membaca isi file');
+            setError(err.message || 'Failed to read file content');
             setLoading(false);
           }
         });
@@ -178,7 +178,7 @@ export default function FileViewer({ server, path, onClose, onSaved }: FileViewe
       setTimeout(() => setSavedSuccess(false), 2200);
       if (onSaved) onSaved();
     } catch (err: any) {
-      setError(err.message || 'Gagal menyimpan file');
+      setError(err.message || 'Failed to save file');
     } finally {
       setSaving(false);
     }
@@ -195,7 +195,7 @@ export default function FileViewer({ server, path, onClose, onSaved }: FileViewe
       const parsed = JSON.parse(content);
       setContent(JSON.stringify(parsed, null, 2));
     } catch (err: any) {
-      setError(`Format Gagal: ${err.message}`);
+      setError(`Format error: ${err.message}`);
     }
   };
 
@@ -204,7 +204,7 @@ export default function FileViewer({ server, path, onClose, onSaved }: FileViewe
       const parsed = JSON.parse(content);
       setContent(JSON.stringify(parsed));
     } catch (err: any) {
-      setError(`Minify Gagal: ${err.message}`);
+      setError(`Minify error: ${err.message}`);
     }
   };
 

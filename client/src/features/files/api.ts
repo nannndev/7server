@@ -22,6 +22,6 @@ export const downloadFile = (id: string, path: string) =>
 
 export const fetchFileBlob = async (id: string, path: string): Promise<Blob> => {
   const res = await apiFetch(`${API_BASE}/servers/${id}/files/download?path=${q(path)}`);
-  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Gagal memuat file');
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Failed to load file');
   return await res.blob();
 };

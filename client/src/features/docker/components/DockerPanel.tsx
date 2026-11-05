@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { cacheGet, cacheSet } from '@/shared/lib/cache';
 import {
   RefreshCw, Play, Square, RotateCw, Pause, Trash2, ScrollText, Terminal as TermIcon, Info, ChevronDown, ChevronRight,
@@ -10,6 +11,7 @@ import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { Skeleton, RowsSkeleton } from '@/shared/ui/skeleton';
 import { useT } from '@/shared/i18n';
+import { confirmModal } from '@/shared/ui/confirm-dialog';
 
 interface DockerPanelProps {
   serverId: string;
@@ -69,7 +71,15 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
 
   // One runner for every mutating action: confirm, show progress, capture output, refresh.
   const run = async (key: string, title: string, fn: () => Promise<string>, confirmMsg?: string) => {
-    if (confirmMsg && !window.confirm(confirmMsg)) return;
+    if (confirmMsg) {
+      const ok = await confirmModal({
+        title,
+        message: confirmMsg,
+        variant: 'danger',
+        confirmText: 'Lanjutkan'
+      });
+      if (!ok) return;
+    }
     setBusy(key);
     try {
       const text = await fn();
@@ -335,8 +345,8 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
                                 ) : (
                                   <>
                                     <ActionBtn k={`${c.id}:start`} title="Start" onClick={() => act(c, 'start')}><Play className="w-3 h-3" /></ActionBtn>
-                                    <ActionBtn k={`${c.id}:rm`} title="Hapus container" danger
-                                      onClick={() => act(c, 'rm', `Hapus container ${c.name}? Data di dalam container (bukan volume) akan hilang.`)}>
+                                    <ActionBtn k={`${c.id}:rm`} title="Remove container" danger
+                                      onClick={() => act(c, 'rm', `Remove container ${c.name}? Data inside container (not volumes) will be lost.`)}>
                                       <Trash2 className="w-3 h-3" />
                                     </ActionBtn>
                                   </>
@@ -379,12 +389,12 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
                     <td className="py-1.5 px-3 text-right">{img.size}</td>
                     <td className="py-1.5 px-3 text-[var(--muted-foreground)] font-sans">{img.createdSince}</td>
                     <td className="py-1.5 px-3 font-sans">
-                      {img.inUse ? <span className="text-emerald-600">dipakai</span> : <span className="text-[var(--muted-foreground)]">tidak dipakai</span>}
+                      {img.inUse ? <span className="text-emerald-600">in use</span> : <span className="text-[var(--muted-foreground)]">unused</span>}
                     </td>
                     <td className="py-1.5 px-3 text-right">
                       {!img.inUse && (
-                        <ActionBtn k={`img:${img.id}`} title="Hapus image" danger
-                          onClick={() => run(`img:${img.id}`, `rmi ${ref}`, () => dockerRemoveImage(serverId, ref), `Hapus image ${ref}?`)}>
+                        <ActionBtn k={`img:${img.id}`} title="Remove image" danger
+                          onClick={() => run(`img:${img.id}`, `rmi ${ref}`, () => dockerRemoveImage(serverId, ref), `Remove image ${ref}?`)}>
                           <Trash2 className="w-3 h-3" />
                         </ActionBtn>
                       )}
@@ -405,26 +415,26 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
               <div key={d.type} className="p-3 rounded-lg border border-[var(--border)] bg-[var(--card)]">
                 <div className="text-[11px] text-[var(--muted-foreground)]">{d.type}</div>
                 <div className="text-lg font-bold font-mono">{d.size}</div>
-                <div className="text-[10px] text-[var(--muted-foreground)]">{d.active}/{d.total} aktif</div>
+                <div className="text-[10px] text-[var(--muted-foreground)]">{d.active}/{d.total} active</div>
                 <div className={`text-[11px] mt-1 font-mono ${d.reclaimable.startsWith('0B') ? 'text-[var(--muted-foreground)]' : 'text-amber-600 font-semibold'}`}>
-                  Bisa dibersihkan: {d.reclaimable}
+                  Reclaimable: {d.reclaimable}
                 </div>
               </div>
             ))}
           </div>
           <div className="border border-[var(--border)] rounded-lg p-3 space-y-2">
-            <h4 className="text-xs font-semibold">Bersihkan</h4>
+            <h4 className="text-xs font-semibold">Prune & Cleanup</h4>
             <p className="text-[11px] text-[var(--muted-foreground)]">
-              Hanya menghapus yang <b>tidak dipakai</b> container mana pun. Volume berisi data database, jadi prune volume diberi peringatan keras.
+              Only removes resources <b>not in use</b> by any container. Volumes contain persistent database data, proceed with caution.
             </p>
             <div className="flex flex-wrap gap-2">
               {([
-                ['build-cache', 'Build cache', 'Hapus semua build cache? Aman, build berikutnya cuma lebih lama.'],
-                ['dangling-images', 'Image tanpa tag', 'Hapus image dangling (<none>)?'],
-                ['images', 'Image tidak dipakai', 'Hapus SEMUA image yang tidak dipakai container mana pun?'],
-                ['containers', 'Container berhenti', 'Hapus semua container yang sedang berhenti?'],
-                ['networks', 'Network tidak dipakai', 'Hapus network yang tidak dipakai?'],
-                ['volumes', '⚠ Volume tidak dipakai', 'PERINGATAN: volume yang tidak terpasang di container mana pun akan DIHAPUS PERMANEN, termasuk data database lama. Lanjutkan?']
+                ['build-cache', 'Build cache', 'Remove all build cache? Safe, but next build may take longer.'],
+                ['dangling-images', 'Dangling images (<none>)', 'Remove dangling images (<none>)?'],
+                ['images', 'Unused images', 'Remove ALL images not used by any container?'],
+                ['containers', 'Stopped containers', 'Remove all stopped containers?'],
+                ['networks', 'Unused networks', 'Remove unused networks?'],
+                ['volumes', '⚠ Unused volumes', 'WARNING: Unattached volumes will be PERMANENTLY DELETED, including database data. Proceed?']
               ] as const).map(([what, label, confirm]) => (
                 <Button
                   key={what} variant={what === 'volumes' ? 'destructive' : 'outline'} size="sm" className="gap-1" disabled={!!busy}
@@ -439,10 +449,10 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
       )}
 
       {/* INSPECT DRAWER */}
-      {inspect && (
-        <div className="fixed inset-0 z-[60] bg-black/60 flex justify-end" onClick={() => setInspect(null)}>
+      {inspect && createPortal(
+        <div className="fixed inset-0 z-[100] bg-black/60 flex justify-end fade-in" onClick={() => setInspect(null)}>
           <div
-            className="w-full max-w-xl h-full bg-[var(--card)] text-[var(--foreground)] border-l border-[var(--border)] overflow-auto p-4 space-y-4 text-xs"
+            className="w-full max-w-xl h-full bg-[var(--card)] text-[var(--foreground)] border-l border-[var(--border)] overflow-auto p-4 space-y-4 text-xs shadow-2xl"
             onClick={(e) => e.stopPropagation()} role="dialog" aria-label={`Inspect ${inspect.name}`}
           >
             <div className="flex items-center gap-2">
@@ -486,7 +496,8 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
               </ul>
             </section>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

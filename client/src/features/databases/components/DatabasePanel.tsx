@@ -12,6 +12,8 @@ import TableView, { GridSkeleton } from '@/features/databases/components/TableVi
 import QueryView from '@/features/databases/components/QueryView';
 import DbProperties from '@/features/databases/components/DbProperties';
 import { useT } from '@/shared/i18n';
+import { confirmModal } from '@/shared/ui/confirm-dialog';
+import { toast } from '@/shared/ui/toast';
 // React Flow + dagre only load when a diagram tab is opened.
 const ErDiagram = lazy(() => import('@/features/databases/components/ErDiagram'));
 
@@ -216,13 +218,21 @@ export default function DatabasePanel({ serverId }: { serverId: string }) {
       loadConn(saved, true);
     });
 
-  const removeConn = (c: DbConnection) =>
-    window.confirm(t('db.removeConnConfirm', { name: c.name })) &&
+  const removeConn = async (c: DbConnection) => {
+    const ok = await confirmModal({
+      title: t('db.removeConn'),
+      message: t('db.removeConnConfirm', { name: c.name }),
+      variant: 'danger',
+      confirmText: t('db.removeConn')
+    });
+    if (!ok) return;
     guard(async () => {
       await deleteDbConnection(c.id);
       setTabs((t) => t.filter((x) => x.connId !== c.id));
+      toast.success(`Connection ${c.name} removed successfully`);
       await loadConns();
     });
+  };
 
   const addDiscovered = (d: DiscoveredDb) =>
     guard(async () => {
@@ -321,12 +331,12 @@ export default function DatabasePanel({ serverId }: { serverId: string }) {
                         <div className="ml-6 my-1 mr-1 p-2 rounded-md bg-red-500/10 border border-red-500/20 text-[11px]">
                           <p className="text-red-500 font-mono whitespace-pre-wrap break-words line-clamp-4">{st.error}</p>
                           <div className="mt-1.5 flex gap-1.5">
-                            <button onClick={() => loadConn(c, true)} className="text-[11px] underline">Coba lagi</button>
-                            <button onClick={() => editConn(c)} className="text-[11px] underline">Ubah login</button>
+                            <button onClick={() => loadConn(c, true)} className="text-[11px] underline">{t('common.retry')}</button>
+                            <button onClick={() => editConn(c)} className="text-[11px] underline">{t('db.editConn')}</button>
                           </div>
                         </div>
                       ) : !st?.version ? (
-                        <div className="pl-7 h-7 flex items-center gap-1.5 text-[11px] text-[var(--muted-foreground)]"><RefreshCw className="w-3 h-3 animate-spin" /> menghubungkan…</div>
+                        <div className="pl-7 h-7 flex items-center gap-1.5 text-[11px] text-[var(--muted-foreground)]"><RefreshCw className="w-3 h-3 animate-spin" /> connecting…</div>
                       ) : (
                         <>
                           <div className="pl-[26px] pb-0.5 text-[10px] text-[var(--muted-foreground)] font-mono truncate">{eng?.label} · v{st.version}</div>
@@ -393,7 +403,7 @@ export default function DatabasePanel({ serverId }: { serverId: string }) {
             )}
           </div>
 
-          <div onPointerDown={startResize} role="separator" aria-orientation="vertical" aria-label="Ubah lebar navigator"
+          <div onPointerDown={startResize} role="separator" aria-orientation="vertical" aria-label="Resize navigator"
             className="absolute top-0 -right-1 w-2 h-full cursor-col-resize group">
             <span className="absolute right-[3px] top-0 h-full w-[2px] group-hover:bg-[var(--accent-brand)]/60 transition-colors" />
           </div>

@@ -5,7 +5,24 @@
 import { useCallback, useEffect, useState } from 'react';
 
 export const FLEET_VIEWS = ['grid', 'rack', 'topology', 'matrix'] as const;
-export const SERVER_TABS = ['overview', 'topology', 'templates', 'webapps', 'pm2', 'docker', 'databases', 'services', 'nginx', 'ports', 'terminal'] as const;
+export const SERVER_TABS = [
+  'overview',
+  'topology',
+  'templates',
+  'webapps',
+  'pm2',
+  'docker',
+  'databases',
+  'cron',
+  'services',
+  'nginx',
+  'ssl',
+  'ports',
+  'security',
+  'backups',
+  'audit',
+  'terminal'
+] as const;
 export const MONITOR_TABS = ['alerts', 'uptime', 'audit'] as const;
 
 export type FleetView = (typeof FLEET_VIEWS)[number];

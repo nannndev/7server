@@ -16,6 +16,8 @@ import { Input } from '@/shared/ui/input';
 import { TableSkeleton } from '@/shared/ui/skeleton';
 import { useServerPage } from './context';
 import { useT } from '@/shared/i18n';
+import { confirmModal } from '@/shared/ui/confirm-dialog';
+import { toast } from '@/shared/ui/toast';
 
 export default function PortsTab() {
   const t = useT();
@@ -48,11 +50,19 @@ export default function PortsTab() {
     );
   });
   const handleKillProcess = async (pid: number | string, comm: string) => {
-    if (!window.confirm(t('ports.killConfirm', { comm, pid }))) return;
+    const ok = await confirmModal({
+      title: 'Matikan Proses Port',
+      message: t('ports.killConfirm', { comm, pid }),
+      variant: 'danger',
+      confirmText: t('ports.killPid')
+    });
+    if (!ok) return;
     try {
       await killProcess(server.id, pid, 'kill');
+      toast.success(`Process ${comm} (PID: ${pid}) terminated successfully`);
       loadPorts();
     } catch (err: any) {
+      toast.error(`Failed to kill process: ${err.message}`);
       ctx.setQuickActionOutput(`Kill Error: ${err.message}`);
     }
   };

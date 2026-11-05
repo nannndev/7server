@@ -97,7 +97,7 @@ export async function sendDiscord(text: string, level: AlertLevel = 'info'): Pro
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      username: 'VPS Hub',
+      username: '7Server',
       allowed_mentions: { parse: [] }, // a server/domain name must never ping @everyone
       embeds: [{ description: text.slice(0, 4000), color: COLORS[level], timestamp: new Date().toISOString() }]
     }),
@@ -230,7 +230,7 @@ function sslExpiry(host: string): Promise<Date | null> {
 async function checkUrl(url: string): Promise<{ status: number | null; ms: number | null; error?: string }> {
   const start = Date.now();
   try {
-    const res = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(10000), headers: { 'User-Agent': 'VPS-Hub-Uptime/1.0' } });
+    const res = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(10000), headers: { 'User-Agent': '7Server-Uptime/1.0' } });
     await res.body?.cancel();
     return { status: res.status, ms: Date.now() - start };
   } catch (e: any) {

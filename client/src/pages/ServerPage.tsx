@@ -18,11 +18,17 @@ import WebAppsTab from './server/WebAppsTab';
 import Pm2Tab from './server/Pm2Tab';
 import DockerTab from './server/DockerTab';
 import DatabasesTab from './server/DatabasesTab';
+import CronTab from './server/CronTab';
 import ServicesTab from './server/ServicesTab';
 import NginxTab from './server/NginxTab';
+import SslTab from './server/SslTab';
 import PortsTab from './server/PortsTab';
+import SecurityTab from './server/SecurityTab';
+import BackupTab from './server/BackupTab';
+import AuditTab from './server/AuditTab';
 import TerminalTab from './server/TerminalTab';
 import { useT } from '@/shared/i18n';
+import { confirmModal } from '@/shared/ui/confirm-dialog';
 
 const TABS: Record<ServerTab, React.FC> = {
   overview: OverviewTab,
@@ -32,9 +38,14 @@ const TABS: Record<ServerTab, React.FC> = {
   pm2: Pm2Tab,
   docker: DockerTab,
   databases: DatabasesTab,
+  cron: CronTab,
   services: ServicesTab,
   nginx: NginxTab,
+  ssl: SslTab,
   ports: PortsTab,
+  security: SecurityTab,
+  backups: BackupTab,
+  audit: AuditTab,
   terminal: TerminalTab
 };
 
@@ -70,7 +81,15 @@ export default function ServerPage({ server, tab, onTabChange, history = [], thr
   };
 
   const runQuickAction = async (label: string, cmd: string) => {
-    if (label === 'Reboot Server' && !window.confirm(t('server.rebootConfirm'))) return;
+    if (label === 'Reboot Server') {
+      const ok = await confirmModal({
+        title: 'Reboot Server',
+        message: t('server.rebootConfirm'),
+        variant: 'danger',
+        confirmText: 'Reboot Sekarang'
+      });
+      if (!ok) return;
+    }
     setQuickActionRunning(label);
     setQuickActionOutput(null);
     try {

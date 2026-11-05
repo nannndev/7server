@@ -22,6 +22,7 @@ import { Input } from '@/shared/ui/input';
 import { TableSkeleton } from '@/shared/ui/skeleton';
 import { useServerPage, sq } from './context';
 import { useT } from '@/shared/i18n';
+import { confirmModal } from '@/shared/ui/confirm-dialog';
 
 export default function WebAppsTab() {
   const t = useT();
@@ -50,9 +51,17 @@ export default function WebAppsTab() {
     list.push({ label: t('webapps.folderSize'), cmd: `du -sh ${sq(app.path)} 2>&1` });
     return list;
   };
-  const runAppAction = (app: WebAppInfo, a: { label: string; cmd: string; confirm?: boolean }) => {
+  const runAppAction = async (app: WebAppInfo, a: { label: string; cmd: string; confirm?: boolean }) => {
     setAppMenu(null);
-    if (a.confirm && !window.confirm(t('webapps.confirmRun', { label: a.label, path: app.path }))) return;
+    if (a.confirm) {
+      const ok = await confirmModal({
+        title: a.label,
+        message: t('webapps.confirmRun', { label: a.label, path: app.path }),
+        variant: 'warning',
+        confirmText: 'Jalankan'
+      });
+      if (!ok) return;
+    }
     ctx.runQuickAction(`${app.name}: ${a.label}`, a.cmd);
   };
   const loadWebAppsData = async (manual?: unknown) => {

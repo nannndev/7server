@@ -1,5 +1,6 @@
 // Cmd/Ctrl+K quick jump. Owns its own open/query state and the global shortcut.
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Server, Terminal, Globe, Zap, FolderOpen, X, Command, ShieldCheck, Activity, Sun, Moon, Languages } from 'lucide-react';
 import { useI18n, LANGS } from '@/shared/i18n';
 import type { ServerItem } from '@/features/servers/types';
@@ -44,8 +45,7 @@ export default function CommandPalette({ servers, navigate, openManageServer, se
   }, [onEscape]);
 
   if (!showPalette) return null;
-  return (
-
+  return createPortal(
     <div
       className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-start justify-center pt-20 p-4 animate-in fade-in"
       onClick={() => setShowPalette(false)}
@@ -208,7 +208,7 @@ export default function CommandPalette({ servers, navigate, openManageServer, se
           </div>
         </div>
       </div>
-    </div>
-
+    </div>,
+    document.body
   );
 }
