@@ -328,7 +328,7 @@ export const restoreBackup = async (serverId: string, req: RestoreBackupRequest)
   unwrap<BackupRestoreResult>(await apiFetch(`${API_BASE}/servers/${serverId}/backups/restore`, jsonPost(req)), 'Failed to restore backup');
 
 export const deleteBackupFile = async (serverId: string, filepath: string): Promise<void> =>
-  unwrap<void>(await apiFetch(`${API_BASE}/servers/${serverId}/backups/file`, jsonDelete({ filepath })), 'Failed to delete backup file');
+  unwrap<void>(await apiFetch(`${API_BASE}/servers/${serverId}/backups/file`, { ...jsonPost({ filepath }), method: 'DELETE' }), 'Failed to delete backup file');
 
 export const downloadBackupFile = (serverId: string, filepath: string, filename: string) =>
   downloadBlob(`${API_BASE}/servers/${serverId}/backups/download?path=${encodeURIComponent(filepath)}`, filename);

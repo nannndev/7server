@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { X, RefreshCw, Terminal as TermIcon, Copy, Check } from 'lucide-react';
+import { X, RefreshCw, Terminal as TermIcon, Copy, Check, Sparkles } from 'lucide-react';
 import { fetchLogs } from '@/features/logs/api';
 import { Button } from '@/shared/ui/button';
 import { Modal } from '@/shared/ui/modal';
@@ -57,6 +57,17 @@ export default function LogsModal({ serverId, type, name, onClose }: LogsModalPr
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const analyzeWithAi = () => {
+    if (!logs) return;
+    window.dispatchEvent(
+      new CustomEvent('7server-copilot-ask', {
+        detail: {
+          prompt: `Tolong analisa log ${name} (${prefixLabel}) berikut. Beritahu apakah ada error/peringatan penting, penyebabnya, dan langkah perbaikan yang direkomendasikan:\n\n\`\`\`\n${logs.slice(-2500)}\n\`\`\``
+        }
+      })
+    );
+  };
+
   return (
     <Modal onClose={onClose} className="max-w-5xl h-[82vh]">
       <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl w-full h-full flex flex-col overflow-hidden shadow-2xl">
@@ -84,6 +95,17 @@ export default function LogsModal({ serverId, type, name, onClose }: LogsModalPr
             />
             Live (4s)
           </label>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={analyzeWithAi}
+            disabled={!logs || loading}
+            className="h-7 text-[11px] gap-1 border-purple-500/30 text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 transition-colors"
+            title="Analyze Logs with AI Copilot"
+          >
+            <Sparkles className="w-3 h-3 text-purple-400 animate-pulse" />
+            <span className="hidden sm:inline">Analyze with AI</span>
+          </Button>
           <Button variant="ghost" size="icon" onClick={copyLogs} title="Copy Logs" className="h-7 w-7">
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
           </Button>

@@ -5,10 +5,10 @@
 html.privacy .sensitive { filter: blur(5px); user-select: none; }
 
 :root {
-  --background: #09090b;
-  --foreground: #f4f4f5;
-  --card: #121215;
-  --card-border: #232328;
+  --background: #0b0b0c;
+  --foreground: #ececee;
+  --card: #141416;
+  --card-border: #26262b;
   --muted: #18181b;
   --muted-foreground: #a1a1aa;
   --accent: #27272a;
@@ -18,28 +18,43 @@ html.privacy .sensitive { filter: blur(5px); user-select: none; }
   --radius: 0.5rem;
   --ring: #a1a1aa;
   --accent-brand: #38bdf8;
-  --sidebar-bg: #0c0c0f;
-  --sidebar-hover: #17171b;
-  --sidebar-active: #1f1f24;
+  --ok: #6be0a0;
+  --sidebar-bg: #0d0d0f;
+  --sidebar-hover: #17171a;
+  --sidebar-active: #1e1e22;
   --ease-out: cubic-bezier(.2, .7, .2, 1);
+
+  /* Metal finish shared with the landing page (taken from the app icon). */
+  --rim-hi: #8e8e96; --rim-mid: #2e2e33; --rim-lo: #4c4c53;
+  --brush: rgba(255, 255, 255, .012);
+  --face-top: #17171a; --face-bot: #121214;
+  --silver-top: #f1f1f3; --silver-mid: #c9c9ce; --silver-bot: #a3a3aa; --silver-ink: #0c0c0e;
+  --weave: rgba(255, 255, 255, .018);
 }
 
 html.light {
-  --background: #f8fafc;
-  --foreground: #0f172a;
-  --card: #ffffff;
-  --card-border: #e2e8f0;
-  --muted: #f1f5f9;
-  --muted-foreground: #64748b;
-  --accent: #f1f5f9;
-  --primary: #0f172a;
+  --background: #f2f2ef;
+  --foreground: #18181a;
+  --card: #fbfbfa;
+  --card-border: #e2e2de;
+  --muted: #efefec;
+  --muted-foreground: #6b6b70;
+  --accent: #efefec;
+  --primary: #18181a;
   --primary-foreground: #ffffff;
-  --border: #e2e8f0;
-  --ring: #64748b;
+  --border: #e2e2de;
+  --ring: #6b6b70;
   --accent-brand: #0284c7;
-  --sidebar-bg: #ffffff;
-  --sidebar-hover: #f1f5f9;
-  --sidebar-active: #e8eef6;
+  --ok: #1f8a55;
+  --sidebar-bg: #f8f8f6;
+  --sidebar-hover: #efefec;
+  --sidebar-active: #e7e7e3;
+
+  --rim-hi: #ffffff; --rim-mid: #c9c9cd; --rim-lo: #e4e4e8;
+  --brush: rgba(0, 0, 0, .007);
+  --face-top: #ffffff; --face-bot: #f6f6f4;
+  --silver-top: #3a3a40; --silver-mid: #232327; --silver-bot: #111113; --silver-ink: #f6f6f7;
+  --weave: rgba(0, 0, 0, .02);
 
   /* Components hardcode zinc-* for dark mode; invert the scale so they follow light mode too. */
   --color-zinc-50: #09090b;
@@ -61,6 +76,72 @@ body {
   font-feature-settings: "rlig" 1, "calt" 1;
   transition: background-color 0.2s ease, color 0.2s ease;
 }
+
+/* ---------------- Metal finish ----------------
+   .metal: machined aluminium rim (gradient border-box) over a faintly brushed face.
+   .btn-silver: polished bar with a specular top edge. Same recipe as the landing page. */
+.metal {
+  border-color: transparent !important;
+  background:
+    repeating-linear-gradient(90deg, var(--brush) 0 1px, transparent 1px 3px) padding-box,
+    linear-gradient(180deg, var(--face-top), var(--face-bot)) padding-box,
+    linear-gradient(180deg, var(--rim-hi), var(--rim-mid) 38%, var(--rim-lo)) border-box !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04), 0 1px 2px rgba(0, 0, 0, .25), 0 10px 24px -18px rgba(0, 0, 0, .6);
+}
+html.light .metal { box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(0, 0, 0, .05), 0 10px 24px -20px rgba(0, 0, 0, .22); }
+.btn-silver {
+  color: var(--silver-ink) !important;
+  background: linear-gradient(180deg, var(--silver-top), var(--silver-mid) 55%, var(--silver-bot)) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7), inset 0 -1px 0 rgba(0, 0, 0, .22), 0 1px 2px rgba(0, 0, 0, .3);
+}
+.btn-silver:hover { filter: brightness(1.06); }
+html.light .btn-silver { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16), 0 1px 2px rgba(0, 0, 0, .2); }
+/* .btn-metal: a raised 3D aluminium key. Brushed face lit from above, a bright bevel on the top
+   edge, a dark lip under it that reads as thickness, and a press that sinks it 1px into its seat. */
+.btn-metal {
+  color: var(--metal-ink) !important;
+  border-color: transparent !important;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, .05) 0 1px, transparent 1px 3px) padding-box,
+    linear-gradient(180deg, var(--metal-1), var(--metal-2) 48%, var(--metal-3) 52%, var(--metal-4)) padding-box,
+    linear-gradient(180deg, var(--metal-rim-hi), var(--metal-rim-lo)) border-box !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .55),     /* specular top bevel */
+    inset 0 -1px 0 rgba(0, 0, 0, .28),          /* bottom bevel */
+    0 1px 0 var(--metal-lip),                   /* the key's thickness */
+    0 2px 1px rgba(0, 0, 0, .35),
+    0 6px 14px -6px rgba(0, 0, 0, .55);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .35);
+  transition: transform 140ms var(--ease-out), box-shadow 140ms var(--ease-out), filter 160ms ease;
+}
+.btn-metal:hover { filter: brightness(1.05); }
+.btn-metal:active, .btn-metal[aria-pressed="true"] {
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, .25), inset 0 -1px 0 rgba(255, 255, 255, .25), 0 0 0 var(--metal-lip), 0 1px 1px rgba(0, 0, 0, .3);
+}
+.btn-metal:disabled { filter: saturate(.6) brightness(.9); }
+:root {
+  --rim: #3a3a40;
+  --metal-1: #e9e9ec; --metal-2: #c7c7cc; --metal-3: #b8b8be; --metal-4: #d2d2d7;
+  --metal-rim-hi: #ffffff; --metal-rim-lo: #7c7c84; --metal-lip: #5d5d64; --metal-ink: #121214;
+}
+html.light {
+  --rim: #cfcfd3;
+  --metal-1: #4a4a51; --metal-2: #2c2c31; --metal-3: #222226; --metal-4: #33333a;
+  --metal-rim-hi: #6c6c74; --metal-rim-lo: #0e0e10; --metal-lip: #050506; --metal-ink: #f4f4f6;
+}
+html.light .btn-metal { text-shadow: 0 -1px 0 rgba(0, 0, 0, .5); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), inset 0 -1px 0 rgba(0, 0, 0, .4), 0 1px 0 var(--metal-lip), 0 2px 1px rgba(0, 0, 0, .2), 0 6px 14px -6px rgba(0, 0, 0, .4); }
+@media (prefers-reduced-motion: reduce) { .btn-metal { transition: none; } .btn-metal:active { transform: none; } }
+
+/* Carbon weave for chrome surfaces (sidebar), very faint. */
+.carbon-bg {
+  background-image:
+    linear-gradient(45deg, var(--weave) 25%, transparent 25% 50%, var(--weave) 50% 75%, transparent 75%),
+    linear-gradient(-45deg, var(--weave) 25%, transparent 25% 50%, var(--weave) 50% 75%, transparent 75%);
+  background-size: 6px 6px; background-position: 0 0, 3px 3px;
+}
+/* Status LED with a small bloom (like the icon's drive lights). */
+.led-glow { box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 18%, transparent), 0 0 7px currentColor; }
 
 /* Custom scrollbars */
 ::-webkit-scrollbar {
@@ -172,6 +253,31 @@ html.light .shimmer-effect::after {
 
 .sidebar-scroll { scrollbar-width: thin; }
 .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+
+/* Copilot drawer: spring-ish slide + fade, children cascade in after the panel lands. */
+.copilot-drawer {
+  transform: translateX(104%);
+  opacity: .6;
+  transition: transform 340ms cubic-bezier(.32,.72,0,1), opacity 240ms ease, width 260ms cubic-bezier(.32,.72,0,1);
+  will-change: transform;
+}
+.copilot-drawer.is-open { transform: none; opacity: 1; }
+.copilot-drawer > * {
+  opacity: 0;
+  transform: translateX(14px);
+  transition: opacity 260ms ease, transform 380ms cubic-bezier(.32,.72,0,1);
+}
+.copilot-drawer.is-open > * { opacity: 1; transform: none; }
+.copilot-drawer.is-open > :nth-child(1) { transition-delay: 70ms; }
+.copilot-drawer.is-open > :nth-child(2) { transition-delay: 120ms; }
+.copilot-drawer.is-open > :nth-child(3) { transition-delay: 170ms; }
+.copilot-drawer.is-open > :nth-child(4) { transition-delay: 220ms; }
+/* new messages slide up softly */
+.copilot-msg { animation: copilot-msg-in 320ms cubic-bezier(.32,.72,0,1) both; }
+@keyframes copilot-msg-in {
+  from { opacity: 0; transform: translateY(8px) scale(.99); }
+  to { opacity: 1; transform: none; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

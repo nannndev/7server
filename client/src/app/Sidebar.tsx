@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   LayoutDashboard, LayoutGrid, Box, Network, Activity, Server, Plus, Bell, Globe, ScrollText,
-  PanelLeftClose, PanelLeftOpen, Sun, Moon, Search, X
+  PanelLeftClose, PanelLeftOpen, Sun, Moon, Search, X, Bot
 } from 'lucide-react';
 import { ServerItem } from '@/features/servers/types';
 import { Route, FleetView } from '@/app/router';
@@ -82,7 +82,7 @@ function Item({ rail, tip, active, onClick, icon: Icon, label, badge, dot, sub, 
       {/* Active indicator bar */}
       <span
         aria-hidden
-        className={`absolute left-0 top-1/2 -translate-y-1/2 w-[3px] rounded-r-full bg-[var(--accent-brand)] transition-all duration-200 ${active ? 'h-5 opacity-100' : 'h-0 opacity-0'}`}
+        className={`absolute left-0 top-1/2 -translate-y-1/2 w-[3px] rounded-r-full bg-[var(--ok)] transition-all duration-200 ${active ? 'h-5 opacity-100' : 'h-0 opacity-0'}`}
       />
       <span className="relative shrink-0">
         <Icon className={`w-4 h-4 transition-transform duration-150 group-hover:scale-110 ${indent ? 'w-3.5 h-3.5' : ''}`} />
@@ -113,7 +113,7 @@ function SubItem({ active, onClick, icon: Icon, label }: { active: boolean; onCl
         ${active ? 'bg-[var(--sidebar-active)] text-[var(--foreground)] font-medium' : 'text-[var(--muted-foreground)] hover:bg-[var(--sidebar-hover)] hover:text-[var(--foreground)]'}`}
     >
       {/* Marker sits on the guide line, so the active section reads as a branch of the server. */}
-      <span aria-hidden className={`absolute -left-[9.5px] top-1/2 -translate-y-1/2 w-[3px] rounded-full bg-[var(--accent-brand)] transition-all duration-200 ${active ? 'h-4 opacity-100' : 'h-0 opacity-0'}`} />
+      <span aria-hidden className={`absolute -left-[9.5px] top-1/2 -translate-y-1/2 w-[3px] rounded-full bg-[var(--ok)] transition-all duration-200 ${active ? 'h-4 opacity-100' : 'h-0 opacity-0'}`} />
       <Icon className="w-3.5 h-3.5 shrink-0" />
       <span className="truncate">{label}</span>
     </button>
@@ -221,7 +221,7 @@ export default function Sidebar(p: SidebarProps) {
         ref={asideRef}
         aria-label={t('nav.main')}
         style={{ width: p.mobileOpen ? 280 : rail ? RAIL_W : width }}
-        className={`fixed md:sticky top-0 left-0 z-50 h-screen shrink-0 flex flex-col bg-[var(--sidebar-bg)] border-r border-[var(--border)]
+        className={`carbon-bg fixed md:sticky top-0 left-0 z-50 h-screen shrink-0 flex flex-col bg-[var(--sidebar-bg)] border-r border-[var(--border)]
           ${dragging ? '' : 'transition-[width,transform] duration-200 ease-[cubic-bezier(.2,.7,.2,1)]'}
           ${p.mobileOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'}`}
       >
@@ -229,10 +229,10 @@ export default function Sidebar(p: SidebarProps) {
         <div className={`h-14 flex items-center gap-2.5 border-b border-[var(--border)] shrink-0 ${rail ? 'justify-center' : 'px-3.5'}`}>
           <button
             onClick={() => go({ page: 'fleet' })}
-            className="w-8 h-8 rounded-lg bg-[var(--primary)] text-[var(--primary-foreground)] flex items-center justify-center font-bold text-sm shadow-sm shrink-0 transition-transform hover:scale-105 active:scale-95"
+            className="metal w-8 h-8 rounded-[9px] overflow-hidden border p-px shrink-0 transition-transform hover:scale-105 active:scale-95"
             aria-label={t('nav.toFleet')}
           >
-            7
+            <img src="/icons/icon-opt2-server-blade.jpg" alt="7Server" className="w-full h-full object-cover rounded-[8px]" />
           </button>
           {!rail && (
             <div className="min-w-0 flex-1">
@@ -345,6 +345,16 @@ export default function Sidebar(p: SidebarProps) {
               <Item rail={rail} tip={tipProps} active={monTab === 'audit'} onClick={() => go({ page: 'monitoring', tab: 'audit' })} icon={ScrollText} label={t('nav.audit')} />
             </>
           )}
+
+          <Section rail={rail} title={t('nav.aiGateway')} />
+          <Item
+            rail={rail}
+            tip={tipProps}
+            active={p.route.page === 'ai-gateway'}
+            onClick={() => go({ page: 'ai-gateway', tab: 'quickstart' })}
+            icon={Bot}
+            label={t('nav.aiGateway')}
+          />
         </nav>
 
         {/* Footer */}

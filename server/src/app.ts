@@ -21,6 +21,7 @@ import { cronRoutes } from './modules/cron/routes.js';
 import { certificateRoutes } from './modules/certificates/routes.js';
 import { securityRoutes } from './modules/security/routes.js';
 import { backupRoutes } from './modules/backups/routes.js';
+import { aiGatewayPublicRoutes, aiGatewayManagementRoutes } from './modules/ai-gateway/routes.js';
 
 export function createApp() {
   const app = express();
@@ -29,13 +30,16 @@ export function createApp() {
   if (config.corsOrigin) app.use(cors({ origin: config.corsOrigin }));
   app.use(express.json({ limit: '5mb' }));
 
+  // Public AI Gateway endpoints (authenticated via Virtual API Key)
+  app.use('/api/ai', aiGatewayPublicRoutes);
+
   app.post('/api/login', loginHandler);
   // Everything under /api below this line requires the token; keep routers after requireAuth.
   app.use('/api', requireAuth, auditMiddleware);
 
   // Order matters where paths overlap (e.g. /servers/test and /servers/batch-exec vs /servers/:id):
   // this is the order the routes had in the old single-file server.
-  app.use('/api', monitoringRoutes, transferRoutes, serversRoutes, diagnosticsRoutes, metricsRoutes, processesRoutes,
+  app.use('/api', aiGatewayManagementRoutes, monitoringRoutes, transferRoutes, serversRoutes, diagnosticsRoutes, metricsRoutes, processesRoutes,
     logsRoutes, filesRoutes, dockerRoutes, databasesRoutes, execRoutes, softwareRoutes, cronRoutes, certificateRoutes, securityRoutes, backupRoutes);
 
   app.use(errorHandler);

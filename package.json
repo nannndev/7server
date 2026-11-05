@@ -6,6 +6,9 @@
   "scripts": {
     "dev:server": "cd server && npm run dev",
     "dev:client": "cd client && npm run dev",
+    "dev:landing": "cd landing && npm run dev",
+    "build:landing": "cd landing && npm run build",
+    "dev:all": "node start.js --all",
     "start": "node start.js",
     "dev": "node start.js"
   }

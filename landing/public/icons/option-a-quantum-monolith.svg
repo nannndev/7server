@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Squircle Gradient -->
+    <linearGradient id="q-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stopColor="#1e1e24"/>
+      <stop offset="40%" stopColor="#121215"/>
+      <stop offset="100%" stopColor="#08080a"/>
+    </linearGradient>
+
+    <!-- Bevel Rim Gradient -->
+    <linearGradient id="q-rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stopColor="#52525b" stopOpacity="0.8"/>
+      <stop offset="50%" stopColor="#27272a" stopOpacity="0.4"/>
+      <stop offset="100%" stopColor="#18181b" stopOpacity="0.8"/>
+    </linearGradient>
+
+    <!-- Neon Core Gradient -->
+    <linearGradient id="q-neon" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stopColor="#a855f7"/>
+      <stop offset="50%" stopColor="#6366f1"/>
+      <stop offset="100%" stopColor="#06b6d4"/>
+    </linearGradient>
+
+    <!-- Titanium Chisel Gradient -->
+    <linearGradient id="q-titanium-top" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stopColor="#3f3f46"/>
+      <stop offset="50%" stopColor="#27272a"/>
+      <stop offset="100%" stopColor="#1f1f23"/>
+    </linearGradient>
+
+    <linearGradient id="q-titanium-side" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stopColor="#18181b"/>
+      <stop offset="100%" stopColor="#0f0f12"/>
+    </linearGradient>
+
+    <!-- Glow Filter -->
+    <filter id="q-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <filter id="q-subtle-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Drop Shadow -->
+  <rect x="36" y="44" width="440" height="440" rx="100" fill="#000000" opacity="0.5" filter="blur(18px)"/>
+
+  <!-- Main macOS Squircle Body -->
+  <rect x="36" y="36" width="440" height="440" rx="100" fill="url(#q-bg)" stroke="url(#q-rim)" stroke-width="3"/>
+
+  <!-- Inner Milled Groove -->
+  <rect x="48" y="48" width="416" height="416" rx="90" fill="none" stroke="#27272a" stroke-width="1.5" stroke-dasharray="8 6"/>
+
+  <!-- 4 Corner Hex Cap Bolts -->
+  <g fill="#27272a" stroke="#3f3f46" stroke-width="1.5">
+    <circle cx="80" cy="80" r="7"/>
+    <circle cx="432" cy="80" r="7"/>
+    <circle cx="80" cy="432" r="7"/>
+    <circle cx="432" cy="432" r="7"/>
+  </g>
+  <g fill="#52525b">
+    <circle cx="80" cy="80" r="3"/>
+    <circle cx="432" cy="80" r="3"/>
+    <circle cx="80" cy="432" r="3"/>
+    <circle cx="432" cy="432" r="3"/>
+  </g>
+
+  <!-- Live Status LED (Top Right) -->
+  <circle cx="410" cy="100" r="5" fill="#10b981" filter="url(#q-subtle-glow)"/>
+  <circle cx="410" cy="100" r="2" fill="#ecfdf5"/>
+
+  <!-- Deep Ambient Glow Behind 7 -->
+  <path d="M 140 140 L 372 140 L 255 380 L 195 380 L 290 196 L 140 196 Z" fill="url(#q-neon)" opacity="0.3" filter="url(#q-glow)"/>
+
+  <!-- Geometric Titanium "7" Facets (Solid Sculpture) -->
+  <!-- Facet 1: Top Bar Surface -->
+  <polygon points="135,135 377,135 365,190 155,190" fill="url(#q-titanium-top)" stroke="#52525b" stroke-width="1"/>
+
+  <!-- Facet 2: Diagonal Stem Surface -->
+  <polygon points="377,135 365,190 240,385 190,385" fill="url(#q-titanium-side)" stroke="#3f3f46" stroke-width="1"/>
+
+  <!-- Bevel 3: Underside Shadow Ridge -->
+  <polygon points="155,190 295,190 225,385 190,385" fill="#121215"/>
+
+  <!-- Central Laser Fiber Conduit Cut (Illuminated Core) -->
+  <path d="M 160 160 L 350 160 L 235 365" fill="none" stroke="url(#q-neon)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" filter="url(#q-glow)"/>
+  <path d="M 160 160 L 350 160 L 235 365" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- SRE Diagnostic Intersect Dot -->
+  <circle cx="350" cy="160" r="8" fill="#38bdf8" filter="url(#q-subtle-glow)"/>
+  <circle cx="350" cy="160" r="3" fill="#ffffff"/>
+
+  <!-- Subtle Micro-Ticks on Top Bar -->
+  <g stroke="#71717a" stroke-width="1.5">
+    <line x1="180" y1="138" x2="180" y2="146"/>
+    <line x1="210" y1="138" x2="210" y2="146"/>
+    <line x1="240" y1="138" x2="240" y2="146"/>
+    <line x1="270" y1="138" x2="270" y2="146"/>
+    <line x1="300" y1="138" x2="300" y2="146"/>
+  </g>
+
+  <!-- Tiny Model Engraving -->
+  <text x="256" y="438" fill="#52525b" font-size="11" font-family="-apple-system, system-ui, 'JetBrains Mono', monospace" font-weight="700" letter-spacing="4" text-anchor="middle">7SERVER</text>
+</svg>
+
