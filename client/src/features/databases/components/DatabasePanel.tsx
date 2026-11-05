@@ -150,7 +150,8 @@ export default function DatabasePanel({ serverId }: { serverId: string }) {
   const openQuery = (c: DbConnection, db?: string, text = '') => {
     const n = tabs.filter((t) => t.kind === 'query').length + 1;
     const id = `q:${c.id}:${Date.now()}`;
-    setTabs((t) => [...t, { id, kind: 'query', connId: c.id, database: db, title: `Query ${n}`, text, result: null }]);
+    const title = t('db.queryN', { n });
+    setTabs((ts) => [...ts, { id, kind: 'query', connId: c.id, database: db, title, text, result: null }]);
     setActiveId(id);
   };
 
@@ -229,7 +230,7 @@ export default function DatabasePanel({ serverId }: { serverId: string }) {
     guard(async () => {
       await deleteDbConnection(c.id);
       setTabs((t) => t.filter((x) => x.connId !== c.id));
-      toast.success(`Connection ${c.name} removed successfully`);
+      toast.success(t('db.connRemoved', { name: c.name }));
       await loadConns();
     });
   };
@@ -260,13 +261,13 @@ export default function DatabasePanel({ serverId }: { serverId: string }) {
   const renderObjects = (c: DbConnection, db: string, depth: number) => {
     const objs = tree[c.id]?.objects?.[db];
     if (objs === 'loading' || objs === undefined) {
-      return <div style={{ paddingLeft: 6 + depth * 14 }} className="h-7 flex items-center gap-1.5 text-[11px] text-[var(--muted-foreground)]"><RefreshCw className="w-3 h-3 animate-spin" /> memuat…</div>;
+      return <div style={{ paddingLeft: 6 + depth * 14 }} className="h-7 flex items-center gap-1.5 text-[11px] text-[var(--muted-foreground)]"><RefreshCw className="w-3 h-3 animate-spin" /> {t('common.loading')}</div>;
     }
     if (!Array.isArray(objs)) {
       return <div style={{ paddingLeft: 6 + depth * 14 }} className="py-1 pr-2 text-[11px] text-red-500 break-words">{objs.error.split('\n')[0]}</div>;
     }
     const list = objs.filter((o) => matches(o.name));
-    if (!list.length) return <div style={{ paddingLeft: 26 + depth * 14 }} className="h-7 flex items-center text-[11px] text-[var(--muted-foreground)]">{objs.length ? 'tidak cocok' : 'kosong'}</div>;
+    if (!list.length) return <div style={{ paddingLeft: 26 + depth * 14 }} className="h-7 flex items-center text-[11px] text-[var(--muted-foreground)]">{objs.length ? t('db.noMatch') : t('db.empty')}</div>;
     return list.map((o) => {
       const Icon = objIcon(o.type);
       const id = `obj:${c.id}:${db}:${o.name}`;
@@ -285,9 +286,9 @@ export default function DatabasePanel({ serverId }: { serverId: string }) {
     <div className="h-[calc(100dvh-13rem)] min-h-[520px] flex rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden">
       {/* ================= NAVIGATOR ================= */}
       {navOpen && (
-        <aside style={{ width: navW }} className="relative shrink-0 flex flex-col border-r border-[var(--border)] bg-[var(--sidebar-bg)]" aria-label="Database navigator">
+        <aside style={{ width: navW }} className="relative shrink-0 flex flex-col border-r border-[var(--border)] bg-[var(--sidebar-bg)]" aria-label={t('db.navAria')}>
           <div className="shrink-0 h-10 px-2 flex items-center gap-1 border-b border-[var(--border)]">
-            <span className="flex-1 pl-1 text-[11px] font-semibold text-[var(--muted-foreground)]">Navigator</span>
+            <span className="flex-1 pl-1 text-[11px] font-semibold text-[var(--muted-foreground)]">{t('db.navigator')}</span>
             <NavBtn title={t('db.scan')} onClick={discover} disabled={discovering}><Sparkles className={`w-3.5 h-3.5 ${discovering ? 'animate-pulse text-[var(--accent-brand)]' : ''}`} /></NavBtn>
             <NavBtn title={t('db.newConn')} onClick={() => engines[0] && setForm(emptyForm(engines[0]))} disabled={!engines.length}><Plus className="w-3.5 h-3.5" /></NavBtn>
             <NavBtn title={t('db.hideNav')} onClick={() => setNavOpen(false)}><PanelLeftClose className="w-3.5 h-3.5" /></NavBtn>
@@ -296,12 +297,12 @@ export default function DatabasePanel({ serverId }: { serverId: string }) {
             <div className="h-7 px-2 flex items-center gap-1.5 rounded-md bg-[var(--background)] border border-[var(--border)] focus-within:border-[var(--muted-foreground)]">
               <Search className="w-3 h-3 text-[var(--muted-foreground)]" />
               <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={t('db.searchTables')} aria-label={t('db.searchTables')} className="flex-1 min-w-0 bg-transparent text-[11px]" />
-              {filter && <button onClick={() => setFilter('')} aria-label="Clear"><X className="w-3 h-3" /></button>}
+              {filter && <button onClick={() => setFilter('')} aria-label={t('db.clear')}><X className="w-3 h-3" /></button>}
             </div>
           </div>
           {error && <p role="alert" className="shrink-0 px-3 py-2 text-[11px] text-red-500 break-words border-b border-[var(--border)]">{error}</p>}
 
-          <div className="flex-1 min-h-0 overflow-auto p-1.5 sidebar-scroll" role="tree" aria-label="Koneksi database">
+          <div className="flex-1 min-h-0 overflow-auto p-1.5 sidebar-scroll" role="tree" aria-label={t('db.connections')}>
             {conns.map((c) => {
               const st = tree[c.id];
               const eng = engineOf(c.engine);
@@ -316,7 +317,7 @@ export default function DatabasePanel({ serverId }: { serverId: string }) {
                     meta={
                       <span className="shrink-0 flex items-center gap-1">
                         {st?.loading && <RefreshCw className="w-3 h-3 animate-spin text-[var(--muted-foreground)]" />}
-                        {c.allowWrite ? <ShieldAlert className="w-3 h-3 text-amber-500" aria-label="mode tulis" /> : <ShieldCheck className="w-3 h-3 text-emerald-500/70" aria-label="read-only" />}
+                        {c.allowWrite ? <ShieldAlert className="w-3 h-3 text-amber-500" aria-label={t('db.writeMode')} /> : <ShieldCheck className="w-3 h-3 text-emerald-500/70" aria-label={t('db.readOnly')} />}
                         <span className="hidden group-hover:flex items-center gap-0.5">
                           <IconBtn title={t('db.newQuery')} onClick={() => openQuery(c, c.database)}><SquareTerminal className="w-3 h-3" /></IconBtn>
                           {eng?.canSchema && !eng.canListDatabases && <IconBtn title={t('db.diagram')} onClick={() => openDbView(c, undefined, 'diagram')}><Network className="w-3 h-3" /></IconBtn>}
@@ -336,7 +337,7 @@ export default function DatabasePanel({ serverId }: { serverId: string }) {
                           </div>
                         </div>
                       ) : !st?.version ? (
-                        <div className="pl-7 h-7 flex items-center gap-1.5 text-[11px] text-[var(--muted-foreground)]"><RefreshCw className="w-3 h-3 animate-spin" /> connecting…</div>
+                        <div className="pl-7 h-7 flex items-center gap-1.5 text-[11px] text-[var(--muted-foreground)]"><RefreshCw className="w-3 h-3 animate-spin" /> {t('db.connecting')}</div>
                       ) : (
                         <>
                           <div className="pl-[26px] pb-0.5 text-[10px] text-[var(--muted-foreground)] font-mono truncate">{eng?.label} · v{st.version}</div>
@@ -403,7 +404,7 @@ export default function DatabasePanel({ serverId }: { serverId: string }) {
             )}
           </div>
 
-          <div onPointerDown={startResize} role="separator" aria-orientation="vertical" aria-label="Resize navigator"
+          <div onPointerDown={startResize} role="separator" aria-orientation="vertical" aria-label={t('db.resizeNav')}
             className="absolute top-0 -right-1 w-2 h-full cursor-col-resize group">
             <span className="absolute right-[3px] top-0 h-full w-[2px] group-hover:bg-[var(--accent-brand)]/60 transition-colors" />
           </div>
@@ -415,28 +416,28 @@ export default function DatabasePanel({ serverId }: { serverId: string }) {
         {/* Tab strip */}
         <div className="shrink-0 h-10 flex items-stretch border-b border-[var(--border)] bg-[var(--sidebar-bg)]">
           {!navOpen && (
-            <button onClick={() => setNavOpen(true)} className="px-2.5 border-r border-[var(--border)] hover:bg-[var(--sidebar-hover)]" aria-label="Tampilkan navigator" title="Tampilkan navigator">
+            <button onClick={() => setNavOpen(true)} className="px-2.5 border-r border-[var(--border)] hover:bg-[var(--sidebar-hover)]" aria-label={t('db.showNav')} title={t('db.showNav')}>
               <PanelLeftOpen className="w-3.5 h-3.5" />
             </button>
           )}
-          <div className="flex-1 min-w-0 flex items-stretch overflow-x-auto" role="tablist" aria-label="Tab terbuka">
-            {tabs.map((t) => {
-              const c = connOf(t.connId);
-              const isActive = t.id === activeId;
-              const Icon = t.kind === 'object' ? objIcon(t.objectType) : t.kind === 'query' ? FileCode2 : t.kind === 'diagram' ? Network : Info;
-              const title = t.kind === 'query' ? t.title : t.kind === 'object' ? t.object : `${t.kind === 'diagram' ? 'ERD' : 'Info'} · ${t.database || c?.name || ''}`;
+          <div className="flex-1 min-w-0 flex items-stretch overflow-x-auto" role="tablist" aria-label={t('db.openTabs')}>
+            {tabs.map((tab) => {
+              const c = connOf(tab.connId);
+              const isActive = tab.id === activeId;
+              const Icon = tab.kind === 'object' ? objIcon(tab.objectType) : tab.kind === 'query' ? FileCode2 : tab.kind === 'diagram' ? Network : Info;
+              const title = tab.kind === 'query' ? tab.title : tab.kind === 'object' ? tab.object : `${tab.kind === 'diagram' ? 'ERD' : 'Info'} · ${tab.database || c?.name || ''}`;
               return (
-                <div key={t.id} role="tab" aria-selected={isActive} tabIndex={0}
-                  onClick={() => setActiveId(t.id)}
-                  onAuxClick={(e) => { if (e.button === 1) closeTab(t.id); }}
-                  onKeyDown={(e) => e.key === 'Enter' && setActiveId(t.id)}
-                  title={`${c?.name || ''}${t.database ? ` / ${t.database}` : ''}`}
+                <div key={tab.id} role="tab" aria-selected={isActive} tabIndex={0}
+                  onClick={() => setActiveId(tab.id)}
+                  onAuxClick={(e) => { if (e.button === 1) closeTab(tab.id); }}
+                  onKeyDown={(e) => e.key === 'Enter' && setActiveId(tab.id)}
+                  title={`${c?.name || ''}${tab.database ? ` / ${tab.database}` : ''}`}
                   className={`group relative shrink-0 max-w-[14rem] flex items-center gap-1.5 pl-3 pr-1.5 border-r border-[var(--border)] text-[12px] cursor-pointer transition-colors
                     ${isActive ? 'bg-[var(--card)] text-[var(--foreground)]' : 'text-[var(--muted-foreground)] hover:bg-[var(--sidebar-hover)] hover:text-[var(--foreground)]'}`}>
                   {isActive && <span aria-hidden className="absolute inset-x-0 top-0 h-[2px] bg-[var(--accent-brand)]" />}
-                  <Icon className={`w-3.5 h-3.5 shrink-0 ${t.kind === 'query' ? 'text-[var(--accent-brand)]' : t.kind === 'object' ? 'text-sky-500' : 'text-amber-500'}`} />
+                  <Icon className={`w-3.5 h-3.5 shrink-0 ${tab.kind === 'query' ? 'text-[var(--accent-brand)]' : tab.kind === 'object' ? 'text-sky-500' : 'text-amber-500'}`} />
                   <span className="truncate font-mono">{title}</span>
-                  <button onClick={(e) => { e.stopPropagation(); closeTab(t.id); }} aria-label={`Tutup ${title}`}
+                  <button onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }} aria-label={t('db.closeTab', { name: title })}
                     className={`shrink-0 p-0.5 rounded hover:bg-[var(--sidebar-active)] ${isActive ? 'opacity-70' : 'opacity-0 group-hover:opacity-70'} hover:!opacity-100`}>
                     <X className="w-3 h-3" />
                   </button>
@@ -446,7 +447,7 @@ export default function DatabasePanel({ serverId }: { serverId: string }) {
           </div>
           {conns.length > 0 && (
             <button onClick={() => { const c = (active && connOf(active.connId)) || conns[0]; openQuery(c, active?.database); }}
-              className="shrink-0 px-3 flex items-center gap-1.5 text-[11px] border-l border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--sidebar-hover)]" title="Query baru (⌘E)">
+              className="shrink-0 px-3 flex items-center gap-1.5 text-[11px] border-l border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--sidebar-hover)]" title={t('db.newQueryShortcut')}>
               <Plus className="w-3.5 h-3.5" /> Query
             </button>
           )}
@@ -503,21 +504,21 @@ export default function DatabasePanel({ serverId }: { serverId: string }) {
         const eng = engineOf(c.engine);
         const items: { label: string; icon: React.ElementType; onClick: () => void; danger?: boolean }[] = [];
         if (ctx.object) {
-          items.push({ label: 'Buka data', icon: Table2, onClick: () => openObject(c, ctx.database || '', ctx.object!) });
-          if (eng?.canSchema) items.push({ label: 'Lihat relasi di diagram', icon: Network, onClick: () => openDbView(c, ctx.database || undefined, 'diagram', ctx.object!.name) });
+          items.push({ label: t('db.openData'), icon: Table2, onClick: () => openObject(c, ctx.database || '', ctx.object!) });
+          if (eng?.canSchema) items.push({ label: t('db.showRelations'), icon: Network, onClick: () => openDbView(c, ctx.database || undefined, 'diagram', ctx.object!.name) });
           if (eng?.kind === 'sql') {
-            items.push({ label: 'SELECT di query baru', icon: FileCode2, onClick: () => openQuery(c, ctx.database, `SELECT * FROM ${ctx.object!.name}\nLIMIT 100;`) });
+            items.push({ label: t('db.selectInNewQuery'), icon: FileCode2, onClick: () => openQuery(c, ctx.database, `SELECT * FROM ${ctx.object!.name}\nLIMIT 100;`) });
             items.push({ label: 'COUNT(*)', icon: FileCode2, onClick: () => openQuery(c, ctx.database, `SELECT COUNT(*) FROM ${ctx.object!.name};`) });
           }
-          items.push({ label: 'Salin nama', icon: FileJson, onClick: () => navigator.clipboard.writeText(ctx.object!.name) });
+          items.push({ label: t('db.copyName'), icon: FileJson, onClick: () => navigator.clipboard.writeText(ctx.object!.name) });
         } else if (ctx.database !== undefined) {
           if (eng?.canSchema) {
-            items.push({ label: 'Diagram relasi', icon: Network, onClick: () => openDbView(c, ctx.database, 'diagram') });
-            items.push({ label: 'Properties database', icon: Info, onClick: () => openDbView(c, ctx.database, 'props') });
+            items.push({ label: t('db.diagram'), icon: Network, onClick: () => openDbView(c, ctx.database, 'diagram') });
+            items.push({ label: t('db.properties'), icon: Info, onClick: () => openDbView(c, ctx.database, 'props') });
           }
-          items.push({ label: 'Query baru di sini', icon: SquareTerminal, onClick: () => openQuery(c, ctx.database) });
-          items.push({ label: 'Refresh tabel', icon: RefreshCw, onClick: () => loadObjects(c, ctx.database!, true) });
-          if (eng?.canDump) items.push({ label: 'Dump database (.sql)', icon: Download, onClick: () => guard(() => dumpDb(c.id, c.name, ctx.database!)) });
+          items.push({ label: t('db.newQueryHere'), icon: SquareTerminal, onClick: () => openQuery(c, ctx.database) });
+          items.push({ label: t('db.refreshTables'), icon: RefreshCw, onClick: () => loadObjects(c, ctx.database!, true) });
+          if (eng?.canDump) items.push({ label: t('db.dump'), icon: Download, onClick: () => guard(() => dumpDb(c.id, c.name, ctx.database!)) });
         } else {
           items.push({ label: t('db.newQuery'), icon: SquareTerminal, onClick: () => openQuery(c, c.database) });
           if (eng?.canSchema && !eng.canListDatabases) {
@@ -592,6 +593,7 @@ function SchemaTab({ conn, engine, database, kind, focus, storageKey, onOpenTabl
   conn: DbConnection; engine: DbEngine; database?: string; kind: 'diagram' | 'props'; focus?: string; storageKey: string;
   onOpenTable: (name: string) => void; onShowDiagram: (focus?: string) => void;
 }) {
+  const t = useT();
   const key = `db:schema:${conn.id}:${database || ''}`;
   const [schema, setSchema] = useState<DbSchema | null>(() => cacheGet<DbSchema>(key) ?? null);
   const [loading, setLoading] = useState(false);
@@ -627,7 +629,7 @@ function SchemaTab({ conn, engine, database, kind, focus, storageKey, onOpenTabl
       <div className="h-full flex items-center justify-center p-6">
         <div className="max-w-md text-center space-y-2">
           <p role="alert" className="text-xs font-mono text-red-500 whitespace-pre-wrap">{error}</p>
-          <button onClick={() => load(true)} className="text-xs underline">Coba lagi</button>
+          <button onClick={() => load(true)} className="text-xs underline">{t('common.retry')}</button>
         </div>
       </div>
     );
@@ -635,7 +637,7 @@ function SchemaTab({ conn, engine, database, kind, focus, storageKey, onOpenTabl
   if (!schema) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-2 text-xs text-[var(--muted-foreground)]">
-        <RefreshCw className="w-4 h-4 animate-spin" /> Membaca schema {database || ''}…
+        <RefreshCw className="w-4 h-4 animate-spin" /> {t('db.readingSchema', { name: database || '' })}
       </div>
     );
   }
@@ -673,27 +675,28 @@ function IconBtn({ title, onClick, children }: { title: string; onClick: () => v
 }
 
 function Welcome({ hasConns, onNewQuery, onScan }: { hasConns: boolean; onNewQuery: () => void; onScan: () => void }) {
+  const t = useT();
   const tips: [string, string][] = [
-    ['Klik tabel', 'buka data di tab baru'],
-    ['Klik kanan', 'menu: query, count, dump'],
-    ['⌘E', 'query baru'],
-    ['⌘↵', 'jalankan query'],
-    ['⌘W', 'tutup tab']
+    [t('db.tipClickTable'), t('db.tipClickTableDesc')],
+    [t('db.tipRightClick'), t('db.tipRightClickDesc')],
+    ['⌘E', t('db.tipNewQuery')],
+    ['⌘↵', t('db.tipRunQuery')],
+    ['⌘W', t('db.tipCloseTab')]
   ];
   return (
     <div className="h-full flex items-center justify-center p-8">
       <div className="max-w-sm w-full space-y-5 page-enter">
         <div>
           <Database className="w-7 h-7 text-[var(--accent-brand)]" />
-          <h3 className="mt-3 text-base font-semibold tracking-tight">Database workbench</h3>
+          <h3 className="mt-3 text-base font-semibold tracking-tight">{t('db.workbench')}</h3>
           <p className="mt-1 text-xs text-[var(--muted-foreground)] leading-relaxed">
-            {hasConns ? 'Buka koneksi di navigator, lalu pilih tabel untuk melihat datanya.' : 'Database di server dan di container Docker bisa dideteksi otomatis.'}
+            {hasConns ? t('db.welcomeHasConns') : t('db.welcomeNoConns')}
           </p>
         </div>
         <div className="flex gap-2">
           {hasConns
-            ? <button onClick={onNewQuery} className="h-8 px-3 rounded-md bg-[var(--accent-brand)] text-white text-xs font-semibold flex items-center gap-1.5 hover:brightness-110 active:scale-[0.98] transition"><SquareTerminal className="w-3.5 h-3.5" /> Query baru</button>
-            : <button onClick={onScan} className="h-8 px-3 rounded-md bg-[var(--accent-brand)] text-white text-xs font-semibold flex items-center gap-1.5 hover:brightness-110 active:scale-[0.98] transition"><Sparkles className="w-3.5 h-3.5" /> Scan server</button>}
+            ? <button onClick={onNewQuery} className="h-8 px-3 rounded-md bg-[var(--accent-brand)] text-white text-xs font-semibold flex items-center gap-1.5 hover:brightness-110 active:scale-[0.98] transition"><SquareTerminal className="w-3.5 h-3.5" /> {t('db.newQuery')}</button>
+            : <button onClick={onScan} className="h-8 px-3 rounded-md bg-[var(--accent-brand)] text-white text-xs font-semibold flex items-center gap-1.5 hover:brightness-110 active:scale-[0.98] transition"><Sparkles className="w-3.5 h-3.5" /> {t('db.scanServer')}</button>}
         </div>
         <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-1.5 text-[11px]">
           {tips.map(([k, v]) => (

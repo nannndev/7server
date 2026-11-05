@@ -122,21 +122,21 @@ export default function FileManagerModal({
     const target = join(dir, file.name);
     if (files.some((f) => f.name === file.name)) {
       const ok = await confirmModal({
-        title: 'Timpa File',
-        message: `File "${file.name}" sudah ada di folder ini. Timpa file dengan versi baru?`,
+        title: t('files.overwriteTitle'),
+        message: t('files.overwriteConfirm', { name: file.name }),
         variant: 'warning',
-        confirmText: 'Timpa File'
+        confirmText: t('files.overwriteTitle')
       });
       if (!ok) return;
     }
     setLoading(true);
     try {
       await uploadFile(server.id, target, file);
-      toast.success(`Uploaded ${file.name}`);
+      toast.success(t('files.uploaded', { name: file.name }));
       await load();
     } catch (err: any) {
       setError(err.message);
-      toast.error(`Failed to upload file: ${err.message}`);
+      toast.error(t('files.uploadFailed', { error: err.message }));
     } finally {
       setLoading(false);
     }
@@ -187,7 +187,7 @@ export default function FileManagerModal({
                   value={pathInput}
                   onChange={(e) => setPathInput(e.target.value)}
                   className="h-7 text-xs font-mono sensitive"
-                  aria-label="Path"
+                  aria-label={t('files.path')}
                 />
               </form>
 
@@ -235,7 +235,7 @@ export default function FileManagerModal({
 
             {/* Quick Bookmarks Bar */}
             <div className="px-4 py-1.5 border-b border-[var(--border)] bg-[var(--muted)]/40 flex items-center gap-1.5 overflow-x-auto text-[11px]">
-              <span className="text-[var(--muted-foreground)] font-medium mr-1">Pintasan:</span>
+              <span className="text-[var(--muted-foreground)] font-medium mr-1">{t('files.shortcuts')}</span>
               {BOOKMARKS.map((b) => (
                 <button
                   key={b.path}
@@ -250,7 +250,7 @@ export default function FileManagerModal({
                 </button>
               ))}
               <span className="ml-auto text-[10px] text-[var(--muted-foreground)] font-mono">
-                {visibleFiles.length} item
+                {t('files.itemCount', { n: visibleFiles.length })}
               </span>
             </div>
 
@@ -275,7 +275,7 @@ export default function FileManagerModal({
                   <thead className="bg-[var(--muted)]/60 text-[var(--muted-foreground)] border-b border-[var(--border)] sticky top-0 text-[10px] uppercase">
                     <tr>
                       <th className="py-2 px-4 text-left font-medium">{t('files.name')}</th>
-                      <th className="py-2 px-3 text-left font-medium">TYPE</th>
+                      <th className="py-2 px-3 text-left font-medium">{t('files.type')}</th>
                       <th className="py-2 px-3 text-right font-medium">{t('files.size')}</th>
                       <th className="py-2 px-3 text-left font-medium hidden sm:table-cell">{t('webapps.thModified')}</th>
                       <th className="py-2 px-3 text-right font-medium">{t('files.actions')}</th>
@@ -299,7 +299,7 @@ export default function FileManagerModal({
                           </td>
                           <td className="py-1.5 px-3">
                             {f.isDir ? (
-                              <span className="text-[10px] text-[var(--muted-foreground)]">Folder</span>
+                              <span className="text-[10px] text-[var(--muted-foreground)]">{t('files.folder')}</span>
                             ) : (
                               <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4 font-mono text-[var(--muted-foreground)]">
                                 {meta?.language}
@@ -323,7 +323,7 @@ export default function FileManagerModal({
                                   onClick={() => setActiveFile(join(dir, f.name))}
                                 >
                                   {meta?.canEdit ? <Edit2 className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                                  {meta?.canEdit ? 'Edit' : 'Preview'}
+                                  {meta?.canEdit ? t('common.edit') : t('files.preview')}
                                 </Button>
                                 <Button
                                   variant="ghost"

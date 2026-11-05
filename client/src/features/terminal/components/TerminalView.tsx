@@ -74,7 +74,7 @@ export default function TerminalView({
   const [sessions, setSessions] = useState<TerminalTabSession[]>(() => [
     {
       id: `session-1`,
-      title: initialCommand ? 'Setup Script' : 'Terminal 1',
+      title: initialCommand ? t('term.setupScript') : t('terminal.tabDefault', { n: 1 }),
       initialCommand
     }
   ]);
@@ -177,7 +177,7 @@ export default function TerminalView({
         const newId = `session-${Date.now()}`;
         const newSession: TerminalTabSession = {
           id: newId,
-          title: 'Setup Script',
+          title: t('term.setupScript'),
           initialCommand
         };
         setSessions((prev) => [...prev, newSession]);
@@ -193,7 +193,7 @@ export default function TerminalView({
     const newId = `session-${Date.now()}`;
     const newTab: TerminalTabSession = {
       id: newId,
-      title: `Terminal ${nextCount}`
+      title: t('terminal.tabDefault', { n: nextCount })
     };
     setSessions((prev) => [...prev, newTab]);
     setActiveSessionId(newId);
@@ -354,17 +354,17 @@ export default function TerminalView({
           <div className="flex items-center gap-1.5">
             <button
               onClick={handleReconnect}
-              title="Hubungkan Ulang Sesi Aktif (Red Dot)"
+              title={t('term.dotReconnect')}
               className="w-3 h-3 rounded-full bg-red-500/80 hover:bg-red-400 transition cursor-pointer"
             />
             <button
               onClick={handleClear}
-              title="Bersihkan Terminal Aktif (Yellow Dot)"
+              title={t('term.dotClear')}
               className="w-3 h-3 rounded-full bg-amber-500/80 hover:bg-amber-400 transition cursor-pointer"
             />
             <button
               onClick={() => setIsFullScreen(!isFullScreen)}
-              title="Layar Penuh (Green Dot)"
+              title={t('term.dotFullscreen')}
               className="w-3 h-3 rounded-full bg-emerald-500/80 hover:bg-emerald-400 transition cursor-pointer"
             />
           </div>
@@ -558,7 +558,7 @@ export default function TerminalView({
               variant="ghost"
               size="icon"
               onClick={onClose}
-              title="Close"
+              title={t('common.close')}
               className="h-7 w-7 text-zinc-400 hover:text-red-400 ml-1"
             >
               <X className="w-3.5 h-3.5" />
@@ -662,9 +662,9 @@ export default function TerminalView({
 
         {/* Tab Count & Shortcuts hint */}
         <div className="hidden lg:flex items-center gap-2 text-[10px] text-zinc-500 font-mono">
-          <span>{sessions.length} sesi aktif</span>
+          <span>{t('term.activeSessions', { n: sessions.length })}</span>
           <span className="text-zinc-700">·</span>
-          <span>Alt+1, Alt+2... untuk ganti tab</span>
+          <span>{t('term.switchTabHint')}</span>
         </div>
       </div>
 
@@ -763,7 +763,7 @@ export default function TerminalView({
                   type="button"
                   onClick={() => sendShortcut(item.cmd, true)}
                   className="px-2 py-0.5 text-left text-xs font-mono font-medium text-zinc-200 hover:text-[var(--primary)] flex items-center gap-1"
-                  title={`${item.desc || item.cmd} (Klik untuk jalankan di tab aktif)`}
+                  title={t('term.runShortcutHint', { desc: item.desc || item.cmd })}
                 >
                   <Play className="w-2.5 h-2.5 text-emerald-400 shrink-0 opacity-70 group-hover:opacity-100" />
                   <span>{item.label}</span>
@@ -773,7 +773,7 @@ export default function TerminalView({
                   type="button"
                   onClick={() => sendShortcut(item.cmd, false)}
                   className="text-[10px] text-zinc-500 hover:text-zinc-300 px-1 py-0.5 rounded hover:bg-zinc-800 border border-transparent hover:border-zinc-700 transition"
-                  title="Tempel perintah ke kursor tanpa enter"
+                  title={t('term.pasteHint')}
                 >
                   {t('terminal.pasteToPrompt')}
                 </button>
@@ -837,19 +837,19 @@ export default function TerminalView({
         <div className="flex items-center gap-3 overflow-x-auto">
           <span className="flex items-center gap-1">
             <kbd className="px-1 py-0.2 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 text-[10px]">Ctrl+C</kbd>
-            <span className="text-[10px]">Cancel</span>
+            <span className="text-[10px]">{t('term.keyCancel')}</span>
           </span>
           <span className="flex items-center gap-1">
             <kbd className="px-1 py-0.2 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 text-[10px]">Ctrl+L</kbd>
-            <span className="text-[10px]">Clear</span>
+            <span className="text-[10px]">{t('term.keyClear')}</span>
           </span>
           <span className="flex items-center gap-1">
             <kbd className="px-1 py-0.2 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 text-[10px]">Ctrl+Z</kbd>
-            <span className="text-[10px]">Suspend</span>
+            <span className="text-[10px]">{t('term.keySuspend')}</span>
           </span>
           <span className="flex items-center gap-1">
             <kbd className="px-1 py-0.2 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 text-[10px]">Ctrl+D</kbd>
-            <span className="text-[10px]">Exit</span>
+            <span className="text-[10px]">{t('term.keyExit')}</span>
           </span>
         </div>
 
@@ -877,6 +877,7 @@ export default function TerminalView({
               </h4>
               <button
                 onClick={() => setShowAddModal(false)}
+                aria-label={t('common.close')}
                 className="text-zinc-500 hover:text-zinc-200"
               >
                 ✕
@@ -890,7 +891,7 @@ export default function TerminalView({
                 </label>
                 <input
                   type="text"
-                  placeholder="Contoh: Restart Nginx"
+                  placeholder={t('term.labelPlaceholder')}
                   value={newLabel}
                   onChange={(e) => setNewLabel(e.target.value)}
                   className="w-full h-8 px-3 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-100 outline-none focus:border-[var(--primary)]"
@@ -904,7 +905,7 @@ export default function TerminalView({
                 </label>
                 <input
                   type="text"
-                  placeholder="Contoh: systemctl restart nginx && nginx -t"
+                  placeholder={t('term.commandPlaceholder', { cmd: 'systemctl restart nginx && nginx -t' })}
                   value={newCmd}
                   onChange={(e) => setNewCmd(e.target.value)}
                   className="w-full h-8 px-3 rounded-lg bg-zinc-900 border border-zinc-800 text-xs font-mono text-zinc-100 outline-none focus:border-[var(--primary)]"

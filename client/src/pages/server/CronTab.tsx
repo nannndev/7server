@@ -73,7 +73,7 @@ export default function CronTab() {
     try {
       await swr(`cron:${server.id}`, () => fetchCronJobs(server.id), setJobs, setLoading, force);
     } catch (err: any) {
-      setError(err.message || 'Failed to load cron jobs');
+      setError(err.message || t('cron.loadFailed'));
     }
   };
 
@@ -125,7 +125,7 @@ export default function CronTab() {
       setShowAddModal(false);
       toast.success(t('cron.saveSuccess'));
     } catch (err: any) {
-      toast.error(err.message || 'Failed to save cron job');
+      toast.error(err.message || t('cron.saveFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -139,7 +139,7 @@ export default function CronTab() {
       setJobs(res);
       toast.success(job.enabled ? t('cron.toggleDisabled') : t('cron.toggleEnabled'));
     } catch (err: any) {
-      toast.error(err.message || 'Failed to update status');
+      toast.error(err.message || t('cron.statusFailed'));
       loadJobs(true);
     }
   };
@@ -157,7 +157,7 @@ export default function CronTab() {
       setJobs(res);
       toast.success(t('cron.deleteSuccess'));
     } catch (err: any) {
-      toast.error(err.message || 'Failed to delete cron job');
+      toast.error(err.message || t('cron.deleteFailed'));
     }
   };
 
@@ -167,12 +167,12 @@ export default function CronTab() {
       const result = await testRunCronJob(server.id, job.command);
       setTestResult({ job, result });
       if (result.code === 0) {
-        toast.success(`Test run succeeded (Exit 0 in ${result.durationMs}ms)`);
+        toast.success(t('cron.testSuccess', { ms: result.durationMs }));
       } else {
-        toast.warning(`Test run exited with code: ${result.code}`);
+        toast.warning(t('cron.testExitCode', { code: result.code }));
       }
     } catch (err: any) {
-      toast.error(err.message || 'Failed to test run cron job');
+      toast.error(err.message || t('cron.testFailed'));
     } finally {
       setRunningJobId(null);
     }
@@ -228,10 +228,10 @@ export default function CronTab() {
               onClick={() => loadJobs(true)}
               disabled={loading}
               className="gap-1.5 h-8 text-xs"
-              title="Refresh"
+              title={t('common.refresh')}
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-              <span>Refresh</span>
+              <span>{t('common.refresh')}</span>
             </Button>
 
             <Button
@@ -390,6 +390,7 @@ export default function CronTab() {
               </h3>
               <button
                 onClick={() => setShowAddModal(false)}
+                aria-label={t('common.close')}
                 className="text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
               >
                 <X className="w-4 h-4" />
@@ -424,7 +425,7 @@ export default function CronTab() {
               {/* Schedule Input */}
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-[var(--foreground)]">
-                  {t('cron.schedule')} <span className="font-mono text-zinc-500">(min hour dom month dow)</span>
+                  {t('cron.schedule')} <span className="font-mono text-zinc-500">{t('cron.fieldsHint')}</span>
                 </label>
                 <Input
                   type="text"
@@ -498,11 +499,12 @@ export default function CronTab() {
                   variant={testResult.result.code === 0 ? 'success' : 'destructive'}
                   className="text-[10px] font-mono py-0 h-4"
                 >
-                  Exit: {testResult.result.code}
+                  {t('cron.exitBadge', { code: testResult.result.code })}
                 </Badge>
               </div>
               <button
                 onClick={() => setTestResult(null)}
+                aria-label={t('common.close')}
                 className="text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
               >
                 <X className="w-4 h-4" />

@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Table2, Eye, Link2, HardDrive, Rows3, Sparkles, KeyRound, ArrowDown, ArrowUp, AlertTriangle, Network, Database } from 'lucide-react';
 import type { DbSchema, DbConnection, DbEngine } from '@/features/databases/api';
 import { tableStats, fmtBytes, fmtNum } from '@/features/databases/lib/erGraph';
+import { useT } from '@/shared/i18n';
 
 type SortKey = 'name' | 'rows' | 'totalBytes' | 'dataBytes' | 'indexBytes' | 'columns' | 'inbound' | 'outbound';
 
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export default function DbProperties({ schema, conn, engine, database, onOpenTable, onShowDiagram }: Props) {
+  const t = useT();
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'totalBytes', dir: 'desc' });
   const [q, setQ] = useState('');
   const stats = useMemo(() => tableStats(schema), [schema]);
@@ -58,10 +60,10 @@ export default function DbProperties({ schema, conn, engine, database, onOpenTab
   );
 
   const kpis: { label: string; value: string; sub?: string; icon: React.ElementType }[] = [
-    { label: 'Ukuran total', value: fmtBytes(totalSize), sub: hasSizes ? `data ${fmtBytes(dataBytes)} · index ${fmtBytes(indexBytes)}` : undefined, icon: HardDrive },
-    { label: 'Tabel', value: fmtNum(tables.length), sub: views.length ? `+ ${views.length} view` : undefined, icon: Table2 },
-    { label: 'Baris (perkiraan)', value: totalRows ? fmtNum(totalRows) : '–', sub: tables.length ? `${fmtNum(columns)} kolom` : undefined, icon: Rows3 },
-    { label: 'Relasi', value: fmtNum(declared + inferred), sub: `${declared} FK · ${inferred} tebakan`, icon: Link2 }
+    { label: t('db.totalSize'), value: fmtBytes(totalSize), sub: hasSizes ? `data ${fmtBytes(dataBytes)} · index ${fmtBytes(indexBytes)}` : undefined, icon: HardDrive },
+    { label: t('db.tables'), value: fmtNum(tables.length), sub: views.length ? t('db.plusViews', { n: views.length }) : undefined, icon: Table2 },
+    { label: t('db.rowsEstimate'), value: totalRows ? fmtNum(totalRows) : '–', sub: tables.length ? t('db.nColumns', { n: fmtNum(columns) }) : undefined, icon: Rows3 },
+    { label: t('db.relations'), value: fmtNum(declared + inferred), sub: t('db.relSub', { fk: declared, inferred }), icon: Link2 }
   ];
 
   return (
@@ -76,7 +78,7 @@ export default function DbProperties({ schema, conn, engine, database, onOpenTab
             </p>
           </div>
           <button onClick={() => onShowDiagram()} className="h-8 px-3 rounded-md bg-[var(--accent-brand)] text-white text-xs font-semibold flex items-center gap-1.5 hover:brightness-110 active:scale-[0.98] transition">
-            <Network className="w-3.5 h-3.5" /> Lihat diagram relasi
+            <Network className="w-3.5 h-3.5" /> {t('db.viewDiagram')}
           </button>
         </div>
 
@@ -94,18 +96,18 @@ export default function DbProperties({ schema, conn, engine, database, onOpenTab
         <div className="grid lg:grid-cols-[1.4fr,1fr] gap-4">
           {/* Largest tables */}
           <section className="p-4 rounded-xl border border-[var(--border)] bg-[var(--card)]">
-            <h3 className="text-xs font-semibold mb-3">Tabel terbesar</h3>
-            {top.length === 0 ? <p className="text-xs text-[var(--muted-foreground)]">Ukuran per tabel tidak tersedia untuk engine ini.</p> : (
+            <h3 className="text-xs font-semibold mb-3">{t('db.largestTables')}</h3>
+            {top.length === 0 ? <p className="text-xs text-[var(--muted-foreground)]">{t('db.noTableSizes')}</p> : (
               <ul className="space-y-2">
-                {top.map((t) => {
-                  const dPct = ((t.dataBytes || 0) / topMax) * 100;
-                  const iPct = ((t.indexBytes || 0) / topMax) * 100;
+                {top.map((tb) => {
+                  const dPct = ((tb.dataBytes || 0) / topMax) * 100;
+                  const iPct = ((tb.indexBytes || 0) / topMax) * 100;
                   return (
-                    <li key={t.name}>
-                      <button onClick={() => onOpenTable(t.name)} className="w-full text-left group">
+                    <li key={tb.name}>
+                      <button onClick={() => onOpenTable(tb.name)} className="w-full text-left group">
                         <div className="flex items-center justify-between text-[12px]">
-                          <span className="font-mono truncate group-hover:text-[var(--accent-brand)] transition-colors">{t.name}</span>
-                          <span className="font-mono text-[11px] text-[var(--muted-foreground)] tabular-nums shrink-0 ml-2">{fmtBytes(t.totalBytes)} · {fmtNum(t.rows)} baris</span>
+                          <span className="font-mono truncate group-hover:text-[var(--accent-brand)] transition-colors">{tb.name}</span>
+                          <span className="font-mono text-[11px] text-[var(--muted-foreground)] tabular-nums shrink-0 ml-2">{fmtBytes(tb.totalBytes)} · {fmtNum(tb.rows)} {t('db.rowsLabel')}</span>
                         </div>
                         <div className="mt-1 h-1.5 flex rounded-full overflow-hidden" aria-hidden>
                           <span className="bg-[var(--accent-brand)] transition-[width] duration-500" style={{ width: `${dPct}%` }} />
@@ -128,11 +130,11 @@ export default function DbProperties({ schema, conn, engine, database, onOpenTab
           {/* Details + health */}
           <section className="p-4 rounded-xl border border-[var(--border)] bg-[var(--card)] space-y-4">
             <div>
-              <h3 className="text-xs font-semibold mb-2">Detail</h3>
+              <h3 className="text-xs font-semibold mb-2">{t('db.details')}</h3>
               <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-1.5 text-[12px]">
                 {([
-                  ['Koneksi', conn.name],
-                  ['Lokasi', conn.location.kind === 'container' ? `docker: ${conn.location.container}` : 'host'],
+                  [t('db.connection'), conn.name],
+                  [t('db.location'), conn.location.kind === 'container' ? `docker: ${conn.location.container}` : 'host'],
                   ['Charset', schema.meta.charset],
                   ['Collation', schema.meta.collation],
                   ...(engines.length ? [['Storage engine', engines.map(([e, n]) => `${e} (${n})`).join(', ')] as [string, string]] : []),
@@ -148,19 +150,19 @@ export default function DbProperties({ schema, conn, engine, database, onOpenTab
 
             {(noPk.length > 0 || isolated.length > 0 || inferred > 0) && (
               <div className="pt-3 border-t border-[var(--border)] space-y-2">
-                <h3 className="text-xs font-semibold">Catatan schema</h3>
+                <h3 className="text-xs font-semibold">{t('db.schemaNotes')}</h3>
                 {noPk.length > 0 && (
-                  <Note icon={AlertTriangle} tone="amber" title={`${noPk.length} tabel tanpa primary key`}>
+                  <Note icon={AlertTriangle} tone="amber" title={t('db.noPkTables', { n: noPk.length })}>
                     {noPk.slice(0, 6).map((t) => <Chip key={t.name} onClick={() => onOpenTable(t.name)}>{t.name}</Chip>)}{noPk.length > 6 && <span>+{noPk.length - 6}</span>}
                   </Note>
                 )}
                 {inferred > 0 && (
-                  <Note icon={Sparkles} tone="sky" title={`${inferred} relasi tanpa foreign key`}>
-                    Ditebak dari nama kolom (mis. <code className="font-mono">user_id → users.id</code>). Database tidak menjaga integritasnya.
+                  <Note icon={Sparkles} tone="sky" title={t('db.inferredRels', { n: inferred })}>
+                    {t('db.inferredNote1')} <code className="font-mono">user_id → users.id</code>{t('db.inferredNote2')}
                   </Note>
                 )}
                 {isolated.length > 0 && (
-                  <Note icon={Table2} tone="muted" title={`${isolated.length} tabel tanpa relasi`}>
+                  <Note icon={Table2} tone="muted" title={t('db.isolatedTables', { n: isolated.length })}>
                     {isolated.slice(0, 6).map((t) => <Chip key={t.name} onClick={() => onOpenTable(t.name)}>{t.name}</Chip>)}{isolated.length > 6 && <span>+{isolated.length - 6}</span>}
                   </Note>
                 )}
@@ -172,45 +174,45 @@ export default function DbProperties({ schema, conn, engine, database, onOpenTab
         {/* All tables */}
         <section className="rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[var(--border)]">
-            <h3 className="text-xs font-semibold flex-1">Semua objek <span className="font-normal text-[var(--muted-foreground)]">({stats.length})</span></h3>
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cari…" aria-label="Cari tabel"
+            <h3 className="text-xs font-semibold flex-1">{t('db.allObjects')} <span className="font-normal text-[var(--muted-foreground)]">({stats.length})</span></h3>
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`${t('common.search')}…`} aria-label={t('db.searchTables')}
               className="h-7 w-48 px-2 rounded-md border border-[var(--border)] bg-[var(--background)] text-[11px]" />
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-[12px]">
               <thead className="bg-[var(--muted)] text-[11px] text-[var(--muted-foreground)]">
                 <tr>
-                  {head('name', 'Nama', false)}
-                  {head('rows', 'Baris')}
-                  {hasSizes && head('dataBytes', 'Data')}
+                  {head('name', t('db.name'), false)}
+                  {head('rows', t('db.rows'))}
+                  {hasSizes && head('dataBytes', t('db.data'))}
                   {hasSizes && head('indexBytes', 'Index')}
                   {hasSizes && head('totalBytes', 'Total')}
-                  {head('columns', 'Kolom')}
-                  {head('outbound', 'FK keluar')}
-                  {head('inbound', 'Dirujuk')}
+                  {head('columns', t('db.columns'))}
+                  {head('outbound', t('db.fkOut'))}
+                  {head('inbound', t('db.referencedBy'))}
                   <th className="px-3 py-2" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)] font-mono">
-                {rows.map((t) => (
-                  <tr key={t.name} className="group hover:bg-[var(--sidebar-hover)]">
+                {rows.map((tb) => (
+                  <tr key={tb.name} className="group hover:bg-[var(--sidebar-hover)]">
                     <td className="px-3 py-1.5">
-                      <button onClick={() => onOpenTable(t.name)} className="flex items-center gap-1.5 hover:text-[var(--accent-brand)] transition-colors">
-                        {t.type === 'view' ? <Eye className="w-3.5 h-3.5 text-violet-500" /> : <Table2 className="w-3.5 h-3.5 text-sky-500" />}
-                        <span className="truncate max-w-[18rem]">{t.name}</span>
-                        {!t.hasPk && t.type === 'table' && <KeyRound className="w-3 h-3 text-amber-500/70" aria-label="tanpa primary key" />}
+                      <button onClick={() => onOpenTable(tb.name)} className="flex items-center gap-1.5 hover:text-[var(--accent-brand)] transition-colors">
+                        {tb.type === 'view' ? <Eye className="w-3.5 h-3.5 text-violet-500" /> : <Table2 className="w-3.5 h-3.5 text-sky-500" />}
+                        <span className="truncate max-w-[18rem]">{tb.name}</span>
+                        {!tb.hasPk && tb.type === 'table' && <KeyRound className="w-3 h-3 text-amber-500/70" aria-label={t('db.noPk')} />}
                       </button>
                     </td>
-                    <td className="px-3 py-1.5 text-right tabular-nums">{fmtNum(t.rows)}</td>
-                    {hasSizes && <td className="px-3 py-1.5 text-right tabular-nums text-[var(--muted-foreground)]">{fmtBytes(t.dataBytes)}</td>}
-                    {hasSizes && <td className="px-3 py-1.5 text-right tabular-nums text-[var(--muted-foreground)]">{fmtBytes(t.indexBytes)}</td>}
-                    {hasSizes && <td className="px-3 py-1.5 text-right tabular-nums">{fmtBytes(t.totalBytes)}</td>}
-                    <td className="px-3 py-1.5 text-right tabular-nums">{t.columns.length}</td>
-                    <td className="px-3 py-1.5 text-right tabular-nums">{t.outbound || ''}</td>
-                    <td className="px-3 py-1.5 text-right tabular-nums">{t.inbound || ''}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">{fmtNum(tb.rows)}</td>
+                    {hasSizes && <td className="px-3 py-1.5 text-right tabular-nums text-[var(--muted-foreground)]">{fmtBytes(tb.dataBytes)}</td>}
+                    {hasSizes && <td className="px-3 py-1.5 text-right tabular-nums text-[var(--muted-foreground)]">{fmtBytes(tb.indexBytes)}</td>}
+                    {hasSizes && <td className="px-3 py-1.5 text-right tabular-nums">{fmtBytes(tb.totalBytes)}</td>}
+                    <td className="px-3 py-1.5 text-right tabular-nums">{tb.columns.length}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">{tb.outbound || ''}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">{tb.inbound || ''}</td>
                     <td className="px-3 py-1.5 text-right">
-                      {(t.inbound + t.outbound > 0) && (
-                        <button onClick={() => onShowDiagram(t.name)} className="opacity-0 group-hover:opacity-100 focus:opacity-100 p-1 rounded hover:bg-[var(--sidebar-active)]" aria-label={`Lihat relasi ${t.name}`} title="Lihat relasinya di diagram">
+                      {(tb.inbound + tb.outbound > 0) && (
+                        <button onClick={() => onShowDiagram(tb.name)} className="opacity-0 group-hover:opacity-100 focus:opacity-100 p-1 rounded hover:bg-[var(--sidebar-active)]" aria-label={t('db.showRelationsOf', { name: tb.name })} title={t('db.showRelations')}>
                           <Network className="w-3 h-3" />
                         </button>
                       )}
@@ -221,8 +223,8 @@ export default function DbProperties({ schema, conn, engine, database, onOpenTab
             </table>
           </div>
           <p className="px-4 py-2 text-[10px] text-[var(--muted-foreground)] border-t border-[var(--border)] font-sans">
-            Jumlah baris dan ukuran adalah statistik dari engine (bisa beda sedikit dari COUNT(*) sebenarnya).
-            {schema.ms != null && <> Dibaca dalam {schema.ms} ms.</>}
+            {t('db.statsNote')}
+            {schema.ms != null && <> {t('db.readIn', { ms: schema.ms })}</>}
           </p>
         </section>
       </div>

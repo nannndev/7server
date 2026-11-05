@@ -49,7 +49,7 @@ export default function ServicesTab() {
       await controlService(server.id, serviceName, action);
       loadServiceData();
     } catch (err: any) {
-      ctx.setQuickActionOutput(`Service Error: ${err.message}`);
+      ctx.setQuickActionOutput(t('svc.serviceError', { error: err.message }));
     }
   };
   const filteredProcesses = processes.filter((p) => {
@@ -70,7 +70,7 @@ export default function ServicesTab() {
   });
   const handleKillProcess = async (pid: number | string, comm: string) => {
     const ok = await confirmModal({
-      title: 'Matikan Proses',
+      title: t('proc.killTitle'),
       message: t('services.killConfirm', { comm, pid }),
       variant: 'danger',
       confirmText: t('services.kill')
@@ -78,11 +78,11 @@ export default function ServicesTab() {
     if (!ok) return;
     try {
       await killProcess(server.id, pid, 'kill');
-      toast.success(`Process ${comm} (PID: ${pid}) terminated successfully`);
+      toast.success(t('proc.killSuccess', { comm, pid }));
       loadServiceData();
     } catch (err: any) {
-      toast.error(`Failed to kill process: ${err.message}`);
-      ctx.setQuickActionOutput(`Kill Error: ${err.message}`);
+      toast.error(t('proc.killFailed', { error: err.message }));
+      ctx.setQuickActionOutput(t('svc.killError', { error: err.message }));
     }
   };
 
@@ -193,16 +193,16 @@ export default function ServicesTab() {
                             size="sm"
                             onClick={() => ctx.openLogs({ type: 'service', name: s.unit })}
                             className="h-6 px-2 text-[10px] gap-1"
-                            title="Journalctl Logs"
+                            title={t('svc.journalLogs')}
                           >
-                            <FileText className="w-3 h-3" /> Logs
+                            <FileText className="w-3 h-3" /> {t('docker.logs')}
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => handleServiceControl(s.unit, 'restart')}
                             className="h-6 w-6 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-                            title="Restart"
+                            title={t('docker.restart')}
                           >
                             <RotateCcw className="w-3 h-3" />
                           </Button>
@@ -212,7 +212,7 @@ export default function ServicesTab() {
                               size="icon"
                               onClick={() => handleServiceControl(s.unit, 'stop')}
                               className="h-6 w-6 text-red-500 hover:text-red-600"
-                              title="Stop"
+                              title={t('docker.stop')}
                             >
                               <Square className="w-3 h-3" />
                             </Button>
@@ -222,7 +222,7 @@ export default function ServicesTab() {
                               size="icon"
                               onClick={() => handleServiceControl(s.unit, 'start')}
                               className="h-6 w-6 text-emerald-500 hover:text-emerald-600"
-                              title="Start"
+                              title={t('docker.start')}
                             >
                               <Play className="w-3 h-3" />
                             </Button>

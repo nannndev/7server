@@ -95,7 +95,7 @@ export default function BackupTab() {
         swr(`backup-profiles:${server.id}`, () => fetchBackupProfiles(server.id), setProfiles, () => {}, force)
       ]);
     } catch (err: any) {
-      setError(err.message || 'Failed to load backup archives');
+      setError(err.message || t('backup.errLoad'));
     }
   };
 
@@ -134,7 +134,7 @@ export default function BackupTab() {
     setFormEngine('mysql');
     setFormDbName('');
     setFormSourcePath('/var/www');
-    setFormProfileName(mode === 'profile' ? 'Daily Database Backup' : '');
+    setFormProfileName(mode === 'profile' ? t('backup.defaultProfileName') : '');
     setFormSchedule('0 2 * * *');
     setFormRetention(7);
     setShowCreateModal(true);
@@ -170,7 +170,7 @@ export default function BackupTab() {
       } else {
         // Create scheduled profile
         await saveBackupProfile(server.id, {
-          name: formProfileName.trim() || 'Custom Backup Profile',
+          name: formProfileName.trim() || t('backup.customProfileName'),
           type: formType,
           target: formType === 'database' ? formDbName.trim() || 'all' : formSourcePath.trim(),
           engine: formType === 'database' ? formEngine : undefined,
@@ -180,12 +180,12 @@ export default function BackupTab() {
         });
 
         setShowCreateModal(false);
-        toast.success('Backup profile created successfully');
+        toast.success(t('backup.profileCreated'));
         loadData(true);
         setActiveSubTab('profiles');
       }
     } catch (err: any) {
-      toast.error(err.message || 'Backup operation failed');
+      toast.error(err.message || t('backup.opFailed'));
     } finally {
       setIsSubmitting(false);
     }
@@ -193,7 +193,7 @@ export default function BackupTab() {
 
   const handleTriggerProfile = async (profile: BackupProfile) => {
     try {
-      toast.info(`Executing profile: ${profile.name}…`);
+      toast.info(t('backup.executingProfile', { name: profile.name }));
       const res = await runBackup(server.id, {
         name: profile.name,
         type: profile.type,
@@ -204,7 +204,7 @@ export default function BackupTab() {
       });
 
       if (res.success && res.item) {
-        toast.success(`Backup finished for ${profile.name}!`);
+        toast.success(t('backup.profileFinished', { name: profile.name }));
         loadData(true);
       } else {
         setRunResult({
@@ -216,25 +216,25 @@ export default function BackupTab() {
         });
       }
     } catch (err: any) {
-      toast.error(err.message || 'Failed to execute profile');
+      toast.error(err.message || t('backup.errExecute'));
     }
   };
 
   const handleDeleteProfile = async (profile: BackupProfile) => {
     const ok = await confirmModal({
-      title: 'Delete Backup Profile',
-      message: `Delete profile "${profile.name}"? Existing backup archives created by this profile will not be deleted.`,
+      title: t('backup.deleteProfileTitle'),
+      message: t('backup.deleteProfileConfirm', { name: profile.name }),
       variant: 'danger',
-      confirmText: 'Delete Profile'
+      confirmText: t('backup.deleteProfile')
     });
     if (!ok) return;
 
     try {
       await deleteBackupProfile(server.id, profile.id);
-      toast.success('Profile deleted');
+      toast.success(t('backup.profileDeleted'));
       loadData(true);
     } catch (err: any) {
-      toast.error(err.message || 'Failed to delete profile');
+      toast.error(err.message || t('backup.errDeleteProfile'));
     }
   };
 
@@ -256,7 +256,7 @@ export default function BackupTab() {
         toast.success(t('backup.restoreSuccess', { ms: res.durationMs }));
       } else {
         setRunResult({
-          title: 'Restore Output Log',
+          title: t('backup.restoreOutputTitle'),
           durationMs: res.durationMs,
           code: res.code,
           stdout: res.stdout,
@@ -264,7 +264,7 @@ export default function BackupTab() {
         });
       }
     } catch (err: any) {
-      toast.error(err.message || 'Failed to restore backup');
+      toast.error(err.message || t('backup.errRestore'));
     } finally {
       setIsRestoring(false);
     }
@@ -284,7 +284,7 @@ export default function BackupTab() {
       toast.success(t('backup.deleteSuccess'));
       loadData(true);
     } catch (err: any) {
-      toast.error(err.message || 'Failed to delete backup file');
+      toast.error(err.message || t('backup.errDeleteFile'));
     }
   };
 
@@ -293,7 +293,7 @@ export default function BackupTab() {
       return (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono bg-purple-500/10 text-purple-400 border border-purple-500/20 font-semibold">
           <FolderArchive className="w-3 h-3" />
-          Tar Archive
+          {t('backup.tarArchive')}
         </span>
       );
     }
@@ -352,10 +352,10 @@ export default function BackupTab() {
               onClick={() => loadData(true)}
               disabled={loading}
               className="gap-1.5 h-8 text-xs font-medium"
-              title="Refresh"
+              title={t('common.refresh')}
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-              <span>Refresh</span>
+              <span>{t('common.refresh')}</span>
             </Button>
 
             <Button
@@ -573,13 +573,13 @@ export default function BackupTab() {
                       </div>
 
                       <Badge variant="outline" className="text-[10px] font-mono px-2 py-0">
-                        Keep {p.retentionCount}
+                        {t('backup.keep', { n: p.retentionCount })}
                       </Badge>
                     </div>
 
                     <div className="space-y-1 text-xs font-mono text-[var(--muted-foreground)] bg-zinc-950 p-2.5 rounded-lg border border-zinc-800">
                       <div>
-                        <span className="text-zinc-500">Target:</span> {p.target}
+                        <span className="text-zinc-500">{t('backup.target')}</span> {p.target}
                       </div>
                       <div>
                         <span className="text-zinc-500">Cron:</span> {p.schedule}
@@ -590,7 +590,7 @@ export default function BackupTab() {
                   <div className="flex items-center justify-between pt-2 border-t border-[var(--border)]">
                     <div className="text-[11px] text-[var(--muted-foreground)] font-mono flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                      Active Profile
+                      {t('backup.activeProfile')}
                     </div>
 
                     <div className="flex items-center gap-1.5">
@@ -599,10 +599,10 @@ export default function BackupTab() {
                         variant="outline"
                         onClick={() => handleTriggerProfile(p)}
                         className="h-7 text-xs gap-1 text-[var(--primary)]"
-                        title="Run Now"
+                        title={t('backup.runNow')}
                       >
                         <Play className="w-3 h-3 text-emerald-400" />
-                        <span>Run Now</span>
+                        <span>{t('backup.runNow')}</span>
                       </Button>
                       <Button
                         size="icon"
@@ -648,7 +648,7 @@ export default function BackupTab() {
                     type="text"
                     value={formProfileName}
                     onChange={(e) => setFormProfileName(e.target.value)}
-                    placeholder="e.g. Daily Production Database"
+                    placeholder={t('backup.profileNamePlaceholder')}
                     className="text-xs"
                     required
                   />
@@ -717,7 +717,7 @@ export default function BackupTab() {
                       type="text"
                       value={formDbName}
                       onChange={(e) => setFormDbName(e.target.value)}
-                      placeholder="e.g. app_production (blank for all)"
+                      placeholder={t('backup.dbNamePlaceholder')}
                       className="font-mono text-xs"
                     />
                   </div>
@@ -737,7 +737,7 @@ export default function BackupTab() {
                     required
                   />
                   <span className="text-[10px] text-[var(--muted-foreground)]">
-                    Automatically excludes node_modules, .git, and cache files.
+                    {t('backup.excludesHint')}
                   </span>
                 </div>
               )}
@@ -826,10 +826,10 @@ export default function BackupTab() {
             <form onSubmit={handleConfirmRestore} className="space-y-3">
               <div className="space-y-1 text-xs font-mono text-[var(--muted-foreground)] bg-zinc-950 p-2.5 rounded-lg border border-zinc-800">
                 <div>
-                  <span className="text-zinc-500">File:</span> {restoreItem.filename}
+                  <span className="text-zinc-500">{t('backup.file')}</span> {restoreItem.filename}
                 </div>
                 <div>
-                  <span className="text-zinc-500">Size:</span> {restoreItem.sizeFormatted}
+                  <span className="text-zinc-500">{t('backup.size')}</span> {restoreItem.sizeFormatted}
                 </div>
               </div>
 
@@ -842,7 +842,7 @@ export default function BackupTab() {
                     type="text"
                     value={restoreTargetDb}
                     onChange={(e) => setRestoreTargetDb(e.target.value)}
-                    placeholder="e.g. app_production"
+                    placeholder={t('backup.targetDbPlaceholder')}
                     className="font-mono text-xs"
                   />
                 </div>
@@ -897,7 +897,7 @@ export default function BackupTab() {
                   variant={runResult.code === 0 ? 'success' : 'destructive'}
                   className="text-[10px] font-mono py-0 h-4"
                 >
-                  Exit: {runResult.code}
+                  {t('backup.exitCode', { code: runResult.code })}
                 </Badge>
               </div>
               <button
@@ -909,12 +909,12 @@ export default function BackupTab() {
             </div>
 
             <div className="text-xs text-[var(--muted-foreground)] flex items-center justify-between font-mono pb-2 border-b border-[var(--border)]">
-              <span>Execution Output</span>
+              <span>{t('backup.executionOutput')}</span>
               <span>{runResult.durationMs}ms</span>
             </div>
 
             <div className="flex-1 rounded-xl bg-zinc-950 p-4 font-mono text-xs text-zinc-200 overflow-auto whitespace-pre leading-relaxed border border-zinc-800">
-              {runResult.stdout || runResult.stderr || '(No stdout/stderr produced)'}
+              {runResult.stdout || runResult.stderr || t('backup.noOutput')}
             </div>
 
             <div className="pt-2 flex justify-end">

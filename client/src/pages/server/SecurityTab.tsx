@@ -63,7 +63,7 @@ export default function SecurityTab() {
         swr(`hardening:${server.id}`, () => fetchSecurityHardening(server.id), setHardening, () => {}, force)
       ]);
     } catch (err: any) {
-      setError(err.message || 'Failed to load security data');
+      setError(err.message || t('sec.loadFailed'));
     }
   };
 
@@ -83,7 +83,7 @@ export default function SecurityTab() {
       setShowAddKeyModal(false);
       toast.success(t('security.keyAdded'));
     } catch (err: any) {
-      toast.error(err.message || 'Failed to add public key');
+      toast.error(err.message || t('sec.addFailed'));
     } finally {
       setSubmittingKey(false);
     }
@@ -102,7 +102,7 @@ export default function SecurityTab() {
       setKeys(res);
       toast.success(t('security.keyDeleted'));
     } catch (err: any) {
-      toast.error(err.message || 'Failed to delete public key');
+      toast.error(err.message || t('sec.deleteFailed'));
     }
   };
 
@@ -150,10 +150,10 @@ export default function SecurityTab() {
               onClick={() => loadSecurityData(true)}
               disabled={loading}
               className="gap-1.5 h-8 text-xs"
-              title="Refresh"
+              title={t('common.refresh')}
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-              <span>Refresh</span>
+              <span>{t('common.refresh')}</span>
             </Button>
 
             <Button
@@ -228,7 +228,7 @@ export default function SecurityTab() {
                             size="icon"
                             onClick={() => handleCopyKey(k)}
                             className="h-7 w-7 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-                            title="Copy Public Key"
+                            title={t('sec.copyKey')}
                           >
                             {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                           </Button>
@@ -273,7 +273,7 @@ export default function SecurityTab() {
                     {t('security.passwordAuth')}
                   </span>
                   <span className="text-[11px] text-[var(--muted-foreground)]">
-                    PasswordAuthentication in sshd_config
+                    {t('sec.inSshdConfig', { option: 'PasswordAuthentication' })}
                   </span>
                 </div>
                 <Badge
@@ -291,7 +291,7 @@ export default function SecurityTab() {
                     {t('security.rootLogin')}
                   </span>
                   <span className="text-[11px] text-[var(--muted-foreground)]">
-                    PermitRootLogin in sshd_config
+                    {t('sec.inSshdConfig', { option: 'PermitRootLogin' })}
                   </span>
                 </div>
                 <Badge
@@ -308,10 +308,10 @@ export default function SecurityTab() {
                   <span className="text-xs font-medium text-[var(--foreground)] block">
                     {t('security.sshPort')}
                   </span>
-                  <span className="text-[11px] text-[var(--muted-foreground)]">SSH server daemon port</span>
+                  <span className="text-[11px] text-[var(--muted-foreground)]">{t('sec.sshPortDesc')}</span>
                 </div>
                 <span className="font-mono text-xs px-2 py-0.5 rounded bg-[var(--muted)] text-[var(--foreground)] border border-[var(--border)] font-semibold">
-                  Port {hardening?.sshPort || 22}
+                  {t('sec.port', { port: hardening?.sshPort || 22 })}
                 </span>
               </div>
             </div>
@@ -382,6 +382,7 @@ export default function SecurityTab() {
               </h3>
               <button
                 onClick={() => setShowAddKeyModal(false)}
+                aria-label={t('common.close')}
                 className="text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
               >
                 <X className="w-4 h-4" />

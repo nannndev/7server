@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
 import { ZoomIn, ZoomOut } from 'lucide-react';
 import { formatBytes } from './fileTypes';
+import { useT } from '@/shared/i18n';
+
+const BG_KEYS = { checker: 'files.bgChecker', dark: 'files.bgDark', light: 'files.bgLight' } as const;
 
 // Zoom, background (checker/dark/light) and intrinsic size readout for an image blob.
 export default function ImageViewer({ blobUrl, blobSize, filename }: { blobUrl: string | null; blobSize: number; filename: string }) {
+  const t = useT();
   const [imgZoom, setImgZoom] = useState(1);
   const [imgBg, setImgBg] = useState<'checker' | 'dark' | 'light'>('checker');
   const [imgDims, setImgDims] = useState<{ w: number; h: number } | null>(null);
@@ -13,11 +17,11 @@ export default function ImageViewer({ blobUrl, blobSize, filename }: { blobUrl: 
       {/* Image Sub-toolbar */}
       <div className="px-4 py-2 border-b border-zinc-800 flex items-center justify-between text-xs text-zinc-400 bg-zinc-950">
         <div className="flex items-center gap-2">
-          <span>Zoom:</span>
+          <span>{t('files.zoom')}</span>
           <button
             onClick={() => setImgZoom((z) => Math.max(0.2, +(z - 0.2).toFixed(1)))}
             className="p-1 hover:text-white"
-            title="Zoom Out"
+            title={t('files.zoomOut')}
           >
             <ZoomOut className="w-3.5 h-3.5" />
           </button>
@@ -25,7 +29,7 @@ export default function ImageViewer({ blobUrl, blobSize, filename }: { blobUrl: 
           <button
             onClick={() => setImgZoom((z) => Math.min(4, +(z + 0.2).toFixed(1)))}
             className="p-1 hover:text-white"
-            title="Zoom In"
+            title={t('files.zoomIn')}
           >
             <ZoomIn className="w-3.5 h-3.5" />
           </button>
@@ -46,7 +50,7 @@ export default function ImageViewer({ blobUrl, blobSize, filename }: { blobUrl: 
                   imgBg === b ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'
                 }`}
               >
-                {b}
+                {t(BG_KEYS[b])}
               </button>
             ))}
           </div>

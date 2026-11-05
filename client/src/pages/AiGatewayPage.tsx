@@ -216,7 +216,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
       setUsage(usageData);
       setStats(statsData);
     } catch (err: any) {
-      toast.error(err.message || 'Failed to load AI Gateway data');
+      toast.error(err.message || t('aiGw.errLoad'));
     } finally {
       setLoading(false);
     }
@@ -956,12 +956,12 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                     <tr>
                       <th className="py-2.5 px-3">{t('aiGw.colTime')}</th>
                       <th className="py-2.5 px-3">{t('aiGw.colStatus')}</th>
-                      <th className="py-2.5 px-3">Provider</th>
-                      <th className="py-2.5 px-3">Model</th>
+                      <th className="py-2.5 px-3">{t('aiGw.colProvider')}</th>
+                      <th className="py-2.5 px-3">{t('aiGw.colModel')}</th>
                       <th className="py-2.5 px-3">{t('aiGw.colVirtualKey')}</th>
-                      <th className="py-2.5 px-3 text-right">Prompt</th>
-                      <th className="py-2.5 px-3 text-right">Completion</th>
-                      <th className="py-2.5 px-3 text-right">Total</th>
+                      <th className="py-2.5 px-3 text-right">{t('aiGw.colPrompt')}</th>
+                      <th className="py-2.5 px-3 text-right">{t('aiGw.colCompletion')}</th>
+                      <th className="py-2.5 px-3 text-right">{t('aiGw.colTotal')}</th>
                       <th className="py-2.5 px-3 text-right">{t('aiGw.colDuration')}</th>
                     </tr>
                   </thead>

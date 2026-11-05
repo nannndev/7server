@@ -37,11 +37,11 @@ export default function BatchCommandModal({ servers, onClose }: BatchCommandModa
 
   const handleRun = async () => {
     if (!command.trim()) {
-      toast.warning('Perintah tidak boleh kosong');
+      toast.warning(t('batch.emptyCommand'));
       return;
     }
     if (selectedIds.length === 0) {
-      toast.warning('Pilih minimal satu server VPS');
+      toast.warning(t('batch.noServers'));
       return;
     }
 
@@ -50,20 +50,20 @@ export default function BatchCommandModal({ servers, onClose }: BatchCommandModa
     try {
       const res = await executeBatchCommand(selectedIds, command);
       setResults(res);
-      toast.success(`Successfully executed command on ${selectedIds.length} servers`);
+      toast.success(t('batch.success', { n: selectedIds.length }));
     } catch (err: any) {
-      toast.error(`Batch execution error: ${err.message}`);
+      toast.error(t('batch.error', { error: err.message }));
     } finally {
       setIsRunning(false);
     }
   };
 
   const quickCommands = [
-    { label: 'Uptime & Info', cmd: 'uname -a && uptime' },
-    { label: 'Disk (df -h)', cmd: 'df -h' },
-    { label: 'Memory (free -m)', cmd: 'free -m' },
-    { label: 'Updates', cmd: 'apt update && apt list --upgradable' },
-    { label: 'Ports', cmd: 'ss -tulpn 2>/dev/null || netstat -tulpn' },
+    { label: t('batch.qUptime'), cmd: 'uname -a && uptime' },
+    { label: t('batch.qDisk'), cmd: 'df -h' },
+    { label: t('batch.qMemory'), cmd: 'free -m' },
+    { label: t('batch.qUpdates'), cmd: 'apt update && apt list --upgradable' },
+    { label: t('batch.qPorts'), cmd: 'ss -tulpn 2>/dev/null || netstat -tulpn' },
     { label: 'Docker PS', cmd: 'docker ps' }
   ];
 
@@ -85,6 +85,7 @@ export default function BatchCommandModal({ servers, onClose }: BatchCommandModa
             variant="ghost"
             size="icon"
             onClick={onClose}
+            aria-label={t('common.close')}
             className="h-7 w-7 text-zinc-400 hover:text-zinc-100"
           >
             <X className="w-4 h-4" />
@@ -129,7 +130,7 @@ export default function BatchCommandModal({ servers, onClose }: BatchCommandModa
           <div className="flex items-center justify-between">
             <label className="text-xs font-medium text-zinc-400">{t('batch.commandLabel')}</label>
             <div className="flex items-center gap-1 overflow-x-auto text-[11px]">
-              <span className="text-zinc-500 font-mono text-[10px]">Snippets:</span>
+              <span className="text-zinc-500 font-mono text-[10px]">{t('batch.snippets')}</span>
               {quickCommands.map((q) => (
                 <button
                   key={q.label}
@@ -169,17 +170,17 @@ export default function BatchCommandModal({ servers, onClose }: BatchCommandModa
 
         {/* Results Area */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-zinc-900">
-          <div className="text-[11px] font-mono text-zinc-500">Output Stream:</div>
+          <div className="text-[11px] font-mono text-zinc-500">{t('batch.outputStream')}</div>
           {!results && !isRunning && (
             <div className="text-center py-12 text-zinc-500 text-xs">
-              Select nodes, enter bash script, and click 'Run'.
+              {t('batch.emptyState')}
             </div>
           )}
 
           {isRunning && (
             <div className="flex items-center justify-center py-12 gap-2 text-zinc-400 text-xs font-mono">
               <div className="w-4 h-4 border-2 border-zinc-400 border-t-transparent rounded-full animate-spin" />
-              <span>Executing across {selectedIds.length} nodes...</span>
+              <span>{t('batch.executingAcross', { n: selectedIds.length })}</span>
             </div>
           )}
 
@@ -205,7 +206,7 @@ export default function BatchCommandModal({ servers, onClose }: BatchCommandModa
                         <Clock className="w-3 h-3" /> {res.durationMs}ms
                       </span>
                       {res.code !== undefined && (
-                        <span className="text-zinc-500">code: {res.code}</span>
+                        <span className="text-zinc-500">{t('batch.exitCode', { code: res.code })}</span>
                       )}
                     </div>
                   </div>
@@ -221,7 +222,7 @@ export default function BatchCommandModal({ servers, onClose }: BatchCommandModa
                       <div className="text-amber-400 whitespace-pre-wrap mt-1">{res.stderr}</div>
                     )}
                     {!res.error && !res.stdout && !res.stderr && (
-                      <div className="text-zinc-500 italic">(Empty output)</div>
+                      <div className="text-zinc-500 italic">{t('batch.emptyOutput')}</div>
                     )}
                   </div>
                 </div>

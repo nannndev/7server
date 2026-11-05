@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import type { DbSchema, SchemaTable } from '@/features/databases/api';
 import { ErFilter, defaultFilter, visibleGraph, fmtNum } from '@/features/databases/lib/erGraph';
+import { useT } from '@/shared/i18n';
 
 type Density = 'full' | 'keys' | 'name';
 type Dir = 'LR' | 'TB';
@@ -41,13 +42,14 @@ const nodeHeight = (t: SchemaTable, density: Density, fk: Set<string>) => {
 };
 
 const TableNode = memo(function TableNode({ data, selected }: NodeProps<Node<TableNodeData>>) {
-  const { table: t, density, fkCols, refCols, highlight, hiddenRels } = data;
-  const cols = visibleColumns(t, density, fkCols);
+  const t = useT();
+  const { table: tb, density, fkCols, refCols, highlight, hiddenRels } = data;
+  const cols = visibleColumns(tb, density, fkCols);
   const shown = cols.slice(0, MAX_COLS);
-  const isView = t.type === 'view';
+  const isView = tb.type === 'view';
   return (
     <div
-      onDoubleClick={() => data.onOpen(t.name)}
+      onDoubleClick={() => data.onOpen(tb.name)}
       className={`er-node rounded-lg border bg-[var(--card)] text-[var(--foreground)] shadow-sm transition-[opacity,box-shadow,border-color] duration-200
         ${selected || highlight === 'focus' ? 'border-[var(--accent-brand)] shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent-brand)_25%,transparent)]' : 'border-[var(--border)]'}
         ${highlight === 'dim' ? 'opacity-25' : 'opacity-100'}`}
@@ -61,12 +63,12 @@ const TableNode = memo(function TableNode({ data, selected }: NodeProps<Node<Tab
 
       <div className={`flex items-center gap-1.5 px-2.5 rounded-t-lg ${shown.length ? 'border-b border-[var(--border)]' : 'rounded-b-lg'} ${isView ? 'bg-violet-500/10' : 'bg-[var(--muted)]'}`} style={{ height: HEAD_H }}>
         {isView ? <Eye className="w-3.5 h-3.5 text-violet-500 shrink-0" /> : <Table2 className="w-3.5 h-3.5 text-sky-500 shrink-0" />}
-        <span className="font-mono text-[12px] font-semibold truncate flex-1" title={t.name}>{t.name}</span>
-        {t.rows != null && <span className="text-[10px] font-mono text-[var(--muted-foreground)] tabular-nums shrink-0">{fmtNum(t.rows)}</span>}
+        <span className="font-mono text-[12px] font-semibold truncate flex-1" title={tb.name}>{tb.name}</span>
+        {tb.rows != null && <span className="text-[10px] font-mono text-[var(--muted-foreground)] tabular-nums shrink-0">{fmtNum(tb.rows)}</span>}
         <button
-          onClick={(e) => { e.stopPropagation(); data.onOpen(t.name); }}
+          onClick={(e) => { e.stopPropagation(); data.onOpen(tb.name); }}
           className="nodrag shrink-0 p-0.5 rounded text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--sidebar-hover)]"
-          title="Buka data" aria-label={`Buka data ${t.name}`}
+          title={t('db.openData')} aria-label={t('erd.openDataOf', { name: tb.name })}
         >
           <Table2 className="w-3 h-3" />
         </button>
@@ -83,12 +85,12 @@ const TableNode = memo(function TableNode({ data, selected }: NodeProps<Node<Tab
             </div>
           ))}
           {cols.length > MAX_COLS && (
-            <div className="px-2.5 text-[10px] text-[var(--muted-foreground)] flex items-center" style={{ height: ROW_H }}>+{cols.length - MAX_COLS} kolom lagi</div>
+            <div className="px-2.5 text-[10px] text-[var(--muted-foreground)] flex items-center" style={{ height: ROW_H }}>{t('erd.moreCols', { n: cols.length - MAX_COLS })}</div>
           )}
         </div>
       )}
       {hiddenRels > 0 && (
-        <div className="absolute -top-2 -right-2 px-1.5 h-4 rounded-full bg-[var(--muted)] border border-[var(--border)] text-[9px] font-semibold text-[var(--muted-foreground)] flex items-center" title={`${hiddenRels} relasi ke tabel yang sedang disembunyikan`}>
+        <div className="absolute -top-2 -right-2 px-1.5 h-4 rounded-full bg-[var(--muted)] border border-[var(--border)] text-[9px] font-semibold text-[var(--muted-foreground)] flex items-center" title={t('erd.hiddenRels', { n: hiddenRels })}>
           +{hiddenRels}
         </div>
       )}
@@ -164,6 +166,7 @@ interface ErDiagramProps {
 }
 
 function ErCanvas({ schema, storageKey, loading, onRefresh, onOpenTable }: ErDiagramProps) {
+  const t = useT();
   const rf = useReactFlow();
   const [filter, setFilter] = useState<ErFilter>(() => {
     try {
@@ -306,40 +309,40 @@ function ErCanvas({ schema, storageKey, loading, onRefresh, onOpenTable }: ErDia
         <div className="flex-1 min-w-[12rem] max-w-sm h-7 px-2 flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--background)] focus-within:border-[var(--muted-foreground)]">
           <Search className="w-3 h-3 text-[var(--muted-foreground)]" />
           <input value={filter.search} onChange={(e) => setFilter((f) => ({ ...f, search: e.target.value }))}
-            placeholder="Filter tables: order*, user" aria-label="Filter tables" className="flex-1 min-w-0 bg-transparent text-[11px] font-mono" />
-          {filter.search && <button onClick={() => setFilter((f) => ({ ...f, search: '' }))} aria-label="Clear filter"><X className="w-3 h-3" /></button>}
+            placeholder={t('erd.filterPlaceholder')} aria-label={t('erd.filterTables')} className="flex-1 min-w-0 bg-transparent text-[11px] font-mono" />
+          {filter.search && <button onClick={() => setFilter((f) => ({ ...f, search: '' }))} aria-label={t('erd.clearFilter')}><X className="w-3 h-3" /></button>}
         </div>
 
         {filter.focus && (
           <div className="h-7 pl-2 pr-1 flex items-center gap-1.5 rounded-md bg-[var(--accent-brand)]/12 text-[11px] border border-[var(--accent-brand)]/30 fade-in">
             <Focus className="w-3 h-3 text-[var(--accent-brand)]" />
             <span className="font-mono font-semibold">{filter.focus}</span>
-            <span className="text-[var(--muted-foreground)]">depth</span>
-            <button onClick={() => setFilter((f) => ({ ...f, depth: Math.max(0, f.depth - 1) }))} className="p-0.5 rounded hover:bg-[var(--sidebar-hover)]" aria-label="Decrease depth"><Minus className="w-3 h-3" /></button>
+            <span className="text-[var(--muted-foreground)]">{t('erd.depth')}</span>
+            <button onClick={() => setFilter((f) => ({ ...f, depth: Math.max(0, f.depth - 1) }))} className="p-0.5 rounded hover:bg-[var(--sidebar-hover)]" aria-label={t('erd.depthDec')}><Minus className="w-3 h-3" /></button>
             <span className="font-mono w-3 text-center">{filter.depth}</span>
-            <button onClick={() => setFilter((f) => ({ ...f, depth: Math.min(6, f.depth + 1) }))} className="p-0.5 rounded hover:bg-[var(--sidebar-hover)]" aria-label="Increase depth"><Plus className="w-3 h-3" /></button>
-            <button onClick={() => setFilter((f) => ({ ...f, focus: null }))} className="p-0.5 rounded hover:bg-[var(--sidebar-hover)]" aria-label="Clear focus"><X className="w-3 h-3" /></button>
+            <button onClick={() => setFilter((f) => ({ ...f, depth: Math.min(6, f.depth + 1) }))} className="p-0.5 rounded hover:bg-[var(--sidebar-hover)]" aria-label={t('erd.depthInc')}><Plus className="w-3 h-3" /></button>
+            <button onClick={() => setFilter((f) => ({ ...f, focus: null }))} className="p-0.5 rounded hover:bg-[var(--sidebar-hover)]" aria-label={t('erd.clearFocus')}><X className="w-3 h-3" /></button>
           </div>
         )}
 
-        <Seg value={density} onChange={setDensity} label="Column details"
-          options={[['full', 'Semua', Rows3], ['keys', 'Kunci', KeyRound], ['name', 'Nama', Table2]]} />
-        <Seg value={dir} onChange={setDir} label="Arah layout"
-          options={[['LR', 'Kiri→kanan', Columns3], ['TB', 'Atas→bawah', Rows3]]} />
+        <Seg value={density} onChange={setDensity} label={t('erd.columnDetails')}
+          options={[['full', t('common.all'), Rows3], ['keys', t('erd.densityKeys'), KeyRound], ['name', t('erd.densityName'), Table2]]} />
+        <Seg value={dir} onChange={setDir} label={t('erd.layoutDir')}
+          options={[['LR', t('erd.dirLR'), Columns3], ['TB', t('erd.dirTB'), Rows3]]} />
 
-        <Toggle on={filter.showInferred} onClick={() => setFilter((f) => ({ ...f, showInferred: !f.showInferred }))} icon={Sparkles} label="Relasi tebakan" title="Relasi yang ditebak dari nama kolom (mis. user_id → users.id), tanpa foreign key di database" />
-        <Toggle on={filter.showViews} onClick={() => setFilter((f) => ({ ...f, showViews: !f.showViews }))} icon={Eye} label="Views" />
-        <Toggle on={filter.hideIsolated} onClick={() => setFilter((f) => ({ ...f, hideIsolated: !f.hideIsolated }))} icon={EyeOff} label="Sembunyikan tanpa relasi" />
+        <Toggle on={filter.showInferred} onClick={() => setFilter((f) => ({ ...f, showInferred: !f.showInferred }))} icon={Sparkles} label={t('erd.inferred')} title={t('erd.inferredHint')} />
+        <Toggle on={filter.showViews} onClick={() => setFilter((f) => ({ ...f, showViews: !f.showViews }))} icon={Eye} label={t('erd.views')} />
+        <Toggle on={filter.hideIsolated} onClick={() => setFilter((f) => ({ ...f, hideIsolated: !f.hideIsolated }))} icon={EyeOff} label={t('erd.hideIsolated')} />
 
         <div className="ml-auto flex items-center gap-1">
           <button onClick={() => setShowList((v) => !v)} aria-expanded={showList}
             className={`h-7 px-2 rounded-md text-[11px] flex items-center gap-1 hover:bg-[var(--sidebar-hover)] ${showList ? 'text-[var(--foreground)] bg-[var(--sidebar-active)]' : 'text-[var(--muted-foreground)]'}`}>
-            <LayoutGrid className="w-3.5 h-3.5" /> Tabel ({graph.tables.length}/{allTables.length})
+            <LayoutGrid className="w-3.5 h-3.5" /> {t('erd.tablesCount', { shown: graph.tables.length, total: allTables.length })}
           </button>
-          <button onClick={exportSvg} className="h-7 px-2 rounded-md text-[11px] flex items-center gap-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--sidebar-hover)]" title="Export SVG">
+          <button onClick={exportSvg} className="h-7 px-2 rounded-md text-[11px] flex items-center gap-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--sidebar-hover)]" title={t('erd.exportSvg')}>
             <Download className="w-3.5 h-3.5" /> SVG
           </button>
-          <button onClick={onRefresh} className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-[var(--sidebar-hover)]" aria-label="Muat ulang schema" title="Muat ulang schema">
+          <button onClick={onRefresh} className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-[var(--sidebar-hover)]" aria-label={t('erd.reloadSchema')} title={t('erd.reloadSchema')}>
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
@@ -349,7 +352,7 @@ function ErCanvas({ schema, storageKey, loading, onRefresh, onOpenTable }: ErDia
         <div className="relative flex-1 min-w-0 er-flow">
           {graph.tables.length === 0 ? (
             <div className="absolute inset-0 flex items-center justify-center text-xs text-[var(--muted-foreground)]">
-              Tidak ada tabel yang cocok dengan filter.
+              {t('erd.noMatch')}
             </div>
           ) : (
             <ReactFlow
@@ -377,11 +380,11 @@ function ErCanvas({ schema, storageKey, loading, onRefresh, onOpenTable }: ErDia
                 nodeColor={(n) => ((n.data as TableNodeData).table.type === 'view' ? '#a78bfa' : (n.data as TableNodeData).highlight === 'focus' ? '#38bdf8' : '#71717a')} />
               <Panel position="top-left">
                 <div className="px-2.5 py-1.5 rounded-md bg-[var(--card)]/90 backdrop-blur border border-[var(--border)] text-[11px] text-[var(--muted-foreground)] shadow-sm flex items-center gap-3">
-                  <span><b className="text-[var(--foreground)]">{graph.tables.length}</b> tabel</span>
+                  <span><b className="text-[var(--foreground)]">{graph.tables.length}</b> {t('erd.tablesLabel')}</span>
                   <span className="flex items-center gap-1"><span className="w-4 border-t-2 border-[var(--accent-brand)]" /> <b className="text-[var(--foreground)]">{declared}</b> FK</span>
-                  {filter.showInferred && <span className="flex items-center gap-1"><span className="w-4 border-t-2 border-dashed border-amber-500" /> <b className="text-[var(--foreground)]">{inferred}</b> tebakan</span>}
-                  <button onClick={() => rf.fitView({ padding: 0.12, duration: 400 })} className="underline hover:text-[var(--foreground)]">lihat semua</button>
-                  <span className="hidden lg:inline">klik tabel = fokus relasinya · drag = pindah · scroll = zoom</span>
+                  {filter.showInferred && <span className="flex items-center gap-1"><span className="w-4 border-t-2 border-dashed border-amber-500" /> <b className="text-[var(--foreground)]">{inferred}</b> {t('erd.inferredLabel')}</span>}
+                  <button onClick={() => rf.fitView({ padding: 0.12, duration: 400 })} className="underline hover:text-[var(--foreground)]">{t('erd.fitAll')}</button>
+                  <span className="hidden lg:inline">{t('erd.hint')}</span>
                 </div>
               </Panel>
             </ReactFlow>
@@ -390,23 +393,23 @@ function ErCanvas({ schema, storageKey, loading, onRefresh, onOpenTable }: ErDia
 
         {/* Table picker: check/uncheck tables, focus one */}
         {showList && (
-          <aside className="w-64 shrink-0 border-l border-[var(--border)] bg-[var(--sidebar-bg)] flex flex-col fade-in" aria-label="Pilih tabel">
+          <aside className="w-64 shrink-0 border-l border-[var(--border)] bg-[var(--sidebar-bg)] flex flex-col fade-in" aria-label={t('erd.pickTables')}>
             <div className="shrink-0 px-3 py-2 flex items-center gap-2 border-b border-[var(--border)] text-[11px]">
-              <span className="font-semibold flex-1">Tampilkan tabel</span>
-              <button onClick={() => setFilter((f) => ({ ...f, hidden: new Set() }))} className="underline text-[var(--muted-foreground)]">semua</button>
-              <button onClick={() => setFilter((f) => ({ ...f, hidden: new Set(allTables.map((t) => t.name)) }))} className="underline text-[var(--muted-foreground)]">kosongkan</button>
+              <span className="font-semibold flex-1">{t('erd.showTables')}</span>
+              <button onClick={() => setFilter((f) => ({ ...f, hidden: new Set() }))} className="underline text-[var(--muted-foreground)]">{t('common.all')}</button>
+              <button onClick={() => setFilter((f) => ({ ...f, hidden: new Set(allTables.map((x) => x.name)) }))} className="underline text-[var(--muted-foreground)]">{t('erd.clearAll')}</button>
             </div>
             <ul className="flex-1 overflow-auto py-1 text-[12px] sidebar-scroll">
-              {allTables.map((t) => {
-                const hidden = filter.hidden.has(t.name);
-                const deg = graph.degree.get(t.name) || 0;
+              {allTables.map((tb) => {
+                const hidden = filter.hidden.has(tb.name);
+                const deg = graph.degree.get(tb.name) || 0;
                 return (
-                  <li key={t.name} className={`group flex items-center gap-2 px-3 h-7 hover:bg-[var(--sidebar-hover)] ${filter.focus === t.name ? 'bg-[var(--sidebar-active)]' : ''}`}>
-                    <input type="checkbox" checked={!hidden} aria-label={`Tampilkan ${t.name}`}
-                      onChange={() => setFilter((f) => { const h = new Set(f.hidden); hidden ? h.delete(t.name) : h.add(t.name); return { ...f, hidden: h }; })} />
-                    <span className={`flex-1 truncate font-mono ${hidden ? 'text-[var(--muted-foreground)] line-through' : ''}`} title={t.name}>{t.name}</span>
-                    <span className="text-[10px] text-[var(--muted-foreground)] tabular-nums" title="jumlah relasi">{deg || ''}</span>
-                    <button onClick={() => focusOn(t.name)} className="opacity-0 group-hover:opacity-100 focus:opacity-100 p-0.5 rounded hover:bg-[var(--sidebar-active)]" aria-label={`Fokus ke ${t.name}`} title="Fokus ke tabel ini">
+                  <li key={tb.name} className={`group flex items-center gap-2 px-3 h-7 hover:bg-[var(--sidebar-hover)] ${filter.focus === tb.name ? 'bg-[var(--sidebar-active)]' : ''}`}>
+                    <input type="checkbox" checked={!hidden} aria-label={t('erd.showTable', { name: tb.name })}
+                      onChange={() => setFilter((f) => { const h = new Set(f.hidden); hidden ? h.delete(tb.name) : h.add(tb.name); return { ...f, hidden: h }; })} />
+                    <span className={`flex-1 truncate font-mono ${hidden ? 'text-[var(--muted-foreground)] line-through' : ''}`} title={tb.name}>{tb.name}</span>
+                    <span className="text-[10px] text-[var(--muted-foreground)] tabular-nums" title={t('erd.relCount')}>{deg || ''}</span>
+                    <button onClick={() => focusOn(tb.name)} className="opacity-0 group-hover:opacity-100 focus:opacity-100 p-0.5 rounded hover:bg-[var(--sidebar-active)]" aria-label={t('erd.focusOn', { name: tb.name })} title={t('erd.focusThis')}>
                       <Focus className="w-3 h-3" />
                     </button>
                   </li>

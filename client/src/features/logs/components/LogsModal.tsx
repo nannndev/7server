@@ -3,6 +3,7 @@ import { X, RefreshCw, Terminal as TermIcon, Copy, Check, Sparkles } from 'lucid
 import { fetchLogs } from '@/features/logs/api';
 import { Button } from '@/shared/ui/button';
 import { Modal } from '@/shared/ui/modal';
+import { useT } from '@/shared/i18n';
 
 interface LogsModalProps {
   serverId: string;
@@ -12,6 +13,7 @@ interface LogsModalProps {
 }
 
 export default function LogsModal({ serverId, type, name, onClose }: LogsModalProps) {
+  const t = useT();
   const [logs, setLogs] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -62,7 +64,7 @@ export default function LogsModal({ serverId, type, name, onClose }: LogsModalPr
     window.dispatchEvent(
       new CustomEvent('7server-copilot-ask', {
         detail: {
-          prompt: `Tolong analisa log ${name} (${prefixLabel}) berikut. Beritahu apakah ada error/peringatan penting, penyebabnya, dan langkah perbaikan yang direkomendasikan:\n\n\`\`\`\n${logs.slice(-2500)}\n\`\`\``
+          prompt: t('logs.analyzePrompt', { name, cmd: prefixLabel, logs: logs.slice(-2500) })
         }
       })
     );
@@ -80,10 +82,10 @@ export default function LogsModal({ serverId, type, name, onClose }: LogsModalPr
             value={lines}
             onChange={(e) => setLines(Number(e.target.value))}
             className="h-7 text-[11px] bg-[var(--card)] border border-[var(--border)] rounded px-2 text-[var(--foreground)]"
-            aria-label="Jumlah baris"
+            aria-label={t('logs.lines')}
           >
             {[100, 200, 500, 1000, 2000].map((n) => (
-              <option key={n} value={n}>{n} baris</option>
+              <option key={n} value={n}>{t('logs.linesOption', { n })}</option>
             ))}
           </select>
           <label className="flex items-center gap-1.5 text-[11px] text-[var(--muted-foreground)] cursor-pointer select-none px-1.5">
@@ -93,7 +95,7 @@ export default function LogsModal({ serverId, type, name, onClose }: LogsModalPr
               onChange={(e) => setFollow(e.target.checked)}
               className="rounded border-[var(--border)]"
             />
-            Live (4s)
+            {t('logs.live')}
           </label>
           <Button
             variant="outline"
@@ -101,18 +103,18 @@ export default function LogsModal({ serverId, type, name, onClose }: LogsModalPr
             onClick={analyzeWithAi}
             disabled={!logs || loading}
             className="h-7 text-[11px] gap-1 btn-metal"
-            title="Analyze Logs with AI Copilot"
+            title={t('logs.analyzeTitle')}
           >
             <Sparkles className="w-3 h-3" />
-            <span className="hidden sm:inline">Analyze with AI</span>
+            <span className="hidden sm:inline">{t('logs.analyze')}</span>
           </Button>
-          <Button variant="ghost" size="icon" onClick={copyLogs} title="Copy Logs" className="h-7 w-7">
+          <Button variant="ghost" size="icon" onClick={copyLogs} title={t('logs.copy')} className="h-7 w-7">
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
           </Button>
-          <Button variant="ghost" size="icon" onClick={load} disabled={loading} title="Refresh" className="h-7 w-7">
+          <Button variant="ghost" size="icon" onClick={load} disabled={loading} title={t('common.refresh')} className="h-7 w-7">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           </Button>
-          <Button variant="ghost" size="icon" onClick={onClose} title="Tutup" className="h-7 w-7">
+          <Button variant="ghost" size="icon" onClick={onClose} title={t('common.close')} className="h-7 w-7">
             <X className="w-4 h-4" />
           </Button>
         </div>
@@ -125,7 +127,7 @@ export default function LogsModal({ serverId, type, name, onClose }: LogsModalPr
           ref={preRef}
           className="flex-1 overflow-auto p-4 text-[11px] leading-relaxed font-mono bg-[#09090b] text-zinc-200 whitespace-pre-wrap"
         >
-          {logs || (loading ? 'Memuat log dari server…' : '(Tidak ada output log)')}
+          {logs || (loading ? t('logs.loading') : t('logs.empty'))}
         </pre>
       </div>
     </Modal>

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, ChevronsUpDown, Copy, Check, X } from 'lucide-react';
 import { ResultSet } from '@/features/databases/api';
+import { useT } from '@/shared/i18n';
 
 interface DataGridProps {
   rs: ResultSet;
@@ -20,6 +21,7 @@ const isNumeric = (v: string | null) => v !== null && v !== '' && /^-?\d+(\.\d+)
  * selected cell's full value shows in the inspector bar; Cmd/Ctrl+C copies it.
  */
 export default function DataGrid({ rs, offset = 0, sort, onSort, columnHint, loading }: DataGridProps) {
+  const t = useT();
   const [sel, setSel] = useState<{ r: number; c: number } | null>(null);
   const [copied, setCopied] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -58,7 +60,7 @@ export default function DataGrid({ rs, offset = 0, sort, onSort, columnHint, loa
   };
 
   if (!rs.columns.length) {
-    return <div className="flex-1 flex items-center justify-center text-xs text-[var(--muted-foreground)]">Tidak ada kolom</div>;
+    return <div className="flex-1 flex items-center justify-center text-xs text-[var(--muted-foreground)]">{t('db.noColumns')}</div>;
   }
 
   return (
@@ -68,7 +70,7 @@ export default function DataGrid({ rs, offset = 0, sort, onSort, columnHint, loa
         tabIndex={0}
         onKeyDown={onKey}
         className={`relative flex-1 min-h-0 overflow-auto outline-none transition-opacity ${loading ? 'opacity-50' : ''}`}
-        aria-label="Data grid"
+        aria-label={t('db.dataGrid')}
         role="grid"
         aria-rowcount={rs.rows.length}
       >
@@ -127,7 +129,7 @@ export default function DataGrid({ rs, offset = 0, sort, onSort, columnHint, loa
           </tbody>
         </table>
         {rs.rows.length === 0 && !loading && (
-          <div className="py-12 text-center text-xs text-[var(--muted-foreground)] font-sans">0 baris</div>
+          <div className="py-12 text-center text-xs text-[var(--muted-foreground)] font-sans">0 {t('db.rowsLabel')}</div>
         )}
       </div>
 
@@ -136,10 +138,10 @@ export default function DataGrid({ rs, offset = 0, sort, onSort, columnHint, loa
         <div className="shrink-0 border-t border-[var(--border)] bg-[var(--muted)]/50 px-3 py-1.5 flex items-start gap-2 text-[11px] fade-in">
           <span className="shrink-0 font-semibold font-mono text-[var(--muted-foreground)] pt-0.5">{rs.columns[sel.c]}</span>
           <pre className="flex-1 min-w-0 max-h-28 overflow-auto whitespace-pre-wrap break-all font-mono">{selValue === null ? 'NULL' : selValue}</pre>
-          <button onClick={() => copy(selValue ?? 'NULL')} className="shrink-0 p-1 rounded hover:bg-[var(--sidebar-hover)]" aria-label="Salin nilai" title="Salin (⌘C)">
+          <button onClick={() => copy(selValue ?? 'NULL')} className="shrink-0 p-1 rounded hover:bg-[var(--sidebar-hover)]" aria-label={t('db.copyValue')} title={t('db.copyShortcut')}>
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
           </button>
-          <button onClick={() => setSel(null)} className="shrink-0 p-1 rounded hover:bg-[var(--sidebar-hover)]" aria-label="Tutup inspector"><X className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setSel(null)} className="shrink-0 p-1 rounded hover:bg-[var(--sidebar-hover)]" aria-label={t('db.closeInspector')}><X className="w-3.5 h-3.5" /></button>
         </div>
       )}
     </div>

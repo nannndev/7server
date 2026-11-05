@@ -43,7 +43,7 @@ export default function AddServerModal({ server, onSave, onClose }: AddServerMod
 
   const handleTestConnection = async () => {
     if (!formData.host) {
-      toast.warning('Mohon isi IP atau Hostname server terlebih dahulu');
+      toast.warning(t('addServer.hostFirst'));
       return;
     }
     setTesting(true);
@@ -61,7 +61,7 @@ export default function AddServerModal({ server, onSave, onClose }: AddServerMod
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.host) {
-      toast.warning('Host wajib diisi!');
+      toast.warning(t('addServer.hostRequired'));
       return;
     }
 
@@ -72,10 +72,10 @@ export default function AddServerModal({ server, onSave, onClose }: AddServerMod
         port: parseInt(String(formData.port), 10) || 22,
         name: formData.name.trim() || formData.host.trim()
       });
-      toast.success(isEditing ? 'Server changes saved' : 'Server added successfully');
+      toast.success(isEditing ? t('addServer.saved') : t('addServer.added'));
       onClose();
     } catch (err: any) {
-      toast.error(`Failed to save: ${err.message}`);
+      toast.error(t('addServer.saveFailed', { error: err.message }));
     } finally {
       setSaving(false);
     }
@@ -101,6 +101,7 @@ export default function AddServerModal({ server, onSave, onClose }: AddServerMod
             variant="ghost"
             size="icon"
             onClick={onClose}
+            aria-label={t('common.close')}
             className="h-7 w-7 text-zinc-400 hover:text-zinc-100"
           >
             <X className="w-4 h-4" />
@@ -223,7 +224,7 @@ export default function AddServerModal({ server, onSave, onClose }: AddServerMod
                 <Input
                   type="password"
                   name="passphrase"
-                  placeholder="Passphrase"
+                  placeholder={t('addServer.placeholderPassphrase')}
                   value={formData.passphrase}
                   onChange={handleChange}
                 />

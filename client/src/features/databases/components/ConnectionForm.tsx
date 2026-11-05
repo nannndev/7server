@@ -71,7 +71,7 @@ export default function ConnectionForm({ form, setForm, engines, error, onSave }
       <div
         className="w-full bg-[var(--card)] text-[var(--foreground)] border border-[var(--border)] rounded-xl p-4 space-y-3 text-xs max-h-[90vh] overflow-auto shadow-2xl"
         role="dialog"
-        aria-label="Database Connection"
+        aria-label={t('db.connDialog')}
       >
         <div className="flex items-center">
           <h3 className="text-sm font-semibold flex-1">{form.id ? t('db.editConn') : t('db.newConn')}</h3>
@@ -104,7 +104,7 @@ export default function ConnectionForm({ form, setForm, engines, error, onSave }
           </select>
         </label>
         <label className="block space-y-1">
-          <span>Name</span>
+          <span>{t('db.name')}</span>
           <Input
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -131,7 +131,7 @@ export default function ConnectionForm({ form, setForm, engines, error, onSave }
             <Input
               value={form.container}
               onChange={(e) => setForm({ ...form, container: e.target.value })}
-              placeholder="container name, e.g. app-mysql"
+              placeholder={t('db.containerPlaceholder')}
               className="h-8 text-xs font-mono"
             />
           )}
@@ -176,7 +176,7 @@ export default function ConnectionForm({ form, setForm, engines, error, onSave }
         {formEngine.fields.includes('user') && form.auth !== 'container-env' && form.auth !== 'none' && (
           <label className="block space-y-1">
             <span>
-              User {form.auth === 'socket' && <span className="text-[var(--muted-foreground)]">(OS / DB user)</span>}
+              {t('db.user')} {form.auth === 'socket' && <span className="text-[var(--muted-foreground)]">{t('db.osDbUser')}</span>}
             </span>
             <Input
               value={form.user}
@@ -188,7 +188,7 @@ export default function ConnectionForm({ form, setForm, engines, error, onSave }
         {formEngine.fields.includes('password') && form.auth === 'password' && (
           <label className="block space-y-1">
             <span>
-              Password {form.hasPassword && <span className="text-emerald-500">{t('db.savedEncrypted')}</span>}
+              {t('db.password')} {form.hasPassword && <span className="text-emerald-500">{t('db.savedEncrypted')}</span>}
             </span>
             <Input
               type="password"

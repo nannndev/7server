@@ -76,7 +76,7 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
         title,
         message: confirmMsg,
         variant: 'danger',
-        confirmText: 'Lanjutkan'
+        confirmText: t('docker.proceed')
       });
       if (!ok) return;
     }
@@ -129,7 +129,7 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
 
   if (loading && !data) {
     return (
-      <div role="status" aria-label="Membaca Docker…" className="space-y-4">
+      <div role="status" aria-label={t('docker.reading')} className="space-y-4">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-16 rounded-xl" />)}
         </div>
@@ -161,9 +161,9 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
       {/* Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          [t('docker.containers'), `${running}/${containers.length}`, 'running'],
-          [t('docker.unhealthy'), String(unhealthy), unhealthy ? 'unhealthy / restarting' : 'healthy'],
-          ['Total CPU', `${totalCpu.toFixed(1)}%`, 'all containers'],
+          [t('docker.containers'), `${running}/${containers.length}`, t('docker.subRunning')],
+          [t('docker.unhealthy'), String(unhealthy), unhealthy ? t('docker.subUnhealthy') : t('docker.subHealthy')],
+          [t('docker.totalCpu'), `${totalCpu.toFixed(1)}%`, t('docker.allContainers')],
           ['Docker', `v${data?.version}`, `compose ${data?.composeVersion || '–'}`]
         ].map(([label, value, sub], i) => (
           <div key={label} className="p-3 rounded-lg border border-[var(--border)] bg-[var(--card)]">
@@ -208,7 +208,7 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
 
       {output && (
         <div className={`p-3 rounded-lg border text-xs relative ${output.ok ? 'border-[var(--border)] bg-[var(--card)]' : 'border-red-500/30 bg-red-500/10'}`}>
-          <button onClick={() => setOutput(null)} className="absolute right-2 top-2" aria-label="Tutup output"><X className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setOutput(null)} className="absolute right-2 top-2" aria-label={t('docker.closeOutput')}><X className="w-3.5 h-3.5" /></button>
           <div className={`font-semibold mb-1 ${output.ok ? '' : 'text-red-500'}`}>{output.title}</div>
           <pre className="whitespace-pre-wrap font-mono text-[11px] max-h-60 overflow-auto">{output.text}</pre>
         </div>
@@ -232,8 +232,8 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
                     onClick={() => setCollapsed((s) => { const n = new Set(s); n.has(project) ? n.delete(project) : n.add(project); return n; })}
                   >
                     {isOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                    {project ? <>🐳 {project}</> : 'Standalone containers'}
-                    <span className="font-normal text-[var(--muted-foreground)]">({up}/{list.length} running)</span>
+                    {project ? <>🐳 {project}</> : t('docker.standalone')}
+                    <span className="font-normal text-[var(--muted-foreground)]">({t('docker.groupRunning', { up, total: list.length })})</span>
                   </button>
                   {dir && (
                     <span className="text-[10px] font-mono text-[var(--muted-foreground)] truncate sensitive" title={files}>
@@ -242,14 +242,14 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
                   )}
                   {project && dir && (
                     <div className="ml-auto flex flex-wrap items-center gap-1">
-                      <Button variant="ghost" size="sm" className="h-6 text-[10px] gap-1" onClick={() => onOpenFolder(dir)} title="Buka folder project">
-                        <FolderOpen className="w-3 h-3" /> Files
+                      <Button variant="ghost" size="sm" className="h-6 text-[10px] gap-1" onClick={() => onOpenFolder(dir)} title={t('docker.openFolder')}>
+                        <FolderOpen className="w-3 h-3" /> {t('common.files')}
                       </Button>
                       {([
-                        ['restart', 'Restart', RotateCw, `Restart semua container di ${project}?`],
-                        ['pull-up', 'Pull & Up', Download, `Pull image terbaru lalu recreate container di ${project}? (deploy)`],
+                        ['restart', t('docker.restart'), RotateCw, t('docker.composeRestartConfirm', { project })],
+                        ['pull-up', 'Pull & Up', Download, t('docker.composePullConfirm', { project })],
                         ['up', 'Up', Play, undefined],
-                        ['stop', 'Stop', Square, `Stop semua container di ${project}?`]
+                        ['stop', t('docker.stop'), Square, t('docker.composeStopConfirm', { project })]
                       ] as const).map(([a, label, Icon, confirm]) => (
                         <Button
                           key={a} variant="outline" size="sm" className="h-6 text-[10px] gap-1" disabled={!!busy}
@@ -267,12 +267,12 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
                     <table className="w-full text-xs">
                       <thead className="text-[10px] text-[var(--muted-foreground)] text-left">
                         <tr className="border-b border-[var(--border)]">
-                          <th className="py-1.5 px-3">CONTAINER</th>
-                          <th className="py-1.5 px-3">STATUS</th>
+                          <th className="py-1.5 px-3">{t('docker.thContainer')}</th>
+                          <th className="py-1.5 px-3">{t('docker.thStatus')}</th>
                           <th className="py-1.5 px-3 w-28">CPU</th>
-                          <th className="py-1.5 px-3 w-36">MEMORY</th>
-                          <th className="py-1.5 px-3">PORTS</th>
-                          <th className="py-1.5 px-3 text-right">AKSI</th>
+                          <th className="py-1.5 px-3 w-36">{t('docker.thMemory')}</th>
+                          <th className="py-1.5 px-3">{t('docker.thPorts')}</th>
+                          <th className="py-1.5 px-3 text-right">{t('docker.thActions')}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[var(--border)]">
@@ -324,29 +324,29 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
                                         className="px-1.5 rounded bg-[var(--muted)] border border-[var(--border)] hover:underline">:{p}</a>
                                     ))}
                                   </div>
-                                ) : <span className="text-[var(--muted-foreground)]" title={c.ports}>{c.ports ? 'internal' : '–'}</span>}
+                                ) : <span className="text-[var(--muted-foreground)]" title={c.ports}>{c.ports ? t('docker.internal') : '–'}</span>}
                               </td>
                               <td className="py-1.5 px-3 text-right whitespace-nowrap">
-                                <ActionBtn k={`${c.id}:logs`} title="Logs" onClick={() => onLogs(c.name)}><ScrollText className="w-3 h-3" /></ActionBtn>
+                                <ActionBtn k={`${c.id}:logs`} title={t('docker.logs')} onClick={() => onLogs(c.name)}><ScrollText className="w-3 h-3" /></ActionBtn>
                                 {isRunning && (
-                                  <ActionBtn k={`${c.id}:shell`} title="Shell ke container" onClick={() => onShell(`docker exec -it ${c.name} sh -c 'command -v bash >/dev/null && exec bash || exec sh'`)}>
+                                  <ActionBtn k={`${c.id}:shell`} title={t('docker.shell')} onClick={() => onShell(`docker exec -it ${c.name} sh -c 'command -v bash >/dev/null && exec bash || exec sh'`)}>
                                     <TermIcon className="w-3 h-3" />
                                   </ActionBtn>
                                 )}
-                                <ActionBtn k={`${c.id}:inspect`} title="Inspect" onClick={() => openInspect(c)}><Info className="w-3 h-3" /></ActionBtn>
-                                <ActionBtn k={`${c.id}:restart`} title="Restart" onClick={() => act(c, 'restart')}><RotateCw className="w-3 h-3" /></ActionBtn>
+                                <ActionBtn k={`${c.id}:inspect`} title={t('docker.inspect')} onClick={() => openInspect(c)}><Info className="w-3 h-3" /></ActionBtn>
+                                <ActionBtn k={`${c.id}:restart`} title={t('docker.restart')} onClick={() => act(c, 'restart')}><RotateCw className="w-3 h-3" /></ActionBtn>
                                 {c.state === 'paused' ? (
-                                  <ActionBtn k={`${c.id}:unpause`} title="Unpause" onClick={() => act(c, 'unpause')}><Play className="w-3 h-3" /></ActionBtn>
+                                  <ActionBtn k={`${c.id}:unpause`} title={t('docker.unpause')} onClick={() => act(c, 'unpause')}><Play className="w-3 h-3" /></ActionBtn>
                                 ) : isRunning ? (
                                   <>
-                                    <ActionBtn k={`${c.id}:pause`} title="Pause" onClick={() => act(c, 'pause')}><Pause className="w-3 h-3" /></ActionBtn>
-                                    <ActionBtn k={`${c.id}:stop`} title="Stop" danger onClick={() => act(c, 'stop', `Stop container ${c.name}?`)}><Square className="w-3 h-3" /></ActionBtn>
+                                    <ActionBtn k={`${c.id}:pause`} title={t('docker.pause')} onClick={() => act(c, 'pause')}><Pause className="w-3 h-3" /></ActionBtn>
+                                    <ActionBtn k={`${c.id}:stop`} title={t('docker.stop')} danger onClick={() => act(c, 'stop', t('docker.stopConfirm', { name: c.name }))}><Square className="w-3 h-3" /></ActionBtn>
                                   </>
                                 ) : (
                                   <>
-                                    <ActionBtn k={`${c.id}:start`} title="Start" onClick={() => act(c, 'start')}><Play className="w-3 h-3" /></ActionBtn>
-                                    <ActionBtn k={`${c.id}:rm`} title="Remove container" danger
-                                      onClick={() => act(c, 'rm', `Remove container ${c.name}? Data inside container (not volumes) will be lost.`)}>
+                                    <ActionBtn k={`${c.id}:start`} title={t('docker.start')} onClick={() => act(c, 'start')}><Play className="w-3 h-3" /></ActionBtn>
+                                    <ActionBtn k={`${c.id}:rm`} title={t('docker.removeContainer')} danger
+                                      onClick={() => act(c, 'rm', t('docker.removeContainerConfirm', { name: c.name }))}>
                                       <Trash2 className="w-3 h-3" />
                                     </ActionBtn>
                                   </>
@@ -371,12 +371,12 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
           <table className="w-full text-xs">
             <thead className="bg-[var(--muted)] text-[10px] text-[var(--muted-foreground)] text-left">
               <tr>
-                <th className="py-2 px-3">REPOSITORY</th>
-                <th className="py-2 px-3">TAG</th>
-                <th className="py-2 px-3 text-right">SIZE</th>
-                <th className="py-2 px-3">DIBUAT</th>
-                <th className="py-2 px-3">STATUS</th>
-                <th className="py-2 px-3 text-right">AKSI</th>
+                <th className="py-2 px-3">{t('docker.thRepository')}</th>
+                <th className="py-2 px-3">{t('docker.thTag')}</th>
+                <th className="py-2 px-3 text-right">{t('docker.thSize')}</th>
+                <th className="py-2 px-3">{t('docker.thCreated')}</th>
+                <th className="py-2 px-3">{t('docker.thStatus')}</th>
+                <th className="py-2 px-3 text-right">{t('docker.thActions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border)] font-mono">
@@ -389,12 +389,12 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
                     <td className="py-1.5 px-3 text-right">{img.size}</td>
                     <td className="py-1.5 px-3 text-[var(--muted-foreground)] font-sans">{img.createdSince}</td>
                     <td className="py-1.5 px-3 font-sans">
-                      {img.inUse ? <span className="text-emerald-600">in use</span> : <span className="text-[var(--muted-foreground)]">unused</span>}
+                      {img.inUse ? <span className="text-emerald-600">{t('docker.inUse')}</span> : <span className="text-[var(--muted-foreground)]">{t('docker.unused')}</span>}
                     </td>
                     <td className="py-1.5 px-3 text-right">
                       {!img.inUse && (
-                        <ActionBtn k={`img:${img.id}`} title="Remove image" danger
-                          onClick={() => run(`img:${img.id}`, `rmi ${ref}`, () => dockerRemoveImage(serverId, ref), `Remove image ${ref}?`)}>
+                        <ActionBtn k={`img:${img.id}`} title={t('docker.removeImage')} danger
+                          onClick={() => run(`img:${img.id}`, `rmi ${ref}`, () => dockerRemoveImage(serverId, ref), t('docker.removeImageConfirm', { ref }))}>
                           <Trash2 className="w-3 h-3" />
                         </ActionBtn>
                       )}
@@ -415,26 +415,26 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
               <div key={d.type} className="p-3 rounded-lg border border-[var(--border)] bg-[var(--card)]">
                 <div className="text-[11px] text-[var(--muted-foreground)]">{d.type}</div>
                 <div className="text-lg font-bold font-mono">{d.size}</div>
-                <div className="text-[10px] text-[var(--muted-foreground)]">{d.active}/{d.total} active</div>
+                <div className="text-[10px] text-[var(--muted-foreground)]">{t('docker.activeOf', { active: d.active, total: d.total })}</div>
                 <div className={`text-[11px] mt-1 font-mono ${d.reclaimable.startsWith('0B') ? 'text-[var(--muted-foreground)]' : 'text-amber-600 font-semibold'}`}>
-                  Reclaimable: {d.reclaimable}
+                  {t('docker.reclaimable', { size: d.reclaimable })}
                 </div>
               </div>
             ))}
           </div>
           <div className="border border-[var(--border)] rounded-lg p-3 space-y-2">
-            <h4 className="text-xs font-semibold">Prune & Cleanup</h4>
+            <h4 className="text-xs font-semibold">{t('docker.pruneTitle')}</h4>
             <p className="text-[11px] text-[var(--muted-foreground)]">
-              Only removes resources <b>not in use</b> by any container. Volumes contain persistent database data, proceed with caution.
+              {t('docker.pruneHelpA')} <b>{t('docker.pruneHelpB')}</b> {t('docker.pruneHelpC')}
             </p>
             <div className="flex flex-wrap gap-2">
               {([
-                ['build-cache', 'Build cache', 'Remove all build cache? Safe, but next build may take longer.'],
-                ['dangling-images', 'Dangling images (<none>)', 'Remove dangling images (<none>)?'],
-                ['images', 'Unused images', 'Remove ALL images not used by any container?'],
-                ['containers', 'Stopped containers', 'Remove all stopped containers?'],
-                ['networks', 'Unused networks', 'Remove unused networks?'],
-                ['volumes', '⚠ Unused volumes', 'WARNING: Unattached volumes will be PERMANENTLY DELETED, including database data. Proceed?']
+                ['build-cache', t('docker.pruneBuildCache'), t('docker.pruneBuildCacheConfirm')],
+                ['dangling-images', t('docker.pruneDangling'), t('docker.pruneDanglingConfirm')],
+                ['images', t('docker.pruneImages'), t('docker.pruneImagesConfirm')],
+                ['containers', t('docker.pruneContainers'), t('docker.pruneContainersConfirm')],
+                ['networks', t('docker.pruneNetworks'), t('docker.pruneNetworksConfirm')],
+                ['volumes', `⚠ ${t('docker.pruneVolumes')}`, t('docker.pruneVolumesConfirm')]
               ] as const).map(([what, label, confirm]) => (
                 <Button
                   key={what} variant={what === 'volumes' ? 'destructive' : 'outline'} size="sm" className="gap-1" disabled={!!busy}
@@ -453,29 +453,29 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
         <div className="fixed inset-0 z-[100] bg-black/60 flex justify-end fade-in" onClick={() => setInspect(null)}>
           <div
             className="w-full max-w-xl h-full bg-[var(--card)] text-[var(--foreground)] border-l border-[var(--border)] overflow-auto p-4 space-y-4 text-xs shadow-2xl"
-            onClick={(e) => e.stopPropagation()} role="dialog" aria-label={`Inspect ${inspect.name}`}
+            onClick={(e) => e.stopPropagation()} role="dialog" aria-label={t('docker.inspectOf', { name: inspect.name })}
           >
             <div className="flex items-center gap-2">
               <h3 className="font-semibold text-sm font-mono flex-1 truncate">{inspect.name}</h3>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setInspect(null)} aria-label="Tutup"><X className="w-4 h-4" /></Button>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setInspect(null)} aria-label={t('common.close')}><X className="w-4 h-4" /></Button>
             </div>
             <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-1">
               {([
-                ['Image', inspect.image], ['Status', `${inspect.status}${inspect.health ? ` (${inspect.health})` : ''}`],
-                ['Exit code', String(inspect.exitCode)], ['OOM killed', inspect.oomKilled ? 'YA' : 'tidak'],
-                ['Restart', `${inspect.restartCount}x · policy ${inspect.restartPolicy || 'no'}`],
-                ['Mulai', inspect.startedAt ? new Date(inspect.startedAt).toLocaleString() : '–'], ['Command', inspect.cmd]
+                ['docker.inspImage', inspect.image], ['docker.inspStatus', `${inspect.status}${inspect.health ? ` (${inspect.health})` : ''}`],
+                ['docker.inspExitCode', String(inspect.exitCode)], ['docker.inspOom', inspect.oomKilled ? t('docker.yes') : t('docker.no')],
+                ['docker.inspRestart', t('docker.restartInfo', { n: inspect.restartCount, policy: inspect.restartPolicy || 'no' })],
+                ['docker.inspStarted', inspect.startedAt ? new Date(inspect.startedAt).toLocaleString() : '–'], ['docker.inspCommand', inspect.cmd]
               ] as const).map(([k, v]) => (
                 <React.Fragment key={k}>
-                  <dt className="text-[var(--muted-foreground)]">{k}</dt>
-                  <dd className={`font-mono break-all ${k === 'OOM killed' && v === 'YA' ? 'text-red-500' : ''}`}>{v}</dd>
+                  <dt className="text-[var(--muted-foreground)]">{t(k)}</dt>
+                  <dd className={`font-mono break-all ${k === 'docker.inspOom' && inspect.oomKilled ? 'text-red-500' : ''}`}>{v}</dd>
                 </React.Fragment>
               ))}
             </dl>
             {([
-              ['Ports', inspect.ports.map((p) => `${p.container} → ${p.host || '(internal)'}`)],
-              ['Networks', inspect.networks.map((n) => `${n.name} · ${n.ip || '–'}`)],
-              ['Mounts', inspect.mounts.map((m) => `${m.type} ${m.source} → ${m.destination}${m.rw ? '' : ' (ro)'}`)]
+              [t('docker.inspPorts'), inspect.ports.map((p) => `${p.container} → ${p.host || `(${t('docker.internal')})`}`)],
+              [t('docker.inspNetworks'), inspect.networks.map((n) => `${n.name} · ${n.ip || '–'}`)],
+              [t('docker.inspMounts'), inspect.mounts.map((m) => `${m.type} ${m.source} → ${m.destination}${m.rw ? '' : ' (ro)'}`)]
             ] as const).map(([title, rows]) => (
               <section key={title}>
                 <h4 className="font-semibold mb-1">{title}</h4>
@@ -484,8 +484,8 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
             ))}
             <section>
               <div className="flex items-center mb-1">
-                <h4 className="font-semibold flex-1">Environment ({inspect.env.length})</h4>
-                <span className="text-[10px] text-[var(--muted-foreground)]">nilai rahasia (password/key/token) disembunyikan server</span>
+                <h4 className="font-semibold flex-1">{t('docker.inspEnv', { n: inspect.env.length })}</h4>
+                <span className="text-[10px] text-[var(--muted-foreground)]">{t('docker.secretsMasked')}</span>
               </div>
               <ul className="font-mono space-y-0.5 break-all">
                 {inspect.env.map((e) => (

@@ -27,6 +27,7 @@ import { RowsSkeleton } from '@/shared/ui/skeleton';
 import { Modal } from '@/shared/ui/modal';
 import { toast } from '@/shared/ui/toast';
 import { confirmModal } from '@/shared/ui/confirm-dialog';
+import { useT } from '@/shared/i18n';
 
 interface ProcessServiceModalProps {
   server: ServerItem;
@@ -34,6 +35,7 @@ interface ProcessServiceModalProps {
 }
 
 export default function ProcessServiceModal({ server, onClose }: ProcessServiceModalProps) {
+  const t = useT();
   const [activeTab, setActiveTab] = useState<'processes' | 'services' | 'docker'>('processes');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +62,7 @@ export default function ProcessServiceModal({ server, onClose }: ProcessServiceM
         setDockerContainers(srvData.dockerContainers || []);
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to fetch data');
+      setError(err.message || t('proc.fetchFailed'));
     } finally {
       setLoading(false);
     }
@@ -72,47 +74,47 @@ export default function ProcessServiceModal({ server, onClose }: ProcessServiceM
 
   const handleKillProcess = async (pid: number, comm: string) => {
     const ok = await confirmModal({
-      title: 'Matikan Proses',
-      message: `Yakin ingin mematikan (kill) proses "${comm}" (PID: ${pid})?`,
+      title: t('proc.killTitle'),
+      message: t('proc.killConfirm', { comm, pid }),
       variant: 'danger',
-      confirmText: 'Matikan (Kill)'
+      confirmText: t('proc.killButton')
     });
     if (!ok) return;
     try {
       await killProcess(server.id, pid, 'kill');
-      toast.success(`Process ${comm} (PID: ${pid}) terminated successfully.`);
-      setActionMessage(`Process ${comm} (PID: ${pid}) terminated.`);
+      toast.success(t('proc.killSuccess', { comm, pid }));
+      setActionMessage(t('proc.killed', { comm, pid }));
       setTimeout(() => setActionMessage(null), 3500);
       loadData();
     } catch (err: any) {
-      toast.error(`Failed to kill process: ${err.message}`);
+      toast.error(t('proc.killFailed', { error: err.message }));
     }
   };
 
   const handleServiceControl = async (serviceName: string, action: string) => {
     try {
-      setActionMessage(`Executing '${action}' on ${serviceName}...`);
+      setActionMessage(t('proc.svcExecuting', { action, name: serviceName }));
       await controlService(server.id, serviceName, action);
-      toast.success(`Service ${serviceName} action '${action}' completed.`);
-      setActionMessage(`Service ${serviceName} action '${action}' completed.`);
+      toast.success(t('proc.svcDone', { action, name: serviceName }));
+      setActionMessage(t('proc.svcDone', { action, name: serviceName }));
       setTimeout(() => setActionMessage(null), 3500);
       loadData();
     } catch (err: any) {
-      toast.error(`Failed to control service: ${err.message}`);
+      toast.error(t('proc.svcFailed', { error: err.message }));
       setActionMessage(null);
     }
   };
 
   const handleDockerControl = async (containerId: string, name: string, action: string) => {
     try {
-      setActionMessage(`Executing '${action}' on container ${name}...`);
+      setActionMessage(t('proc.ctrExecuting', { action, name }));
       await controlDocker(server.id, containerId, action);
-      toast.success(`Container ${name} action '${action}' completed.`);
-      setActionMessage(`Container ${name} action '${action}' completed.`);
+      toast.success(t('proc.ctrDone', { action, name }));
+      setActionMessage(t('proc.ctrDone', { action, name }));
       setTimeout(() => setActionMessage(null), 3500);
       loadData();
     } catch (err: any) {
-      toast.error(`Failed to control container: ${err.message}`);
+      toast.error(t('proc.ctrFailed', { error: err.message }));
       setActionMessage(null);
     }
   };
@@ -156,7 +158,7 @@ export default function ProcessServiceModal({ server, onClose }: ProcessServiceM
               <span className="font-semibold text-xs text-zinc-100">{server.name}</span>
               <span className="text-[11px] text-zinc-500 font-mono sensitive">({server.host})</span>
             </div>
-            <p className="text-[11px] text-zinc-500">Running Processes, Systemd Services & Containers</p>
+            <p className="text-[11px] text-zinc-500">{t('proc.subtitle')}</p>
           </div>
           <Button
             variant="ghost"
@@ -186,7 +188,7 @@ export default function ProcessServiceModal({ server, onClose }: ProcessServiceM
               }`}
             >
               <Activity className="w-3.5 h-3.5 text-zinc-400" />
-              Processes ({processes.length})
+              {t('proc.tabProcesses', { n: processes.length })}
             </button>
             <button
               onClick={() => { setActiveTab('services'); setSearchQuery(''); }}
@@ -197,7 +199,7 @@ export default function ProcessServiceModal({ server, onClose }: ProcessServiceM
               }`}
             >
               <Layers className="w-3.5 h-3.5 text-zinc-400" />
-              Services ({services.length})
+              {t('proc.tabServices', { n: services.length })}
             </button>
             <button
               onClick={() => { setActiveTab('docker'); setSearchQuery(''); }}
@@ -217,7 +219,7 @@ export default function ProcessServiceModal({ server, onClose }: ProcessServiceM
               <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
               <Input
                 type="text"
-                placeholder={`Search ${activeTab}...`}
+                placeholder={{ processes: t('proc.searchProcesses'), services: t('proc.searchServices'), docker: t('proc.searchDocker') }[activeTab]}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-8 h-8 text-xs bg-zinc-950 border-zinc-800"
@@ -255,18 +257,18 @@ export default function ProcessServiceModal({ server, onClose }: ProcessServiceM
                 <thead>
                   <tr className="border-b border-zinc-800 text-zinc-400 text-[11px] font-medium">
                     <th className="py-2 px-3">PID</th>
-                    <th className="py-2 px-3">USER</th>
+                    <th className="py-2 px-3">{t('proc.thUser')}</th>
                     <th className="py-2 px-3">% CPU</th>
                     <th className="py-2 px-3">% MEM</th>
-                    <th className="py-2 px-3">COMMAND</th>
-                    <th className="py-2 px-3 text-right">ACTION</th>
+                    <th className="py-2 px-3">{t('proc.thCommand')}</th>
+                    <th className="py-2 px-3 text-right">{t('proc.thAction')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-800/50 font-mono text-xs">
                   {filteredProcesses.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="text-center py-10 text-zinc-500">
-                        No processes match filter
+                        {t('proc.noProcesses')}
                       </td>
                     </tr>
                   ) : (
@@ -300,7 +302,7 @@ export default function ProcessServiceModal({ server, onClose }: ProcessServiceM
                             className="h-6 px-2 text-[10px] gap-1"
                           >
                             <Skull className="w-3 h-3" />
-                            Kill
+                            {t('proc.kill')}
                           </Button>
                         </td>
                       </tr>
@@ -315,7 +317,7 @@ export default function ProcessServiceModal({ server, onClose }: ProcessServiceM
           {!loading && !error && activeTab === 'services' && (
             <div className="space-y-3">
               <div className="flex items-center gap-1.5 pb-1">
-                <span className="text-[11px] text-zinc-500">Filter:</span>
+                <span className="text-[11px] text-zinc-500">{t('proc.filter')}</span>
                 {(['all', 'running', 'failed'] as const).map((st) => (
                   <button
                     key={st}
@@ -326,7 +328,7 @@ export default function ProcessServiceModal({ server, onClose }: ProcessServiceM
                         : 'text-zinc-500 hover:text-zinc-300'
                     }`}
                   >
-                    {st}
+                    {{ all: t('proc.filterAll'), running: t('proc.filterRunning'), failed: t('proc.filterFailed') }[st]}
                   </button>
                 ))}
               </div>
@@ -336,17 +338,17 @@ export default function ProcessServiceModal({ server, onClose }: ProcessServiceM
                   <thead>
                     <tr className="border-b border-zinc-800 text-zinc-400 text-[11px] font-medium">
                       <th className="py-2 px-3">UNIT</th>
-                      <th className="py-2 px-3">STATUS</th>
+                      <th className="py-2 px-3">{t('proc.thStatus')}</th>
                       <th className="py-2 px-3">SUB</th>
-                      <th className="py-2 px-3">DESCRIPTION</th>
-                      <th className="py-2 px-3 text-right">CONTROL</th>
+                      <th className="py-2 px-3">{t('proc.thDescription')}</th>
+                      <th className="py-2 px-3 text-right">{t('proc.thControl')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-800/50">
                     {filteredServices.length === 0 ? (
                       <tr>
                         <td colSpan={5} className="text-center py-10 text-zinc-500">
-                          No services match filter
+                          {t('proc.noServices')}
                         </td>
                       </tr>
                     ) : (
@@ -377,7 +379,7 @@ export default function ProcessServiceModal({ server, onClose }: ProcessServiceM
                                 size="icon"
                                 onClick={() => setLogsTarget({ type: 'service', name: s.unit })}
                                 className="h-6 w-6 text-zinc-400 hover:text-zinc-100"
-                                title="Logs"
+                                title={t('docker.logs')}
                               >
                                 <ScrollText className="w-3 h-3" />
                               </Button>
@@ -386,7 +388,7 @@ export default function ProcessServiceModal({ server, onClose }: ProcessServiceM
                                 size="icon"
                                 onClick={() => handleServiceControl(s.unit, 'restart')}
                                 className="h-6 w-6 text-zinc-400 hover:text-zinc-100"
-                                title="Restart"
+                                title={t('docker.restart')}
                               >
                                 <RotateCw className="w-3 h-3" />
                               </Button>
@@ -396,7 +398,7 @@ export default function ProcessServiceModal({ server, onClose }: ProcessServiceM
                                   size="icon"
                                   onClick={() => handleServiceControl(s.unit, 'stop')}
                                   className="h-6 w-6 text-zinc-400 hover:text-red-400"
-                                  title="Stop"
+                                  title={t('docker.stop')}
                                 >
                                   <Square className="w-3 h-3" />
                                 </Button>
@@ -406,7 +408,7 @@ export default function ProcessServiceModal({ server, onClose }: ProcessServiceM
                                   size="icon"
                                   onClick={() => handleServiceControl(s.unit, 'start')}
                                   className="h-6 w-6 text-zinc-400 hover:text-emerald-400"
-                                  title="Start"
+                                  title={t('docker.start')}
                                 >
                                   <Play className="w-3 h-3" />
                                 </Button>
@@ -428,18 +430,18 @@ export default function ProcessServiceModal({ server, onClose }: ProcessServiceM
               {dockerContainers.length === 0 ? (
                 <div className="text-center py-16 text-zinc-500 space-y-1">
                   <Box className="w-7 h-7 mx-auto opacity-30" />
-                  <p className="text-xs">No active Docker containers or Docker is not installed.</p>
+                  <p className="text-xs">{t('proc.noDocker')}</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
                       <tr className="border-b border-zinc-800 text-zinc-400 text-[11px] font-medium">
-                        <th className="py-2 px-3">NAME</th>
+                        <th className="py-2 px-3">{t('proc.thName')}</th>
                         <th className="py-2 px-3">ID</th>
                         <th className="py-2 px-3">IMAGE</th>
-                        <th className="py-2 px-3">STATUS</th>
-                        <th className="py-2 px-3 text-right">CONTROL</th>
+                        <th className="py-2 px-3">{t('proc.thStatus')}</th>
+                        <th className="py-2 px-3 text-right">{t('proc.thControl')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-800/50 font-mono text-xs">
@@ -463,7 +465,7 @@ export default function ProcessServiceModal({ server, onClose }: ProcessServiceM
                                 size="icon"
                                 onClick={() => setLogsTarget({ type: 'docker', name: c.name })}
                                 className="h-6 w-6 text-zinc-400 hover:text-zinc-100"
-                                title="Logs"
+                                title={t('docker.logs')}
                               >
                                 <ScrollText className="w-3 h-3" />
                               </Button>

@@ -3,6 +3,7 @@ import { Download, Music, Archive } from 'lucide-react';
 import { downloadFile } from '@/features/files/api';
 import { Button } from '@/shared/ui/button';
 import { formatBytes, type FileClassification } from './fileTypes';
+import { useT } from '@/shared/i18n';
 
 interface MediaViewerProps {
   meta: FileClassification;
@@ -14,6 +15,7 @@ interface MediaViewerProps {
 
 /** Audio / video players and the download card for archives and other binaries. */
 export default function MediaViewer({ meta, blobUrl, blobSize, serverId, path }: MediaViewerProps) {
+  const t = useT();
   const server = { id: serverId };
   if (meta.category === 'audio') {
     return (
@@ -23,12 +25,12 @@ export default function MediaViewer({ meta, blobUrl, blobSize, serverId, path }:
         </div>
         <div>
           <h4 className="text-base font-semibold text-white font-mono">{meta.filename}</h4>
-          <p className="text-xs text-zinc-400 mt-1">{formatBytes(blobSize)} · Remote Audio Stream</p>
+          <p className="text-xs text-zinc-400 mt-1">{formatBytes(blobSize)} · {t('files.audioStream')}</p>
         </div>
         {blobUrl && (
           <audio controls className="w-full max-w-md mt-4">
             <source src={blobUrl} />
-            Browser tidak mendukung HTML5 Audio.
+            {t('files.noAudio')}
           </audio>
         )}
       </div>
@@ -40,7 +42,7 @@ export default function MediaViewer({ meta, blobUrl, blobSize, serverId, path }:
         {blobUrl && (
           <video controls className="max-h-[70vh] max-w-full rounded-lg shadow-2xl border border-zinc-800">
             <source src={blobUrl} />
-            Browser tidak mendukung HTML5 Video.
+            {t('files.noVideo')}
           </video>
         )}
       </div>
@@ -61,7 +63,7 @@ export default function MediaViewer({ meta, blobUrl, blobSize, serverId, path }:
       {meta.category === 'archive' && (
         <div className="max-w-md w-full bg-zinc-950 border border-zinc-800 rounded-xl p-4 text-left font-mono text-xs space-y-2">
           <span className="text-zinc-500 text-[11px] font-sans block font-semibold">
-            Sintaks Ekstraksi di Terminal (SSH):
+            {t('files.extractHint')}
           </span>
           <div className="p-2 bg-black rounded border border-zinc-800 text-emerald-400 flex justify-between items-center">
             <code>
@@ -76,7 +78,7 @@ export default function MediaViewer({ meta, blobUrl, blobSize, serverId, path }:
       )}
 
       <Button onClick={() => downloadFile(server.id, path)} className="gap-2">
-        <Download className="w-4 h-4" /> Download File ({formatBytes(blobSize)})
+        <Download className="w-4 h-4" /> {t('files.downloadFile', { size: formatBytes(blobSize) })}
       </Button>
     </div>
   );

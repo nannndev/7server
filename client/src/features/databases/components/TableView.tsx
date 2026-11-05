@@ -3,6 +3,7 @@ import { RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filt
 import { browseDb, fetchDbStructure, BrowseResult, ObjectStructure, DbConnection, DbEngine } from '@/features/databases/api';
 import { cacheGet, cacheSet } from '@/shared/lib/cache';
 import DataGrid, { downloadResult } from '@/features/databases/components/DataGrid';
+import { useT } from '@/shared/i18n';
 
 const PAGE_SIZES = [50, 100, 250, 500, 1000];
 type Sub = 'data' | 'structure' | 'ddl';
@@ -17,6 +18,7 @@ interface TableViewProps {
 }
 
 export default function TableView({ conn, engine, database, object, objectType, onOpenQuery }: TableViewProps) {
+  const t = useT();
   const base = `${conn.id}:${database || ''}:${object}`;
   const [sub, setSub] = useState<Sub>('data');
   const [limit, setLimit] = useState(100);
@@ -77,8 +79,8 @@ export default function TableView({ conn, engine, database, object, objectType, 
   const keyOf = (col: string) => structure?.columns.find((c) => c.name === col)?.key;
 
   const subTabs: [Sub, string, React.ElementType][] = [
-    ['data', 'Data', Table2],
-    ...(isSql ? ([['structure', 'Struktur', Columns3], ['ddl', 'DDL', FileCode2]] as [Sub, string, React.ElementType][]) : [])
+    ['data', t('db.data'), Table2],
+    ...(isSql ? ([['structure', t('db.structure'), Columns3], ['ddl', 'DDL', FileCode2]] as [Sub, string, React.ElementType][]) : [])
   ];
 
   return (
@@ -101,7 +103,7 @@ export default function TableView({ conn, engine, database, object, objectType, 
             <input value={whereInput} onChange={(e) => setWhereInput(e.target.value)} placeholder="status = 'active' AND id > 100"
               className="flex-1 min-w-0 bg-transparent text-[11px] font-mono" aria-label="Filter WHERE" />
             {where && (
-              <button type="button" onClick={() => { setWhereInput(''); setWhere(''); setOffset(0); }} className="text-[10px] text-[var(--muted-foreground)] hover:text-[var(--foreground)]">reset</button>
+              <button type="button" onClick={() => { setWhereInput(''); setWhere(''); setOffset(0); }} className="text-[10px] text-[var(--muted-foreground)] hover:text-[var(--foreground)]">{t('db.reset')}</button>
             )}
           </form>
         )}
@@ -110,7 +112,7 @@ export default function TableView({ conn, engine, database, object, objectType, 
         <div className="flex items-center gap-1 ml-auto">
           {sub === 'data' && data && (
             <>
-              <button onClick={() => onOpenQuery(data.sql || `SELECT * FROM ${object} LIMIT 100`)} title="Buka sebagai query"
+              <button onClick={() => onOpenQuery(data.sql || `SELECT * FROM ${object} LIMIT 100`)} title={t('db.openAsQuery')}
                 className="h-7 px-2 rounded-md text-[11px] flex items-center gap-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--sidebar-hover)]">
                 <FileCode2 className="w-3.5 h-3.5" /> SQL
               </button>
@@ -118,7 +120,7 @@ export default function TableView({ conn, engine, database, object, objectType, 
             </>
           )}
           <button onClick={() => (sub === 'data' ? load() : (cacheSet(`struct:${base}`, undefined), fetchDbStructure(conn.id, object, database).then(setStructure).catch((e) => setStructError(e.message))))}
-            className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-[var(--sidebar-hover)]" aria-label="Refresh" title="Refresh">
+            className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-[var(--sidebar-hover)]" aria-label={t('common.refresh')} title={t('common.refresh')}>
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
@@ -137,20 +139,20 @@ export default function TableView({ conn, engine, database, object, objectType, 
           <div className="shrink-0 h-9 border-t border-[var(--border)] px-3 flex items-center gap-3 text-[11px] text-[var(--muted-foreground)]">
             <span className="font-mono">
               {rowsShown ? `${offset + 1}–${offset + rowsShown}` : '0'}
-              {total != null && <> dari <b className="text-[var(--foreground)]">{total.toLocaleString()}</b></>} baris
+              {total != null && <> {t('db.of')} <b className="text-[var(--foreground)]">{total.toLocaleString()}</b></>} {t('db.rowsLabel')}
             </span>
             {data?.ms != null && <span className="font-mono">· {data.ms} ms</span>}
-            {where && <span className="text-[var(--accent-brand)]">· difilter</span>}
+            {where && <span className="text-[var(--accent-brand)]">· {t('db.filtered')}</span>}
             <div className="ml-auto flex items-center gap-1">
-              <select value={limit} onChange={(e) => { setLimit(Number(e.target.value)); setOffset(0); }} aria-label="Baris per halaman"
+              <select value={limit} onChange={(e) => { setLimit(Number(e.target.value)); setOffset(0); }} aria-label={t('db.rowsPerPage')}
                 className="h-6 bg-transparent border border-[var(--border)] rounded px-1 text-[11px]">
-                {PAGE_SIZES.map((n) => <option key={n} value={n}>{n} / hal</option>)}
+                {PAGE_SIZES.map((n) => <option key={n} value={n}>{t('db.perPage', { n })}</option>)}
               </select>
               {[
-                { label: 'Halaman pertama', icon: ChevronsLeft, on: () => setOffset(0), dis: offset === 0 },
-                { label: 'Sebelumnya', icon: ChevronLeft, on: () => setOffset(Math.max(0, offset - limit)), dis: offset === 0 },
-                { label: 'Berikutnya', icon: ChevronRight, on: () => setOffset(offset + limit), dis: !canNext },
-                { label: 'Halaman terakhir', icon: ChevronsRight, on: () => lastOffset != null && setOffset(lastOffset), dis: lastOffset == null || offset >= lastOffset }
+                { label: t('db.firstPage'), icon: ChevronsLeft, on: () => setOffset(0), dis: offset === 0 },
+                { label: t('db.prevPage'), icon: ChevronLeft, on: () => setOffset(Math.max(0, offset - limit)), dis: offset === 0 },
+                { label: t('db.nextPage'), icon: ChevronRight, on: () => setOffset(offset + limit), dis: !canNext },
+                { label: t('db.lastPage'), icon: ChevronsRight, on: () => lastOffset != null && setOffset(lastOffset), dis: lastOffset == null || offset >= lastOffset }
               ].map(({ label, icon: Icon, on, dis }) => (
                 <button key={label} onClick={on} disabled={dis || loading} aria-label={label} title={label}
                   className="h-6 w-6 rounded flex items-center justify-center hover:bg-[var(--sidebar-hover)] disabled:opacity-30 disabled:hover:bg-transparent">
@@ -169,11 +171,11 @@ export default function TableView({ conn, engine, database, object, objectType, 
           {structure && (
             <>
               <section>
-                <h4 className="text-xs font-semibold mb-2">Kolom <span className="font-normal text-[var(--muted-foreground)]">({structure.columns.length})</span></h4>
+                <h4 className="text-xs font-semibold mb-2">{t('db.columns')} <span className="font-normal text-[var(--muted-foreground)]">({structure.columns.length})</span></h4>
                 <div className="border border-[var(--border)] rounded-lg overflow-hidden">
                   <table className="w-full text-[12px]">
                     <thead className="bg-[var(--muted)] text-[var(--muted-foreground)] text-left text-[11px]">
-                      <tr>{['Kolom', 'Tipe', 'Null', 'Default', 'Extra'].map((h) => <th key={h} className="px-3 py-1.5 font-medium">{h}</th>)}</tr>
+                      <tr>{[t('db.column'), t('db.type'), 'Null', 'Default', 'Extra'].map((h) => <th key={h} className="px-3 py-1.5 font-medium">{h}</th>)}</tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--border)] font-mono">
                       {structure.columns.map((c) => (
@@ -194,8 +196,8 @@ export default function TableView({ conn, engine, database, object, objectType, 
                 </div>
               </section>
               <section>
-                <h4 className="text-xs font-semibold mb-2">Index <span className="font-normal text-[var(--muted-foreground)]">({structure.indexes.length})</span></h4>
-                {structure.indexes.length === 0 ? <p className="text-xs text-[var(--muted-foreground)]">Tidak ada index.</p> : (
+                <h4 className="text-xs font-semibold mb-2">{t('db.indexes')} <span className="font-normal text-[var(--muted-foreground)]">({structure.indexes.length})</span></h4>
+                {structure.indexes.length === 0 ? <p className="text-xs text-[var(--muted-foreground)]">{t('db.noIndexes')}</p> : (
                   <div className="grid sm:grid-cols-2 gap-2">
                     {structure.indexes.map((i) => (
                       <div key={i.name} className="px-3 py-2 rounded-lg border border-[var(--border)] text-[12px]">
@@ -220,12 +222,12 @@ export default function TableView({ conn, engine, database, object, objectType, 
             <div className="relative">
               <button onClick={() => { navigator.clipboard.writeText(structure.ddl!); setCopied(true); setTimeout(() => setCopied(false), 1200); }}
                 className="absolute right-2 top-2 h-7 px-2 rounded-md text-[11px] flex items-center gap-1 bg-[var(--card)] border border-[var(--border)] hover:bg-[var(--sidebar-hover)]">
-                {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />} Salin
+                {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />} {t('common.copy')}
               </button>
               <pre className="p-4 rounded-lg bg-[var(--muted)] border border-[var(--border)] text-[12px] font-mono whitespace-pre-wrap leading-relaxed">{structure.ddl}</pre>
             </div>
           ) : (
-            <p className="text-xs text-[var(--muted-foreground)]">{structError || (structure ? 'DDL tidak tersedia untuk engine ini.' : 'Memuat…')}</p>
+            <p className="text-xs text-[var(--muted-foreground)]">{structError || (structure ? t('db.noDdl') : t('common.loading'))}</p>
           )}
         </div>
       )}
@@ -234,12 +236,13 @@ export default function TableView({ conn, engine, database, object, objectType, 
 }
 
 function ExportMenu({ onPick }: { onPick: (f: 'csv' | 'json') => void }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   return (
     <div className="relative">
-      <button onClick={() => setOpen((v) => !v)} aria-expanded={open} title="Export halaman ini"
+      <button onClick={() => setOpen((v) => !v)} aria-expanded={open} title={t('db.exportPage')}
         className="h-7 px-2 rounded-md text-[11px] flex items-center gap-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--sidebar-hover)]">
-        <Download className="w-3.5 h-3.5" /> Export
+        <Download className="w-3.5 h-3.5" /> {t('db.export')}
       </button>
       {open && (
         <>
@@ -247,7 +250,7 @@ function ExportMenu({ onPick }: { onPick: (f: 'csv' | 'json') => void }) {
           <div className="pop-in absolute right-0 mt-1 z-40 w-36 py-1 rounded-lg bg-[var(--card)] border border-[var(--border)] shadow-xl text-xs">
             {(['csv', 'json'] as const).map((f) => (
               <button key={f} onClick={() => { onPick(f); setOpen(false); }} className="w-full text-left px-3 py-1.5 hover:bg-[var(--sidebar-hover)]">
-                {f.toUpperCase()} <span className="text-[var(--muted-foreground)]">(halaman ini)</span>
+                {f.toUpperCase()} <span className="text-[var(--muted-foreground)]">{t('db.thisPage')}</span>
               </button>
             ))}
           </div>

@@ -40,6 +40,8 @@ import ImageViewer from './viewer/ImageViewer';
 import MediaViewer from './viewer/MediaViewer';
 import { useT } from '@/shared/i18n';
 
+const MD_MODE_KEYS = { split: 'files.mdSplit', preview: 'files.preview', edit: 'common.edit' } as const;
+
 export { classifyFile } from './viewer/fileTypes';
 export type { FileCategory, FileClassification } from './viewer/fileTypes';
 
@@ -106,7 +108,7 @@ export default function FileViewer({ server, path, onClose, onSaved }: FileViewe
         })
         .catch((err: any) => {
           if (active) {
-            setError(err.message || 'Failed to load file media');
+            setError(err.message || t('files.errLoadMedia'));
             setLoading(false);
           }
         });
@@ -120,7 +122,7 @@ export default function FileViewer({ server, path, onClose, onSaved }: FileViewe
         })
         .catch((err: any) => {
           if (active) {
-            setError(err.message || 'Failed to read file content');
+            setError(err.message || t('files.errRead'));
             setLoading(false);
           }
         });
@@ -178,7 +180,7 @@ export default function FileViewer({ server, path, onClose, onSaved }: FileViewe
       setTimeout(() => setSavedSuccess(false), 2200);
       if (onSaved) onSaved();
     } catch (err: any) {
-      setError(err.message || 'Failed to save file');
+      setError(err.message || t('files.errSave'));
     } finally {
       setSaving(false);
     }
@@ -195,7 +197,7 @@ export default function FileViewer({ server, path, onClose, onSaved }: FileViewe
       const parsed = JSON.parse(content);
       setContent(JSON.stringify(parsed, null, 2));
     } catch (err: any) {
-      setError(`Format error: ${err.message}`);
+      setError(t('files.errFormat', { error: err.message }));
     }
   };
 
@@ -204,7 +206,7 @@ export default function FileViewer({ server, path, onClose, onSaved }: FileViewe
       const parsed = JSON.parse(content);
       setContent(JSON.stringify(parsed));
     } catch (err: any) {
-      setError(`Minify error: ${err.message}`);
+      setError(t('files.errMinify', { error: err.message }));
     }
   };
 
@@ -294,7 +296,7 @@ export default function FileViewer({ server, path, onClose, onSaved }: FileViewe
             <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4 font-mono text-[var(--muted-foreground)]">
               {meta.language}
             </Badge>
-            {isModified && <span className="text-[10px] text-amber-500 font-sans font-medium">● Belum Disimpan</span>}
+            {isModified && <span className="text-[10px] text-amber-500 font-sans font-medium">● {t('files.unsaved')}</span>}
           </div>
         </div>
 
@@ -337,7 +339,7 @@ export default function FileViewer({ server, path, onClose, onSaved }: FileViewe
                       : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
                   }`}
                 >
-                  {m}
+                  {t(MD_MODE_KEYS[m])}
                 </button>
               ))}
             </div>
@@ -346,10 +348,10 @@ export default function FileViewer({ server, path, onClose, onSaved }: FileViewe
           {meta.category === 'log' && (
             <div className="flex items-center gap-1 mr-1">
               <Button variant="ghost" size="sm" onClick={() => jumpTo('top')} className="h-7 text-[11px] gap-1">
-                <ArrowUp className="w-3 h-3" /> Top
+                <ArrowUp className="w-3 h-3" /> {t('files.top')}
               </Button>
               <Button variant="ghost" size="sm" onClick={() => jumpTo('bottom')} className="h-7 text-[11px] gap-1">
-                <ArrowDown className="w-3 h-3" /> End
+                <ArrowDown className="w-3 h-3" /> {t('files.end')}
               </Button>
             </div>
           )}
@@ -361,7 +363,7 @@ export default function FileViewer({ server, path, onClose, onSaved }: FileViewe
               onClick={() => setShowSvgSource(!showSvgSource)}
               className="h-7 text-[11px] gap-1 mr-1"
             >
-              <Code2 className="w-3 h-3" /> {showSvgSource ? 'Preview SVG' : 'Edit Source XML'}
+              <Code2 className="w-3 h-3" /> {showSvgSource ? t('files.previewSvg') : t('files.editSvgSource')}
             </Button>
           )}
 
@@ -467,7 +469,7 @@ export default function FileViewer({ server, path, onClose, onSaved }: FileViewe
             className="h-7 text-xs flex-1 max-w-sm font-mono"
           />
           <span className="text-[11px] text-[var(--muted-foreground)] font-mono">
-            {searchQuery ? `${searchMatchesCount} matches` : ''}
+            {searchQuery ? t('files.matches', { n: searchMatchesCount }) : ''}
           </span>
           <Button variant="ghost" size="icon" onClick={() => setShowSearch(false)} className="h-6 w-6 ml-auto">
             <X className="w-3 h-3" />
@@ -487,11 +489,11 @@ export default function FileViewer({ server, path, onClose, onSaved }: FileViewe
           <span className="flex items-center gap-1.5">
             {jsonStatus.valid ? (
               <>
-                <CheckCircle2 className="w-3 h-3" /> Format JSON Valid
+                <CheckCircle2 className="w-3 h-3" /> {t('files.jsonValid')}
               </>
             ) : (
               <>
-                <AlertTriangle className="w-3 h-3" /> Syntax Error: {jsonStatus.error}
+                <AlertTriangle className="w-3 h-3" /> {t('files.syntaxError', { error: jsonStatus.error ?? '' })}
               </>
             )}
           </span>
@@ -598,19 +600,19 @@ export default function FileViewer({ server, path, onClose, onSaved }: FileViewe
           <span>UTF-8</span>
           {meta.canEdit && (
             <span>
-              Ln {cursorPos.line}, Col {cursorPos.col}
+              {t('files.cursor', { line: cursorPos.line, col: cursorPos.col })}
             </span>
           )}
-          <span>{linesCount} baris</span>
-          <span>{content.length.toLocaleString()} karakter</span>
+          <span>{t('files.lineCount', { n: linesCount })}</span>
+          <span>{t('files.charCount', { n: content.length.toLocaleString() })}</span>
         </div>
 
         <div className="flex items-center gap-3">
           {isModified ? (
-            <span className="text-amber-500 font-sans">Perubahan belum disimpan (⌘S)</span>
+            <span className="text-amber-500 font-sans">{t('files.unsavedChanges')}</span>
           ) : (
             <span className="text-emerald-500 flex items-center gap-1 font-sans">
-              <Check className="w-3 h-3" /> Sinkron dengan server
+              <Check className="w-3 h-3" /> {t('files.synced')}
             </span>
           )}
         </div>
