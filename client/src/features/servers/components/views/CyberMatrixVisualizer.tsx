@@ -16,6 +16,7 @@ import {
 import { ServerItem } from '@/features/servers/types';
 import { Button } from '@/shared/ui/button';
 import { Badge } from '@/shared/ui/badge';
+import { useT } from '@/shared/i18n';
 
 interface CyberMatrixVisualizerProps {
   servers: ServerItem[];
@@ -116,6 +117,7 @@ export default function CyberMatrixVisualizer({
   onManage,
   onOpenTerminal
 }: CyberMatrixVisualizerProps) {
+  const t = useT();
   const stageRef = useRef<HTMLDivElement>(null);
   const [rot, setRot] = useState({ x: -24, y: 34 });
   const [zoom, setZoom] = useState(1);
@@ -183,7 +185,7 @@ export default function CyberMatrixVisualizer({
             <Activity className="w-4 h-4 text-[var(--foreground)]" /> 3D Isometric Resource Matrix & Telemetry Radar
           </h3>
           <p className="text-[11px] text-[var(--muted-foreground)]">
-            Perbandingan tinggi pilar beban 3D (CPU, RAM, Swap, Storage) dan profil radar antar-VPS secara real-time
+            {t('matrix.subtitle')}
           </p>
         </div>
 
@@ -379,7 +381,7 @@ export default function CyberMatrixVisualizer({
                 <span className="w-2 h-2 bg-amber-400 inline-block" /> DISK
               </span>
             </div>
-            <span>Drag untuk memutar matriks 3D</span>
+            <span>{t('matrix.dragHint')}</span>
           </div>
         </div>
 
@@ -485,7 +487,7 @@ export default function CyberMatrixVisualizer({
                   <th className="py-2 px-2">RAM</th>
                   <th className="py-2 px-2">SWAP</th>
                   <th className="py-2 px-2">DISK</th>
-                  <th className="py-2 px-3 text-right">AKSI</th>
+                  <th className="py-2 px-3 text-right uppercase">{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">

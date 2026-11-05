@@ -119,7 +119,7 @@ export default function TopBar({
             <>
               <li aria-hidden><ChevronRight className="w-3.5 h-3.5 text-[var(--muted-foreground)]" /></li>
               <li className="fade-in text-[var(--foreground)] font-semibold truncate capitalize">
-                {route.tab === 'roles' ? t('users.tabRoles') : route.tab === 'sessions' ? t('users.tabSessions') : t('users.tabUsers')}
+                {route.tab === 'roles' ? t('users.tabRoles') : route.tab === 'sessions' ? t('users.tabSessions') : t('users.tabUsersPlain')}
               </li>
             </>
           )}
