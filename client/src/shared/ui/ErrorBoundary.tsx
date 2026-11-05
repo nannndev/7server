@@ -54,7 +54,7 @@ export class ErrorBoundary extends Component<Props, State> {
               </div>
             )}
 
-            <Button onClick={this.handleReset} className="w-full bg-purple-600 hover:bg-purple-700 text-white">
+            <Button onClick={this.handleReset} className="w-full btn-metal">
               <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
               Muat Ulang Halaman (Reload)
             </Button>

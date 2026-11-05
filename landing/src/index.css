@@ -1,0 +1,166 @@
+@import "tailwindcss";
+@import "./iso/iso.css";
+
+/* Page tokens sit on top of the figure kit's tokens (.iso on <html>), so page and figure share one
+   palette in both themes. Theme comes from <html data-theme>, set before first paint in index.html. */
+.iso {
+  --line: #232323;
+  --line-strong: #333333;
+  --raise: #161616;
+  --accent: #6be0a0; /* the one accent: "connected / ok" green, same as the kit's green */
+  --accent-ink: #0b0b0b;
+  --font-sans: 'Inter Tight', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  color-scheme: dark;
+}
+.iso[data-theme='light'] {
+  --line: #e2e2de;
+  --line-strong: #cfcfca;
+  --raise: #ffffff;
+  --accent: #1f8a55;
+  --accent-ink: #ffffff;
+  color-scheme: light;
+}
+
+html {
+  background: var(--anatomy-page);
+  scroll-behavior: smooth;
+  scroll-padding-top: 72px;
+}
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: var(--anatomy-page);
+  color: var(--anatomy-text);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  transition: background-color 240ms var(--anatomy-ease), color 240ms var(--anatomy-ease);
+}
+code, pre, kbd { font-family: var(--font-mono); }
+::selection { background: color-mix(in srgb, var(--accent) 28%, transparent); color: var(--anatomy-strong); }
+
+/* The figure card on this page: rounded, borderless lift instead of the kit's hairline box. */
+.iso-plate { border-radius: 14px; box-shadow: var(--anatomy-lift); }
+.iso-figure { margin: 0; }
+.iso-stage { outline: none; border-radius: 8px; cursor: pointer; }
+.iso-stage:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
+.iso-line[data-flow] { stroke: var(--accent); }
+
+/* Scroll reveal: content rises 12px and fades in once, staggered by --i. */
+.reveal {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 640ms var(--anatomy-ease), transform 760ms var(--anatomy-ease);
+  transition-delay: calc(var(--i, 0) * 70ms);
+}
+.reveal[data-shown] { opacity: 1; transform: none; }
+
+/* Status dot that breathes slowly (connected lamp). */
+@keyframes breathe { 0%, 100% { opacity: .45 } 50% { opacity: 1 } }
+.breathe { animation: breathe 2.8s ease-in-out infinite; }
+
+/* Theme switch: icons cross-fade instead of popping. */
+.theme-icon { transition: opacity 200ms ease, transform 300ms var(--anatomy-ease); }
+.theme-icon[data-off] { opacity: 0; transform: rotate(-60deg) scale(.6); }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .reveal { opacity: 1; transform: none; transition: none; }
+  .breathe { animation: none; }
+}
+
+/* ---------------------------------------------------------------- metal finish (from the app icon)
+   Brushed-aluminium rims, carbon-fibre ground, silver buttons, one violet/cyan core glow. */
+.iso {
+  --rim-hi: #9a9aa2; --rim-mid: #3a3a40; --rim-lo: #5c5c63;   /* aluminium bevel: bright top, dark waist, lit bottom lip */
+  --brush: rgba(255, 255, 255, .014);                          /* hairline brushing on metal faces */
+  --face-top: #1a1a1d; --face-bot: #121214;                    /* card face, lit from above */
+  --silver-top: #f1f1f3; --silver-mid: #c9c9ce; --silver-bot: #a3a3aa; --silver-ink: #0c0c0e;
+  --core-violet: rgba(139, 92, 246, .22); --core-cyan: rgba(56, 189, 248, .14);
+  --weave: rgba(255, 255, 255, .022);
+}
+.iso[data-theme='light'] {
+  --rim-hi: #ffffff; --rim-mid: #c4c4c9; --rim-lo: #e6e6ea;
+  --brush: rgba(0, 0, 0, .008);
+  --face-top: #ffffff; --face-bot: #f3f3f1;
+  --silver-top: #3a3a40; --silver-mid: #232327; --silver-bot: #111113; --silver-ink: #f6f6f7;
+  --core-violet: rgba(139, 92, 246, .12); --core-cyan: rgba(56, 189, 248, .08);
+  --weave: rgba(0, 0, 0, .025);
+}
+
+/* Card with a machined rim: the border is a gradient ring (border-box), the face is brushed metal. */
+.metal {
+  border: 1px solid transparent !important;
+  background:
+    repeating-linear-gradient(90deg, var(--brush) 0 1px, transparent 1px 3px) padding-box,
+    linear-gradient(180deg, var(--face-top), var(--face-bot)) padding-box,
+    linear-gradient(180deg, var(--rim-hi), var(--rim-mid) 42%, var(--rim-lo)) border-box !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 1px 2px rgba(0, 0, 0, .25), 0 12px 28px -18px rgba(0, 0, 0, .6);
+  transition: transform 320ms var(--anatomy-ease), box-shadow 320ms var(--anatomy-ease);
+}
+a.metal:hover, article.metal:hover { transform: translateY(-2px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07), 0 2px 4px rgba(0, 0, 0, .25), 0 18px 36px -18px rgba(0, 0, 0, .7); }
+.iso[data-theme='light'] .metal { box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(0, 0, 0, .06), 0 12px 28px -20px rgba(0, 0, 0, .25); }
+
+/* Inset well (code lines): carbon-dark recess under a thin bevel. */
+.well {
+  border: 1px solid transparent !important;
+  background:
+    linear-gradient(180deg, #0a0a0b, #0e0e10) padding-box,
+    linear-gradient(180deg, #202024, #34343a) border-box !important;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, .45);
+}
+.iso[data-theme='light'] .well { background: linear-gradient(180deg, #ececea, #f6f6f4) padding-box, linear-gradient(180deg, var(--rim-mid), var(--rim-hi)) border-box !important; box-shadow: inset 0 1px 2px rgba(0, 0, 0, .08); }
+
+/* Primary button: polished aluminium bar with a specular top edge. Secondary: dark metal. */
+.btn-silver {
+  color: var(--silver-ink) !important;
+  background: linear-gradient(180deg, var(--silver-top), var(--silver-mid) 55%, var(--silver-bot)) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7), inset 0 -1px 0 rgba(0, 0, 0, .25), 0 1px 2px rgba(0, 0, 0, .35), 0 8px 20px -10px rgba(0, 0, 0, .6);
+  transition: transform 200ms var(--anatomy-ease), filter 200ms ease;
+}
+.btn-silver:hover { filter: brightness(1.06); transform: translateY(-1px); }
+.btn-silver:active { transform: translateY(0) scale(.98); }
+.iso[data-theme='light'] .btn-silver { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18), 0 1px 2px rgba(0, 0, 0, .2), 0 8px 18px -10px rgba(0, 0, 0, .5); }
+
+/* Headline in brushed silver. */
+.silver-text {
+  background: linear-gradient(180deg, var(--anatomy-strong) 30%, color-mix(in srgb, var(--anatomy-strong) 58%, var(--anatomy-page)));
+  -webkit-background-clip: text; background-clip: text; color: transparent !important;
+}
+
+/* Carbon-fibre ground behind the hero, faded out at the edges so it never ends on a line. */
+.carbon {
+  position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    linear-gradient(45deg, var(--weave) 25%, transparent 25% 50%, var(--weave) 50% 75%, transparent 75%) 0 0 / 6px 6px,
+    linear-gradient(-45deg, var(--weave) 25%, transparent 25% 50%, var(--weave) 50% 75%, transparent 75%) 3px 3px / 6px 6px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 30%, transparent 75%);
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 30%, transparent 75%);
+}
+
+/* The icon's optical core: a soft violet/cyan glow behind the figure's dial corner, slowly breathing. */
+.core-glow { position: relative; isolation: isolate; }
+.core-glow::before {
+  content: ''; position: absolute; z-index: -1; pointer-events: none;
+  width: 46%; aspect-ratio: 1; right: 12%; top: -8%;
+  background: radial-gradient(circle, var(--core-violet), var(--core-cyan) 38%, transparent 68%);
+  filter: blur(18px);
+  animation: core 9s ease-in-out infinite;
+}
+@keyframes core { 0%, 100% { opacity: .75; transform: scale(1) } 50% { opacity: 1; transform: scale(1.06) } }
+
+/* Figure card gets the same machined rim. */
+.iso-plate {
+  border: 1px solid transparent;
+  background: linear-gradient(180deg, var(--anatomy-card), var(--anatomy-card)) padding-box,
+    linear-gradient(180deg, var(--rim-hi), var(--rim-mid) 42%, var(--rim-lo)) border-box;
+}
+
+/* Status LED: green with a small bloom, like the drive lights on the icon. */
+.led { background: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent), 0 0 8px var(--accent); }
+
+@media (prefers-reduced-motion: reduce) {
+  .core-glow::before { animation: none; }
+  .metal, .btn-silver { transition: none; }
+  a.metal:hover, article.metal:hover, .btn-silver:hover { transform: none; }
+}

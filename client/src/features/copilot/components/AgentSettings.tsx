@@ -20,7 +20,7 @@ const Seg = <T extends string>({ value, options, onChange, label }: { value: T; 
         role="radio"
         aria-checked={value === v}
         onClick={() => onChange(v)}
-        className={`px-2.5 py-1 rounded-md text-[11px] transition-colors ${value === v ? 'bg-purple-600 text-white' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'}`}
+        className={`px-2.5 py-1 rounded-md text-[11px] transition-colors ${value === v ? 'btn-metal' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'}`}
       >
         {text}
       </button>
@@ -68,11 +68,11 @@ export function AgentSettings({ value, server, onSave, onClose }: Props) {
                   key={g.id}
                   onClick={() => toggleGuide(g.id)}
                   aria-pressed={on}
-                  className={`text-left p-2.5 rounded-xl border transition-colors ${on ? 'border-purple-500/60 bg-purple-500/10' : 'border-[var(--border)] hover:border-purple-500/30'}`}
+                  className={`text-left p-2.5 rounded-xl border transition-colors ${on ? 'border-[var(--rim)] bg-[var(--foreground)]/[0.06]' : 'border-[var(--border)] hover:border-[var(--rim)]'}`}
                 >
                   <div className="flex items-center gap-1.5 text-xs font-medium text-[var(--foreground)]">
-                    <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${on ? 'bg-purple-600 border-purple-600' : 'border-[var(--border)]'}`}>
-                      {on && <Check className="w-2.5 h-2.5 text-white" />}
+                    <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${on ? 'btn-metal border-transparent' : 'border-[var(--border)]'}`}>
+                      {on && <Check className="w-2.5 h-2.5" />}
                     </span>
                     {t(`guide.${g.id}` as MessageKey)}
                   </div>
@@ -92,7 +92,7 @@ export function AgentSettings({ value, server, onSave, onClose }: Props) {
             value={draft.custom}
             onChange={(e) => set({ custom: e.target.value })}
             placeholder={t('agentSettings.customPlaceholder')}
-            className="w-full resize-y rounded-xl bg-[var(--background)] border border-[var(--border)] p-2.5 text-xs text-[var(--foreground)] placeholder-[var(--muted-foreground)] focus:ring-2 focus:ring-purple-500 outline-none"
+            className="w-full resize-y rounded-xl bg-[var(--background)] border border-[var(--border)] p-2.5 text-xs text-[var(--foreground)] placeholder-[var(--muted-foreground)] focus:ring-2 focus:ring-[var(--ring)] outline-none"
           />
           <div className="text-[10px] text-right text-[var(--muted-foreground)]">{draft.custom.length}/{LIMITS.custom}</div>
         </section>
@@ -110,7 +110,7 @@ export function AgentSettings({ value, server, onSave, onClose }: Props) {
                 value={note}
                 onChange={(e) => set({ serverNotes: { ...draft.serverNotes, [server.id]: e.target.value } })}
                 placeholder={t('agentSettings.serverNotePlaceholder')}
-                className="w-full resize-y rounded-xl bg-[var(--background)] border border-[var(--border)] p-2.5 text-xs text-[var(--foreground)] placeholder-[var(--muted-foreground)] focus:ring-2 focus:ring-purple-500 outline-none"
+                className="w-full resize-y rounded-xl bg-[var(--background)] border border-[var(--border)] p-2.5 text-xs text-[var(--foreground)] placeholder-[var(--muted-foreground)] focus:ring-2 focus:ring-[var(--ring)] outline-none"
               />
               <div className="text-[10px] text-right text-[var(--muted-foreground)]">{note.length}/{LIMITS.serverNote} · {t('agentSettings.serverNoteHint')}</div>
             </>
@@ -131,7 +131,7 @@ export function AgentSettings({ value, server, onSave, onClose }: Props) {
         </Button>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={onClose}>{t('common.cancel')}</Button>
-          <Button size="sm" disabled={!dirty} onClick={() => onSave(draft)} className="bg-purple-600 hover:bg-purple-700 text-white">{t('common.save')}</Button>
+          <Button size="sm" disabled={!dirty} onClick={() => onSave(draft)} className="btn-metal">{t('common.save')}</Button>
         </div>
       </div>
     </div>

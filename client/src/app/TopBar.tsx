@@ -175,10 +175,10 @@ export default function TopBar({ route, navigate, managedServer, serverCount, mo
           variant="outline"
           size="sm"
           onClick={onToggleCopilot}
-          className="gap-1.5 border-purple-500/30 text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 transition-colors"
+          className="gap-1.5 border-[var(--rim)] text-[var(--foreground)] hover:text-[var(--foreground)] hover:bg-[var(--foreground)]/[0.06] transition-colors"
           title="7Server AI Copilot (⌘J)"
         >
-          <Sparkles className="w-3.5 h-3.5 text-purple-400 animate-pulse" />
+          <Sparkles className="w-3.5 h-3.5 text-[var(--foreground)] animate-pulse" />
           <span className="hidden md:inline font-medium">Copilot</span>
         </Button>
 

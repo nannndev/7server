@@ -121,7 +121,7 @@ const PROVIDERS_META: ProviderMeta[] = [
     name: 'OpenRouter',
     tagline: 'aiGw.p.openrouter.tagline',
     badge: 'aiGw.p.openrouter.badge',
-    color: 'from-purple-500/20 to-pink-500/10 text-purple-400 border-purple-500/30',
+    color: 'from-[var(--foreground)]/10 to-pink-500/10 text-[var(--foreground)] border-[var(--rim)]',
     models: ['anthropic/claude-3.7-sonnet', 'openai/gpt-4o', 'deepseek/deepseek-r1'],
     defaultUrl: 'https://openrouter.ai/api/v1',
     keyPlaceholder: 'sk-or-v1-...',
@@ -380,7 +380,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border)]">
         <div>
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-purple-500/10 text-purple-500 border border-purple-500/20 shadow-sm">
+            <div className="p-2 rounded-xl bg-[var(--foreground)]/[0.06] text-[var(--foreground)] border border-[var(--rim)] shadow-sm">
               <Bot className="w-5 h-5" />
             </div>
             <div>
@@ -415,7 +415,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
             <div className="w-px h-6 bg-[var(--border)]" />
             <div>
               <div className="text-[10px] text-[var(--muted-foreground)] uppercase font-semibold">{t('aiGateway.statsActiveKeys')}</div>
-              <div className="font-bold font-mono text-purple-400">{t('aiGw.nKeys', { n: keys.filter((k) => k.enabled).length })}</div>
+              <div className="font-bold font-mono text-[var(--foreground)]">{t('aiGw.nKeys', { n: keys.filter((k) => k.enabled).length })}</div>
             </div>
             <div className="w-px h-6 bg-[var(--border)]" />
             <div>
@@ -437,7 +437,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
           onClick={() => onTabChange('providers')}
           className={`flex items-center gap-2 px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
             currentTab === 'providers'
-              ? 'border-purple-500 text-purple-500 font-semibold'
+              ? 'border-[var(--rim)] text-[var(--foreground)] font-semibold'
               : 'border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
           }`}
         >
@@ -453,7 +453,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
           onClick={() => onTabChange('keys')}
           className={`flex items-center gap-2 px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
             currentTab === 'keys'
-              ? 'border-purple-500 text-purple-500 font-semibold'
+              ? 'border-[var(--rim)] text-[var(--foreground)] font-semibold'
               : 'border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
           }`}
         >
@@ -469,7 +469,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
           onClick={() => onTabChange('quickstart')}
           className={`flex items-center gap-2 px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
             currentTab === 'quickstart'
-              ? 'border-purple-500 text-purple-500 font-semibold'
+              ? 'border-[var(--rim)] text-[var(--foreground)] font-semibold'
               : 'border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
           }`}
         >
@@ -480,7 +480,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
           onClick={() => onTabChange('usage')}
           className={`flex items-center gap-2 px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
             currentTab === 'usage'
-              ? 'border-purple-500 text-purple-500 font-semibold'
+              ? 'border-[var(--rim)] text-[var(--foreground)] font-semibold'
               : 'border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
           }`}
         >
@@ -493,9 +493,9 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
       {currentTab === 'providers' && (
         <div className="space-y-6">
           {/* Workflow callout */}
-          <div className="p-4 rounded-xl bg-purple-500/5 border border-purple-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="p-4 rounded-xl bg-[var(--foreground)]/[0.03] border border-[var(--rim)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center shrink-0 mt-0.5">
+              <div className="w-8 h-8 rounded-lg bg-[var(--foreground)]/[0.06] text-[var(--foreground)] flex items-center justify-center shrink-0 mt-0.5">
                 <Zap className="w-4 h-4" />
               </div>
               <div className="space-y-0.5">
@@ -508,7 +508,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
               </div>
             </div>
             {connectedCount > 0 ? (
-              <Button size="sm" onClick={() => onTabChange('keys')} className="bg-purple-600 hover:bg-purple-700 text-white shrink-0">
+              <Button size="sm" onClick={() => onTabChange('keys')} className="btn-metal shrink-0">
                 {t('aiGw.step1Next')}
               </Button>
             ) : null}
@@ -607,14 +607,14 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                           href={p.docsUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-[11px] text-[var(--muted-foreground)] hover:text-purple-400 transition-colors flex items-center gap-1"
+                          className="text-[11px] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors flex items-center gap-1"
                         >
                           {t('aiGw.getKey')} <ExternalLink className="w-2.5 h-2.5" />
                         </a>
                         <Button
                           size="sm"
                           onClick={() => openConnectModal(p)}
-                          className="h-7 text-xs bg-purple-600 hover:bg-purple-700 text-white"
+                          className="h-7 text-xs btn-metal"
                         >
                           <Plug className="w-3 h-3 mr-1" />
                           {t('aiGw.connect')}
@@ -632,9 +632,9 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
       {/* ----------------- TAB 2: UNIVERSAL VIRTUAL KEYS (9ROUTER STYLE) ----------------- */}
       {currentTab === 'keys' && (
         <div className="space-y-4">
-          <div className="p-4 rounded-xl bg-purple-500/5 border border-purple-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="p-4 rounded-xl bg-[var(--foreground)]/[0.03] border border-[var(--rim)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center shrink-0 mt-0.5">
+              <div className="w-8 h-8 rounded-lg bg-[var(--foreground)]/[0.06] text-[var(--foreground)] flex items-center justify-center shrink-0 mt-0.5">
                 <Key className="w-4 h-4" />
               </div>
               <div className="space-y-0.5">
@@ -652,7 +652,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                 setCreatedKeySecret(null);
                 setShowNewKeyModal(true);
               }}
-              className="bg-purple-600 hover:bg-purple-700 text-white shrink-0"
+              className="btn-metal shrink-0"
             >
               <Plus className="w-3.5 h-3.5 mr-1" />
               {t('aiGateway.createKey')}
@@ -663,7 +663,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
             <Card className="p-12 text-center bg-[var(--card)] border border-[var(--border)] space-y-3">
               <Key className="w-8 h-8 text-[var(--muted-foreground)]/40 mx-auto" />
               <h3 className="text-sm font-medium text-[var(--foreground)]">{t('aiGateway.noKeys')}</h3>
-              <Button size="sm" onClick={() => setShowNewKeyModal(true)} className="bg-purple-600 hover:bg-purple-700 text-white">
+              <Button size="sm" onClick={() => setShowNewKeyModal(true)} className="btn-metal">
                 <Plus className="w-3.5 h-3.5 mr-1" />
                 {t('aiGateway.createKey')}
               </Button>
@@ -689,7 +689,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                       <tr key={k.id} className="hover:bg-[var(--muted)]/30 transition-colors">
                         <td className="py-3 px-3 font-medium text-[var(--foreground)]">
                           <div className="flex items-center gap-2">
-                            <Key className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+                            <Key className="w-3.5 h-3.5 text-[var(--foreground)] shrink-0" />
                             <span>{k.name}</span>
                           </div>
                         </td>
@@ -720,7 +720,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                           </div>
                         </td>
                         <td className="py-3 px-3 text-right font-mono">{k.totalRequests.toLocaleString()}</td>
-                        <td className="py-3 px-3 text-right font-mono text-purple-400">
+                        <td className="py-3 px-3 text-right font-mono text-[var(--foreground)]">
                           {formatTokens((k.totalInputTokens || 0) + (k.totalOutputTokens || 0))}
                         </td>
                         <td className="py-3 px-3 text-[var(--muted-foreground)]">
@@ -764,7 +764,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
         <div className="space-y-6">
           <Card className="p-4 bg-[var(--card)] border border-[var(--border)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-500 flex items-center justify-center shrink-0">
+              <div className="w-8 h-8 rounded-lg bg-[var(--foreground)]/[0.06] text-[var(--foreground)] flex items-center justify-center shrink-0">
                 <Key className="w-4 h-4" />
               </div>
               <div>
@@ -777,7 +777,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                 <select
                   value={selectedKeyId}
                   onChange={(e) => setSelectedKeyId(e.target.value)}
-                  className="h-8 px-2.5 text-xs rounded-lg bg-[var(--background)] border border-[var(--border)] text-[var(--foreground)] focus:ring-1 focus:ring-purple-500"
+                  className="h-8 px-2.5 text-xs rounded-lg bg-[var(--background)] border border-[var(--border)] text-[var(--foreground)] focus:ring-1 focus:ring-[var(--ring)]"
                 >
                   {keys.map((k) => (
                     <option key={k.id} value={k.key || k.keyPrefix}>
@@ -786,7 +786,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                   ))}
                 </select>
               ) : (
-                <Button size="sm" onClick={() => setShowNewKeyModal(true)} className="bg-purple-600 hover:bg-purple-700 text-white">
+                <Button size="sm" onClick={() => setShowNewKeyModal(true)} className="btn-metal">
                   <Plus className="w-3.5 h-3.5 mr-1" />
                   {t('aiGateway.createKey')}
                 </Button>
@@ -832,10 +832,10 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
 
               <div className="text-zinc-500 select-none pt-2"># 2. {t('aiGw.cc2')}</div>
               <div>
-                <span className="text-purple-400">export</span> <span className="text-amber-300">ANTHROPIC_BASE_URL</span>=<span className="text-emerald-300">"{gatewayBaseUrl}"</span>
+                <span className="text-[var(--foreground)]">export</span> <span className="text-amber-300">ANTHROPIC_BASE_URL</span>=<span className="text-emerald-300">"{gatewayBaseUrl}"</span>
               </div>
               <div>
-                <span className="text-purple-400">export</span> <span className="text-amber-300">ANTHROPIC_API_KEY</span>=<span className="text-emerald-300">"{activeKeyForQuickstart}"</span>
+                <span className="text-[var(--foreground)]">export</span> <span className="text-amber-300">ANTHROPIC_API_KEY</span>=<span className="text-emerald-300">"{activeKeyForQuickstart}"</span>
               </div>
 
               <div className="text-zinc-500 select-none pt-2"># 3. {t('aiGw.cc3')}</div>
@@ -848,7 +848,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
             <Card className="p-4 bg-[var(--card)] border border-[var(--border)] space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 font-semibold text-xs text-[var(--foreground)]">
-                  <Sparkles className="w-4 h-4 text-purple-500" />
+                  <Sparkles className="w-4 h-4 text-[var(--foreground)]" />
                   {t('aiGateway.cursorTitle')}
                 </div>
                 <Button
@@ -867,7 +867,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
               </p>
               <div className="p-2.5 rounded-lg bg-[var(--background)] border border-[var(--border)] font-mono text-[11px] space-y-1">
                 <div className="text-[var(--muted-foreground)]">Base URL:</div>
-                <div className="text-purple-400 select-all">{gatewayBaseUrl}/v1</div>
+                <div className="text-[var(--foreground)] select-all">{gatewayBaseUrl}/v1</div>
                 <div className="text-[var(--muted-foreground)] pt-1">API Key:</div>
                 <div className="text-emerald-400 select-all">{activeKeyForQuickstart}</div>
               </div>
@@ -989,7 +989,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                           <div className="flex items-center gap-1.5">
                             <span>{log.model}</span>
                             {log.streaming && (
-                              <span className="text-[9px] px-1 py-0.2 rounded bg-purple-500/10 text-purple-500 font-sans">
+                              <span className="text-[9px] px-1 py-0.2 rounded bg-[var(--foreground)]/[0.06] text-[var(--foreground)] font-sans">
                                 SSE
                               </span>
                             )}
@@ -1004,7 +1004,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                         <td className="py-2.5 px-3 text-right font-mono text-[var(--muted-foreground)]">
                           {log.outputTokens.toLocaleString()}
                         </td>
-                        <td className="py-2.5 px-3 text-right font-mono font-medium text-purple-400">
+                        <td className="py-2.5 px-3 text-right font-mono font-medium text-[var(--foreground)]">
                           {log.totalTokens.toLocaleString()}
                         </td>
                         <td className="py-2.5 px-3 text-right font-mono text-[var(--muted-foreground)]">
@@ -1025,8 +1025,8 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
         <Modal onClose={() => setConnectingProvider(null)} className="max-w-md">
           <ModalCard title={t('aiGw.connectTo', { name: connectingProvider.name })} icon={<BrandIcon name={connectingProvider.id} className="w-4 h-4" />} onClose={() => setConnectingProvider(null)}>
           <form onSubmit={handleVerifyAndConnect} className="space-y-4">
-            <div className="p-3 rounded-lg bg-purple-500/5 border border-purple-500/20 text-xs text-[var(--foreground)] space-y-1">
-              <div className="font-semibold flex items-center gap-1.5 text-purple-400">
+            <div className="p-3 rounded-lg bg-[var(--foreground)]/[0.03] border border-[var(--rim)] text-xs text-[var(--foreground)] space-y-1">
+              <div className="font-semibold flex items-center gap-1.5 text-[var(--foreground)]">
                 <Sparkles className="w-3.5 h-3.5" />
                 {t('aiGw.liveVerify')}
               </div>
@@ -1121,7 +1121,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                 <Button
                   type="submit"
                   disabled={isVerifying || (connectingProvider.id !== 'ollama' && !connectApiKey.trim())}
-                  className="bg-purple-600 hover:bg-purple-700 text-white"
+                  className="btn-metal"
                 >
                   {isVerifying ? (
                     <>
@@ -1153,7 +1153,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
         >
           <ModalCard
             title={createdKeySecret ? t('aiGateway.keyCreatedTitle') : t('aiGateway.createKey')}
-            icon={<Key className="w-4 h-4 text-purple-500" />}
+            icon={<Key className="w-4 h-4 text-[var(--foreground)]" />}
             onClose={() => { setShowNewKeyModal(false); setCreatedKeySecret(null); }}
           >
           {createdKeySecret ? (
@@ -1185,7 +1185,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                     setShowNewKeyModal(false);
                     setCreatedKeySecret(null);
                   }}
-                  className="bg-purple-600 hover:bg-purple-700 text-white"
+                  className="btn-metal"
                 >
                   {t('aiGw.done')}
                 </Button>
@@ -1226,7 +1226,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                               setNewKeyProviders((prev) => prev.filter((p) => p !== prov.id));
                             }
                           }}
-                          className="rounded border-[var(--border)] text-purple-600 focus:ring-purple-500"
+                          className="rounded border-[var(--border)] text-[var(--foreground)] focus:ring-[var(--ring)]"
                         />
                         <BrandIcon name={prov.id} className="w-3.5 h-3.5" />
                         <span className="font-medium">{prov.name}</span>
@@ -1243,7 +1243,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                 <Button type="button" variant="ghost" onClick={() => setShowNewKeyModal(false)}>
                   {t('common.cancel')}
                 </Button>
-                <Button type="submit" disabled={!newKeyName.trim()} className="bg-purple-600 hover:bg-purple-700 text-white">
+                <Button type="submit" disabled={!newKeyName.trim()} className="btn-metal">
                   {t('aiGateway.createKey')}
                 </Button>
               </div>

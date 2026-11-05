@@ -98,10 +98,10 @@ function ChipSelect({ icon, label, value, onChange, options, mono }: {
 
 function RunStatus({ run }: { run?: CommandRun }) {
   if (!run) return <span className="w-2 h-2 rounded-full bg-zinc-600" />;
-  if (run.status === 'running') return <Loader2 className="w-3 h-3 animate-spin text-purple-400" />;
+  if (run.status === 'running') return <Loader2 className="w-3 h-3 animate-spin text-[var(--foreground)]" />;
   if (run.status === 'done') return <span className={`w-2 h-2 rounded-full ${run.exitCode === 0 ? 'bg-emerald-500' : 'bg-red-500'}`} />;
   if (run.status === 'skipped') return <span className="w-2 h-2 rounded-full bg-zinc-500" title="dilewati" />;
-  return <span className={`w-2 h-2 rounded-full ${run.auto ? 'bg-purple-500 animate-pulse' : 'bg-amber-500'}`} />;
+  return <span className={`w-2 h-2 rounded-full ${run.auto ? 'bg-[var(--ok)] animate-pulse' : 'bg-amber-500'}`} />;
 }
 
 function TypingDots() {
@@ -127,7 +127,7 @@ function Markdown({ text }: { text: string }) {
         const h = /^(#{1,4})\s+(.*)/.exec(l);
         if (h) return <div key={i} className={`font-semibold text-[var(--foreground)] ${h[1].length <= 2 ? 'text-sm pt-1' : 'text-[13px]'}`}>{inline(h[2], i)}</div>;
         const b = /^\s*([-*•]|\d+\.)\s+(.*)/.exec(l);
-        if (b) return <div key={i} className="flex gap-2 pl-1"><span className="text-purple-400 shrink-0">{/\d/.test(b[1]) ? b[1] : '•'}</span><span>{inline(b[2], i)}</span></div>;
+        if (b) return <div key={i} className="flex gap-2 pl-1"><span className="text-[var(--foreground)] shrink-0">{/\d/.test(b[1]) ? b[1] : '•'}</span><span>{inline(b[2], i)}</span></div>;
         if (!l.trim()) return <div key={i} className="h-1.5" />;
         return <div key={i}>{inline(l, i)}</div>;
       })}
@@ -446,7 +446,7 @@ export default function AiCopilotDrawer({
                     <button onClick={() => patchRun(msg.id, runIdx, { status: 'skipped' })} className="px-2 py-1 rounded text-[10px] text-zinc-300 hover:bg-zinc-800 flex items-center gap-1">
                       <SkipForward className="w-3 h-3" /> {t('copilot.skip')}
                     </button>
-                    <button onClick={() => approveRun(msg, runIdx)} className={`px-2 py-1 rounded text-[10px] font-medium text-white flex items-center gap-1 ${risky ? 'bg-red-600 hover:bg-red-700' : 'bg-purple-600 hover:bg-purple-700'}`}>
+                    <button onClick={() => approveRun(msg, runIdx)} className={`px-2 py-1 rounded text-[10px] font-medium flex items-center gap-1 ${risky ? 'bg-red-600 hover:bg-red-700 text-white' : 'btn-metal'}`}>
                       <Play className="w-3 h-3" /> {t('copilot.run')}
                     </button>
                   </div>
@@ -466,7 +466,7 @@ export default function AiCopilotDrawer({
         })}
         {msg.runs && msg.runs.filter((r) => r.status === 'pending' && !r.auto).length > 1 && !msg.fed && (
           <div className="flex justify-end">
-            <button onClick={() => approveAll(msg)} className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-1">
+            <button onClick={() => approveAll(msg)} className="px-2.5 py-1 rounded-lg text-[11px] font-medium btn-metal flex items-center gap-1">
               <Play className="w-3 h-3" /> {t('copilot.runAll')}
             </button>
           </div>
@@ -494,7 +494,7 @@ export default function AiCopilotDrawer({
         {/* Header */}
         <div className="h-14 px-4 border-b border-[var(--border)] flex items-center justify-between gap-3 shrink-0 bg-[var(--background)]/60 backdrop-blur-md">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+            <div className="w-8 h-8 rounded-lg btn-metal flex items-center justify-center shrink-0 shadow-sm">
               <Sparkles className="w-4 h-4 animate-pulse" />
             </div>
             <div className="min-w-0">
@@ -518,10 +518,10 @@ export default function AiCopilotDrawer({
               onClick={() => { setShowSettings((v) => !v); setShowHistory(false); }}
               title={t('copilot.settings')}
               aria-expanded={showSettings}
-              className={`relative h-8 w-8 ${showSettings ? 'text-purple-500' : 'text-[var(--muted-foreground)]'}`}
+              className={`relative h-8 w-8 ${showSettings ? 'text-[var(--foreground)]' : 'text-[var(--muted-foreground)]'}`}
             >
               <Settings2 className="w-3.5 h-3.5" />
-              {customized && <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-purple-500" />}
+              {customized && <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-[var(--ok)]" />}
             </Button>
             <Button variant="ghost" size="icon" onClick={handleNewChat} title={t('copilot.newChat')} className="h-8 w-8 text-[var(--muted-foreground)]">
               <Plus className="w-4 h-4" />
@@ -532,7 +532,7 @@ export default function AiCopilotDrawer({
               onClick={() => { setShowHistory((v) => !v); setShowSettings(false); }}
               title={t('copilot.history')}
               aria-expanded={showHistory}
-              className={`h-8 w-8 ${showHistory ? 'text-purple-500' : 'text-[var(--muted-foreground)]'}`}
+              className={`h-8 w-8 ${showHistory ? 'text-[var(--foreground)]' : 'text-[var(--muted-foreground)]'}`}
             >
               <History className="w-3.5 h-3.5" />
             </Button>
@@ -556,7 +556,7 @@ export default function AiCopilotDrawer({
               chats.map((c) => (
                 <div
                   key={c.id}
-                  className={`group flex items-center gap-2 px-4 py-2 text-xs border-b border-[var(--border)]/50 hover:bg-[var(--muted)]/50 ${c.id === chatId ? 'bg-purple-500/10' : ''}`}
+                  className={`group flex items-center gap-2 px-4 py-2 text-xs border-b border-[var(--border)]/50 hover:bg-[var(--muted)]/50 ${c.id === chatId ? 'bg-[var(--foreground)]/[0.06]' : ''}`}
                 >
                   <button onClick={() => openChat(c)} className="flex-1 min-w-0 text-left">
                     <div className="truncate text-[var(--foreground)]">{c.title}</div>
@@ -590,7 +590,7 @@ export default function AiCopilotDrawer({
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.length === 0 ? (
             <div className="h-full flex flex-col justify-center items-center text-center px-4 space-y-5">
-              <div className="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-500 border border-purple-500/20 flex items-center justify-center shadow-inner">
+              <div className="w-12 h-12 rounded-2xl bg-[var(--foreground)]/[0.06] text-[var(--foreground)] border border-[var(--rim)] flex items-center justify-center shadow-inner">
                 <Bot className="w-6 h-6" />
               </div>
               <div className="space-y-1">
@@ -609,13 +609,13 @@ export default function AiCopilotDrawer({
                   <button
                     key={i}
                     onClick={() => handleSend(t(action.prompt))}
-                    className="w-full p-2.5 rounded-xl border border-[var(--border)] bg-[var(--card)] hover:border-purple-500/50 hover:bg-purple-500/5 text-left text-xs transition flex items-center justify-between group"
+                    className="w-full p-2.5 rounded-xl border border-[var(--border)] bg-[var(--card)] hover:border-[var(--rim)] hover:bg-[var(--foreground)]/[0.03] text-left text-xs transition flex items-center justify-between group"
                   >
                     <div className="flex items-center gap-2 truncate">
                       <span className="text-sm">{action.icon}</span>
                       <span className="font-medium text-[var(--foreground)] truncate">{t(action.label)}</span>
                     </div>
-                    <ArrowRight className="w-3.5 h-3.5 text-[var(--muted-foreground)] group-hover:text-purple-500 transition-transform group-hover:translate-x-0.5" />
+                    <ArrowRight className="w-3.5 h-3.5 text-[var(--muted-foreground)] group-hover:text-[var(--foreground)] transition-transform group-hover:translate-x-0.5" />
                   </button>
                 ))}
               </div>
@@ -623,7 +623,7 @@ export default function AiCopilotDrawer({
           ) : (
             messages.map((msg) => msg.kind === 'tool' ? (
               <div key={msg.id} className="flex items-center gap-2 pl-10 text-[10px] text-[var(--muted-foreground)]">
-                <Layers className="w-3 h-3 text-purple-500" /> {t('copilot.toolFed')}
+                <Layers className="w-3 h-3 text-[var(--foreground)]" /> {t('copilot.toolFed')}
               </div>
             ) : (
               <div
@@ -631,14 +631,14 @@ export default function AiCopilotDrawer({
                 className={`copilot-msg flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 {msg.role === 'assistant' && (
-                  <div className="w-7 h-7 rounded-lg bg-purple-600 text-white flex items-center justify-center shrink-0 text-xs font-bold mt-0.5">
+                  <div className="w-7 h-7 rounded-lg btn-metal flex items-center justify-center shrink-0 text-xs font-bold mt-0.5">
                     <Bot className="w-4 h-4" />
                   </div>
                 )}
                 <div
                   className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 ${
                     msg.role === 'user'
-                      ? 'bg-purple-600 text-white rounded-tr-sm shadow-sm'
+                      ? 'btn-metal rounded-tr-sm shadow-sm'
                       : 'bg-[var(--muted)]/50 border border-[var(--border)] text-[var(--foreground)] rounded-tl-sm'
                   }`}
                 >
@@ -657,7 +657,7 @@ export default function AiCopilotDrawer({
               e.preventDefault();
               handleSend();
             }}
-            className="rounded-2xl border border-[var(--border)] bg-[var(--background)] focus-within:border-purple-500/60 focus-within:ring-2 focus-within:ring-purple-500/20 transition-shadow"
+            className="rounded-2xl border border-[var(--border)] bg-[var(--background)] focus-within:border-[var(--rim)] focus-within:ring-2 focus-within:ring-[var(--foreground)]/15 transition-shadow"
           >
             <textarea
               ref={textareaRef}
@@ -689,7 +689,7 @@ export default function AiCopilotDrawer({
                 onClick={toggleAgent}
                 aria-pressed={agentMode}
                 title={agentMode ? t('copilot.modeAgentHint') : t('copilot.modeManualHint')}
-                className={`h-7 px-2 rounded-lg text-[11px] flex items-center gap-1 transition-colors ${agentMode ? 'text-purple-400 bg-purple-500/10 hover:bg-purple-500/20' : 'text-[var(--muted-foreground)] hover:bg-[var(--muted)]'}`}
+                className={`h-7 px-2 rounded-lg text-[11px] flex items-center gap-1 transition-colors ${agentMode ? 'text-[var(--foreground)] bg-[var(--foreground)]/[0.06] hover:bg-[var(--foreground)]/10' : 'text-[var(--muted-foreground)] hover:bg-[var(--muted)]'}`}
               >
                 <Zap className="w-3 h-3" /> {agentMode ? t('copilot.modeAgent') : t('copilot.modeManual')}
               </button>
@@ -701,7 +701,7 @@ export default function AiCopilotDrawer({
                 </Button>
               ) : (
                 <Button type="submit" size="icon" disabled={!input.trim()} title={t('copilot.send')}
-                  className="h-8 w-8 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-30 text-white shrink-0 transition-transform active:scale-95">
+                  className="h-8 w-8 rounded-xl btn-metal disabled:opacity-30 shrink-0 transition-transform active:scale-95">
                   <Send className="w-3.5 h-3.5" />
                 </Button>
               )}
@@ -709,7 +709,7 @@ export default function AiCopilotDrawer({
           </form>
           <div className="flex items-center justify-between text-[10px] text-[var(--muted-foreground)] px-1.5 pt-1.5">
             <span className="flex items-center gap-1.5 truncate">
-              {agentBusy && <Loader2 className="w-3 h-3 animate-spin text-purple-400" />}
+              {agentBusy && <Loader2 className="w-3 h-3 animate-spin text-[var(--foreground)]" />}
               {agentBusy ? (isStreaming ? t('copilot.statusWriting') : t('copilot.statusRunning')) : t('copilot.newline')}
             </span>
             <kbd className="font-mono bg-[var(--muted)] px-1 rounded border border-[var(--border)]">⌘J</kbd>

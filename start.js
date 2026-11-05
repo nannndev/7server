@@ -23,10 +23,23 @@ const clientProcess = spawn('npm run dev', [], {
   shell: true
 });
 
+let landingProcess = null;
+if (process.argv.includes('--all') || process.argv.includes('--landing')) {
+  console.log('\x1b[1;35m  🌐 Starting 7Server Landing Page on port 3001...  \x1b[0m\n');
+  landingProcess = spawn('npm run dev', [], {
+    cwd: path.join(__dirname, 'landing'),
+    stdio: 'inherit',
+    shell: true
+  });
+}
+
 function cleanup() {
   console.log('\n\x1b[33mShutting down 7Server...\x1b[0m');
   try { serverProcess.kill(); } catch (e) {}
   try { clientProcess.kill(); } catch (e) {}
+  if (landingProcess) {
+    try { landingProcess.kill(); } catch (e) {}
+  }
   process.exit();
 }
 

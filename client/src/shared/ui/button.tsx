@@ -11,9 +11,9 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const base = 'inline-flex items-center justify-center whitespace-nowrap rounded-md text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-400 disabled:pointer-events-none disabled:opacity-50 select-none cursor-pointer';
 
     const variants = {
-      default: 'bg-[var(--primary)] text-[var(--primary-foreground)] shadow-sm hover:opacity-90 active:scale-[0.98]',
+      default: 'btn-silver bg-[var(--primary)] text-[var(--primary-foreground)] active:scale-[0.98]',
       destructive: 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20 active:scale-[0.98]',
-      outline: 'border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] hover:bg-[var(--muted)] active:scale-[0.98]',
+      outline: 'metal border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] hover:brightness-110 active:scale-[0.98]',
       secondary: 'bg-[var(--muted)] text-[var(--foreground)] hover:opacity-80 active:scale-[0.98]',
       ghost: 'text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]',
       link: 'text-[var(--foreground)] underline-offset-4 hover:underline'

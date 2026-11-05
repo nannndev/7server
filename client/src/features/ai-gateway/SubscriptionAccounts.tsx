@@ -174,7 +174,7 @@ export function SubscriptionAccounts({ onChange }: { onChange?: (accounts: Subsc
 
               {f?.start.kind === 'redirect' && (
                 <div className="space-y-2 p-3 rounded-lg bg-[var(--background)] border border-[var(--border)] text-[11px] text-[var(--muted-foreground)]">
-                  <div>1. {t('subs.step1')} (<a className="text-purple-500 underline" href={f.start.authUrl} target="_blank" rel="noopener noreferrer">{t('subs.reopen')}</a>).</div>
+                  <div>1. {t('subs.step1')} (<a className="text-[var(--foreground)] underline" href={f.start.authUrl} target="_blank" rel="noopener noreferrer">{t('subs.reopen')}</a>).</div>
                   {f.start.autoCallback && (
                     <div className="flex items-center gap-1.5 text-[var(--foreground)]"><RefreshCw className="w-3 h-3 animate-spin" /> {t('subs.waitingAuto')}</div>
                   )}
@@ -189,7 +189,7 @@ export function SubscriptionAccounts({ onChange }: { onChange?: (accounts: Subsc
                   />
                   <div className="flex gap-2 justify-end">
                     <Button size="sm" variant="outline" onClick={() => setFlow(null)}>{t('common.cancel')}</Button>
-                    <Button size="sm" disabled={!f.pasted.trim() || f.busy} onClick={finish} className="bg-purple-600 hover:bg-purple-700 text-white">
+                    <Button size="sm" disabled={!f.pasted.trim() || f.busy} onClick={finish} className="btn-metal">
                       {f.busy ? <RefreshCw className="w-3.5 h-3.5 mr-1 animate-spin" /> : null}{t('subs.finish')}
                     </Button>
                   </div>
@@ -198,8 +198,8 @@ export function SubscriptionAccounts({ onChange }: { onChange?: (accounts: Subsc
 
               {f?.start.kind === 'device' && (
                 <div className="space-y-2 p-3 rounded-lg bg-[var(--background)] border border-[var(--border)] text-[11px] text-[var(--muted-foreground)]">
-                  <div>{t('subs.deviceOpen')} <a className="text-purple-500 underline" href={f.start.verificationUri} target="_blank" rel="noopener noreferrer">{f.start.verificationUri}</a> {t('subs.deviceEnter')}</div>
-                  <button onClick={() => copy((f.start as any).userCode)} className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-dashed border-purple-500/40 font-mono text-lg tracking-widest text-[var(--foreground)]">
+                  <div>{t('subs.deviceOpen')} <a className="text-[var(--foreground)] underline" href={f.start.verificationUri} target="_blank" rel="noopener noreferrer">{f.start.verificationUri}</a> {t('subs.deviceEnter')}</div>
+                  <button onClick={() => copy((f.start as any).userCode)} className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-dashed border-[var(--rim)] font-mono text-lg tracking-widest text-[var(--foreground)]">
                     {f.start.userCode} <Copy className="w-3.5 h-3.5" />
                   </button>
                   <div className="flex items-center justify-between">
@@ -221,7 +221,7 @@ export function SubscriptionAccounts({ onChange }: { onChange?: (accounts: Subsc
                       </Button>
                     </>
                   )}
-                  <Button size="sm" disabled={busy === p.id || !!flow} onClick={() => begin(p.id)} className="bg-purple-600 hover:bg-purple-700 text-white">
+                  <Button size="sm" disabled={busy === p.id || !!flow} onClick={() => begin(p.id)} className="btn-metal">
                     {p.id === 'copilot' ? <ExternalLink className="w-3.5 h-3.5 mr-1" /> : <LogIn className="w-3.5 h-3.5 mr-1" />}
                     {acc ? t('subs.relogin') : t('subs.login')}
                   </Button>

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en" class="iso">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>7Server · Manage every VPS over SSH, install nothing on them</title>
+    <meta name="description" content="Self-hosted dashboard for your VPS fleet. Monitor CPU, RAM and disk, open a browser terminal, manage Docker, Nginx, cron, backups and databases, and use an AI copilot that asks before it changes anything. Agentless: it uses the SSH access you already have." />
+    <link rel="icon" href="/favicon.jpg" type="image/jpeg" />
+    <link rel="apple-touch-icon" href="/favicon.jpg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <script>
+      // Theme before first paint: saved choice, else the system's. Avoids a dark/light flash.
+      try {
+        var saved = localStorage.getItem('7server-theme');
+        var theme = saved === 'light' || saved === 'dark' ? saved : matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        document.documentElement.dataset.theme = theme;
+      } catch (e) { document.documentElement.dataset.theme = 'dark'; }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
