@@ -1,5 +1,5 @@
 {
-  "name": "7server",
+  "name": "sevenserver",
   "version": "0.1.0",
   "description": "Self-hosted dashboard for your servers: monitoring, browser terminal, Docker, Nginx, cron, backups, databases and an AI copilot. Agentless, over SSH.",
   "type": "module",

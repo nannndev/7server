@@ -47,10 +47,10 @@ Dashboard akan otomatis aktif di:
 
 ---
 
-## 📦 npm (`npm install -g 7server`)
+## 📦 npm (`npm install -g sevenserver`)
 
 ```bash
-npm install -g 7server      # butuh Node.js 22.13+
+npm install -g sevenserver  # butuh Node.js 22.13+, perintahnya tetap `7server`
 7server                     # http://127.0.0.1:5001, data di ~/.7server
 7server --port 8080 --host 0.0.0.0 --data /srv/7server --no-open
 ```

@@ -1,4 +1,6 @@
-# 7server
+# sevenserver
+
+Installs the `7server` command.
 
 Self-hosted dashboard for your servers. It connects over the SSH access you already have: nothing is installed on your servers.
 
@@ -9,7 +11,7 @@ Monitoring with Discord alerts, a browser terminal, Docker and Compose, Nginx an
 Needs Node.js 22.13 or newer.
 
 ```bash
-npm install -g 7server
+npm install -g sevenserver
 7server
 ```
 
