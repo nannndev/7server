@@ -1,0 +1,30 @@
+# Keeps the repo's labels in line with .github/labels.yml (creates or updates, never deletes).
+name: Sync labels
+on:
+  push:
+    branches: [main]
+    paths: [.github/labels.yml]
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node -e "
+            const lines = require('fs').readFileSync('.github/labels.yml', 'utf8').split('\n');
+            let cur = null; const out = [];
+            for (const l of lines) {
+              const m = l.match(/^- name: (.+)$/); if (m) { cur = { name: m[1].trim() }; out.push(cur); continue; }
+              const k = l.match(/^  (color|description): (.+)$/); if (k && cur) cur[k[1]] = k[2].trim().replace(/^\"|\"$/g, '');
+            }
+            for (const x of out) console.log([x.name, x.color, x.description || ''].join('\t'));
+          " | while IFS=$'\t' read -r name color desc; do
+            gh label create "$name" --color "$color" --description "$desc" --force -R "$GITHUB_REPOSITORY"
+          done

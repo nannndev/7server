@@ -1,0 +1,21 @@
+# Sections of the auto-generated GitHub Release notes, by PR label.
+changelog:
+  exclude:
+    labels: [skip-changelog]
+  categories:
+    - title: ⚠️ Breaking changes
+      labels: [breaking]
+    - title: 🔒 Security
+      labels: [security]
+    - title: ✨ Features
+      labels: [enhancement]
+    - title: 🐛 Fixes
+      labels: [bug]
+    - title: ⚡ Performance
+      labels: [performance]
+    - title: 📝 Docs
+      labels: [documentation]
+    - title: 🧰 Maintenance
+      labels: [chore, dependencies]
+    - title: Other changes
+      labels: ["*"]

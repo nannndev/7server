@@ -1,0 +1,33 @@
+# Labels PRs by the files they touch (.github/labeler.yml) and by the PR title prefix
+# (feat: → enhancement, fix: → bug, docs: → documentation ...). Release notes group by these labels.
+name: Label PRs
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/labeler@v5
+      - name: Label from title
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TITLE: ${{ github.event.pull_request.title }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          case "$TITLE" in
+            feat*)               l=enhancement ;;
+            fix*)                l=bug ;;
+            docs*)               l=documentation ;;
+            perf*)               l=performance ;;
+            sec*|security*)      l=security ;;
+            chore*|ci*|build*|refactor*|test*) l=chore ;;
+            *) exit 0 ;;
+          esac
+          case "$TITLE" in *!:*) gh pr edit "$PR" -R "$GITHUB_REPOSITORY" --add-label breaking ;; esac
+          gh pr edit "$PR" -R "$GITHUB_REPOSITORY" --add-label "$l"

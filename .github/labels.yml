@@ -1,0 +1,58 @@
+# Repo labels. Edit here; .github/workflows/labels.yml applies them on push to main.
+# type
+- name: enhancement
+  color: a2eeef
+  description: New feature or request
+- name: bug
+  color: d73a4a
+  description: Something isn't working
+- name: breaking
+  color: b60205
+  description: Changes behaviour users rely on
+- name: security
+  color: ee0701
+  description: Security fix or hardening
+- name: performance
+  color: fbca04
+  description: Faster or lighter
+- name: documentation
+  color: 0075ca
+  description: Docs, README, landing copy
+- name: chore
+  color: c5def5
+  description: CI, build, refactor, tests
+- name: dependencies
+  color: 0366d6
+  description: Dependency updates
+# area
+- name: "area: server"
+  color: 5319e7
+  description: Express API, SSH, modules
+- name: "area: dashboard"
+  color: 1d76db
+  description: React client
+- name: "area: ai-gateway"
+  color: 0e8a16
+  description: AI gateway and copilot
+- name: "area: cli"
+  color: 006b75
+  description: npm package and 7server command
+- name: "area: docker"
+  color: 0db7ed
+  description: Dockerfile and compose
+- name: "area: landing"
+  color: d4c5f9
+  description: Landing page
+# triage
+- name: good first issue
+  color: 7057ff
+  description: Good for newcomers
+- name: help wanted
+  color: 008672
+  description: Extra attention is needed
+- name: question
+  color: d876e3
+  description: Further information is requested
+- name: skip-changelog
+  color: ededed
+  description: Leave out of release notes

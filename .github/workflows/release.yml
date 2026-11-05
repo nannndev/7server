@@ -1,0 +1,79 @@
+# Runs when a version tag is pushed (node scripts/release.mjs patch && git push origin main vX.Y.Z).
+# Needs one repo secret: NPM_TOKEN (npmjs.com > Access Tokens > Granular, publish rights on sevenserver).
+name: Release
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write   # GitHub Release
+  packages: write   # ghcr.io image
+  id-token: write   # npm provenance
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: npm
+          cache-dependency-path: |
+            server/package-lock.json
+            client/package-lock.json
+
+      - name: Tag matches package version
+        run: |
+          v=$(node -p "require('./packages/npm/package.json').version")
+          [ "v$v" = "$GITHUB_REF_NAME" ] || { echo "tag $GITHUB_REF_NAME but packages/npm is $v"; exit 1; }
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+          case "$v" in *-*) echo "NPM_TAG=next" >> "$GITHUB_ENV";; *) echo "NPM_TAG=latest" >> "$GITHUB_ENV";; esac
+
+      - run: npm ci --no-audit --no-fund
+        working-directory: server
+      - run: npm ci --no-audit --no-fund
+        working-directory: client
+      - run: npx tsc --noEmit -p . && cd ../client && npx tsc --noEmit -p .
+        working-directory: server
+      - run: npm test
+      - run: npm run build:npm
+
+      - name: Publish to npm
+        run: npm publish --provenance --access public --tag "$NPM_TAG"
+        working-directory: packages/npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/7server
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ env.NPM_TAG == 'latest' }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pre=""; [ "$NPM_TAG" = next ] && pre="--prerelease"
+          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes --verify-tag $pre

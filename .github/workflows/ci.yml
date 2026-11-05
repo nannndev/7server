@@ -1,0 +1,66 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            server/package-lock.json
+            client/package-lock.json
+      - run: npm ci --no-audit --no-fund
+        working-directory: server
+      - run: npm ci --no-audit --no-fund
+        working-directory: client
+      - name: Typecheck server
+        run: npx tsc --noEmit -p .
+        working-directory: server
+      - name: Typecheck client
+        run: npx tsc --noEmit -p .
+        working-directory: client
+      - name: Tests
+        run: npm test
+      - name: Build npm package
+        run: npm run build:npm
+      - name: Pack (dry run)
+        run: npm pack --dry-run
+        working-directory: packages/npm
+
+  landing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --no-audit --no-fund
+        working-directory: landing
+      - run: npm run build
+        working-directory: landing
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -62,12 +62,13 @@ Paketnya dibuat dari repo ini: `npm run build:npm` (server di-bundle esbuild jad
 Satu container berisi dashboard, API, dan AI Gateway di satu port. Data (`7server.db` + `secret.key`) ada di volume `7server-data`.
 
 ```bash
-cp .env.docker.example .env      # isi DASHBOARD_PASSWORD
+cp .env.docker.example .env      # opsional: DASHBOARD_PASSWORD
 docker compose up -d
 ```
 
-Buka `http://localhost:5001`, login sebagai `admin` dengan password tadi. Kalau `DASHBOARD_PASSWORD` kosong, password acak ada di:
-`docker compose exec 7server cat /data/dashboard.password`.
+Buka `http://localhost:5001`. Saat pertama kali, buat akun admin langsung di browser. Kalau dibuka dari mesin lain, kamu akan diminta **kode setup 6 digit** yang tampil di `docker compose logs 7server`. Kalau `DASHBOARD_PASSWORD` diisi, admin (`admin`) langsung dibuat dengan password itu, tanpa langkah setup.
+
+Lupa password: `docker compose exec 7server node --import tsx src/resetPassword.ts admin`.
 
 - **Port sengaja hanya di `127.0.0.1`.** Untuk akses dari luar, pasang nginx/Caddy dengan HTTPS di depannya dan set `TRUST_PROXY` di `.env` (nginx di host yang sama: `172.16.0.0/12`).
 - **AI Gateway:** di dalam container, alamat bridge Docker (`172.16/12`) tidak dianggap "dalam sistem", karena port yang di-publish bisa membuat pemanggil dari internet terlihat seperti bridge. Ubah lewat `AI_GATEWAY_TRUST_DOCKER_BRIDGE=1` hanya kalau semua yang di bridge memang tepercaya.
@@ -75,6 +76,15 @@ Buka `http://localhost:5001`, login sebagai `admin` dengan password tadi. Kalau 
 - **Backup:** salin `7server.db` **dan** `secret.key` bersama-sama (tanpa `secret.key`, kredensial SSH di database tidak bisa dibuka):
   `docker run --rm -v 7server-data:/data -v "$PWD":/backup alpine tar czf /backup/7server-backup.tgz -C /data .`
 - Image tidak berisi data atau rahasia apa pun (`.dockerignore`), berjalan sebagai user non-root, dengan healthcheck.
+- Image siap pakai dari setiap rilis: `ghcr.io/nannndev/7server:latest` (atau `:0.1.1`, `:0.1`).
+
+## 🔁 CI & rilis
+
+- **CI** (`.github/workflows/ci.yml`): typecheck server + client, semua test (`npm test`), build paket npm, build landing, build image Docker — di setiap PR dan push ke `main`.
+- **Rilis**: dari `main` yang bersih, `npm run release patch` (atau `minor`/`major`/`1.2.3`) → bump versi `packages/npm`, commit, tag `vX.Y.Z`. Lalu `git push origin main vX.Y.Z`. Workflow `release.yml` publish `sevenserver` ke npm (dengan provenance), push image multi-arch ke GHCR, dan membuat GitHub Release dengan catatan otomatis. Versi `-beta.N` masuk tag npm `next` dan ditandai prerelease.
+- **Label**: daftar di `.github/labels.yml` (disinkronkan otomatis). PR diberi label dari file yang diubah (`area: …`) dan dari prefix judul (`feat:` → enhancement, `fix:` → bug, `feat!:` → breaking). Catatan rilis dikelompokkan per label (`.github/release.yml`).
+- **Info update di CLI**: `7server` mengecek npm sekali sehari dan menampilkan versi baru + link catatan rilisnya.
+- Secret yang perlu: `NPM_TOKEN` (Settings → Secrets → Actions).
 
 ## 📁 Struktur Direktori
 

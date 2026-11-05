@@ -1,0 +1,24 @@
+"area: server":
+  - changed-files:
+      - any-glob-to-any-file: server/**
+"area: dashboard":
+  - changed-files:
+      - any-glob-to-any-file: client/**
+"area: ai-gateway":
+  - changed-files:
+      - any-glob-to-any-file: [server/src/modules/ai-gateway/**, client/src/features/ai-gateway/**, client/src/features/copilot/**]
+"area: cli":
+  - changed-files:
+      - any-glob-to-any-file: packages/npm/**
+"area: docker":
+  - changed-files:
+      - any-glob-to-any-file: [Dockerfile, docker-compose.yml, .dockerignore]
+"area: landing":
+  - changed-files:
+      - any-glob-to-any-file: landing/**
+documentation:
+  - changed-files:
+      - any-glob-to-any-file: ['**/*.md', docs/**]
+chore:
+  - changed-files:
+      - any-glob-to-any-file: [.github/**, scripts/**]

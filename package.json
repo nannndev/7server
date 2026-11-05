@@ -12,6 +12,8 @@
     "start": "node start.js",
     "dev": "node start.js",
     "build:npm": "node packages/npm/build.mjs",
-    "pack:npm": "node packages/npm/build.mjs && cd packages/npm && npm pack"
+    "pack:npm": "node packages/npm/build.mjs && cd packages/npm && npm pack",
+    "test": "node scripts/run-tests.mjs",
+    "release": "node scripts/release.mjs"
   }
 }
