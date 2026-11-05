@@ -13,7 +13,7 @@ jobs:
   label:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/labeler@v5
+      - uses: actions/labeler@v7
       - name: Label from title
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
