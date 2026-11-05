@@ -5,7 +5,7 @@ import type { Request, Response } from 'express';
 import { getCredential, isConnected, markExpired } from './accounts.js';
 import { COPILOT, type OAuthCredential, type OAuthProviderId } from './oauth.js';
 import {
-  type ChatRequest, toClaude, claudeToOpenAi, claudeEvent, toCodex, codexEvent, toGemini, geminiEvent,
+  type ChatRequest, CLAUDE_CODE_SYSTEM, toClaude, claudeToOpenAi, claudeEvent, toCodex, codexEvent, toGemini, geminiEvent,
   completion, chunk, sseEvents
 } from './formats.js';
 
@@ -188,4 +188,98 @@ export async function subscriptionModels(): Promise<{ id: string; object: 'model
     for (const id of ids) out.push({ id: `${ALIAS_OF[provider]}/${id}`, object: 'model', owned_by: provider });
   }
   return out;
+}
+
+// ---------------------------------------------------------------- Anthropic Messages passthrough
+// Claude Code (and any Anthropic SDK client) speaks /v1/messages. With a logged-in Claude account we
+// forward the body untouched, so tools, thinking, images and prompt caching keep working; only auth
+// changes. shortcut: cx/ gh/ gc/ models are not translated to the Messages format here; use
+// /v1/chat/completions for those, or add a translator when a client needs it.
+
+const CLAUDE_OAUTH_BETAS = ['claude-code-20250219', 'oauth-2025-04-20'];
+
+/** OAuth tokens only work when the first system block is the Claude Code identity; add it if a client didn't. */
+export function withClaudeCodeSystem(body: any): any {
+  const sys = body?.system;
+  const blocks = typeof sys === 'string' ? [{ type: 'text', text: sys }] : Array.isArray(sys) ? sys : [];
+  if (blocks[0]?.type === 'text' && String(blocks[0].text || '').startsWith(CLAUDE_CODE_SYSTEM)) return body;
+  return { ...body, system: [{ type: 'text', text: CLAUDE_CODE_SYSTEM }, ...blocks.filter((b: any) => !(b?.type === 'text' && !b.text))] };
+}
+
+/** Client beta flags plus the ones OAuth needs, deduplicated. */
+export const mergeBetas = (client?: string) =>
+  [...new Set([...String(client || '').split(',').map((s) => s.trim()).filter(Boolean), ...CLAUDE_OAUTH_BETAS])].join(',');
+
+/**
+ * Forwards an Anthropic Messages request to the logged-in Claude account and pipes the reply back
+ * unchanged (JSON or SSE). `path` is '/v1/messages' or '/v1/messages/count_tokens'.
+ */
+export async function claudeMessages(req: Request, res: Response, body: any, path = '/v1/messages'): Promise<ChatOutcome> {
+  if (!isConnected('claude')) throw new UpstreamError(503, 'Akun Claude belum login. Hubungkan di 7Server → AI Gateway.');
+  const ctrl = new AbortController();
+  res.on('close', () => { if (!res.writableFinished) ctrl.abort(); });
+
+  const payload = JSON.stringify(path.endsWith('count_tokens') ? body : withClaudeCodeSystem(body));
+  const send = (cred: OAuthCredential) =>
+    fetch(`https://api.anthropic.com${path}?beta=true`, {
+      method: 'POST',
+      signal: ctrl.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${cred.accessToken}`,
+        'anthropic-version': String(req.headers['anthropic-version'] || '2023-06-01'),
+        'anthropic-beta': mergeBetas(req.headers['anthropic-beta'] as string),
+        'anthropic-dangerous-direct-browser-access': 'true',
+        'x-app': 'cli',
+        'User-Agent': 'claude-cli/2.1.280 (external, sdk-cli)',
+        Accept: body?.stream ? 'text/event-stream' : 'application/json'
+      },
+      body: payload
+    });
+
+  let up = await send(await getCredential('claude'));
+  if (up.status === 401) {
+    markExpired('claude');
+    up = await send(await getCredential('claude'));
+  }
+
+  const type = up.headers.get('content-type') || 'application/json';
+  if (!up.ok || !type.includes('event-stream') || !up.body) {
+    // Errors and JSON replies: pass status and body through so the client sees Anthropic's own error shape.
+    const text = await up.text();
+    res.status(up.status).setHeader('Content-Type', type);
+    res.send(text);
+    let u: any = {};
+    try { u = JSON.parse(text).usage || {}; } catch { /* not JSON */ }
+    return { inTok: u.input_tokens || 0, outTok: u.output_tokens || 0, status: up.status, error: up.ok ? undefined : text.slice(0, 250) };
+  }
+
+  res.status(200).set({ 'Content-Type': type, 'Cache-Control': 'no-cache, no-transform', 'X-Accel-Buffering': 'no' });
+  const reader = up.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '', inTok = 0, outTok = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      res.write(Buffer.from(value)); // bytes untouched
+      // Watch the same bytes for usage numbers.
+      buf += dec.decode(value, { stream: true });
+      let i: number;
+      while ((i = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, i).trim();
+        buf = buf.slice(i + 1);
+        if (!line.startsWith('data:')) continue;
+        try {
+          const e = claudeEvent(JSON.parse(line.slice(5)));
+          if (e.inTok) inTok = e.inTok;
+          if (e.outTok) outTok = e.outTok;
+        } catch { /* partial / keep-alive */ }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+    res.end();
+  }
+  return { inTok, outTok, status: 200 };
 }

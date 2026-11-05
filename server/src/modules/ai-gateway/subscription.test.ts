@@ -45,6 +45,7 @@ assert.equal(normalizeIp('::ffff:10.0.0.1'), '10.0.0.1');
 assert.ok(needsRefresh('claude', { accessToken: 'a', expiresAt: Date.now() + 60_000 }));
 assert.ok(!needsRefresh('claude', { accessToken: 'a', expiresAt: Date.now() + 3_600_000 }));
 assert.ok(!needsRefresh('claude', { accessToken: 'a' })); // no expiry info: use as-is, 401 triggers refresh
+assert.ok(needsRefresh('claude', { accessToken: 'a', expiresAt: 0 })); // markExpired() after a 401 must force a refresh
 assert.ok(needsRefresh('copilot', { accessToken: 'gh', apiToken: 'x', apiTokenExpiresAt: Date.now() + 1000 }));
 
 // ---- format translation
@@ -130,6 +131,7 @@ function fakeRes() {
   r.end = (s?: string) => { if (s) r.chunks.push(s); r.headersSent = true; };
   r.json = (b: any) => { r.body = b; r.headersSent = true; };
   r.on = () => r;
+  r.send = (b: string) => { r.body = b; };
   r.writableFinished = false;
   return r;
 }
@@ -162,6 +164,49 @@ await assert.rejects(subscriptionChat(fakeReq, fakeRes(), { model: 'gc/gemini-2.
 const ids = (await subscriptionModels()).map((m) => m.id);
 assert.ok(ids.includes('cc/claude-sonnet-5') && ids.includes('cx/gpt-6-sol'));
 assert.ok(!ids.some((i) => i.startsWith('gc/') || i.startsWith('gh/')));
+
+// ---- /v1/messages passthrough (Claude Code): body forwarded untouched except identity + betas
+const { claudeMessages, withClaudeCodeSystem, mergeBetas } = await import('./subscription.js');
+assert.deepEqual(withClaudeCodeSystem({ system: 'Be brief' }).system.map((b: any) => b.text), [CLAUDE_CODE_SYSTEM, 'Be brief']);
+const already = { system: [{ type: 'text', text: CLAUDE_CODE_SYSTEM }, { type: 'text', text: 'x' }] };
+assert.equal(withClaudeCodeSystem(already), already); // Claude Code already sends it: no duplicate
+assert.equal(mergeBetas('fine-grained-tool-streaming-2025-05-14,oauth-2025-04-20'), 'fine-grained-tool-streaming-2025-05-14,oauth-2025-04-20,claude-code-20250219');
+
+const msgSse = [
+  { type: 'message_start', message: { usage: { input_tokens: 42 } } },
+  { type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: 't1', name: 'Bash', input: {} } },
+  { type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: '{"command":"ls"}' } },
+  { type: 'message_delta', delta: { stop_reason: 'tool_use' }, usage: { output_tokens: 7 } }
+].map((e) => `event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`).join('');
+let msgCalls = 0;
+const msgBodies: any[] = [];
+globalThis.fetch = (async (url: any, init: any) => {
+  const u = String(url);
+  if (u.startsWith('https://api.anthropic.com/v1/messages/count_tokens')) return new Response('{"input_tokens":12}', { headers: { 'content-type': 'application/json' } });
+  if (u.startsWith('https://api.anthropic.com/v1/messages')) {
+    msgCalls++;
+    msgBodies.push({ headers: init.headers, body: JSON.parse(init.body) });
+    if (msgCalls === 1) return new Response('{"type":"error","error":{"type":"authentication_error"}}', { status: 401, headers: { 'content-type': 'application/json' } });
+    return new Response(msgSse, { headers: { 'content-type': 'text/event-stream' } });
+  }
+  if (u.startsWith('https://api.anthropic.com/v1/oauth/token')) return new Response(JSON.stringify({ access_token: 'fresh-at', refresh_token: 'fresh-rt', expires_in: 3600 }));
+  return new Response('nope', { status: 599 });
+}) as any;
+const ccBody = { model: 'claude-sonnet-5', stream: true, max_tokens: 1000, system: [{ type: 'text', text: CLAUDE_CODE_SYSTEM }], tools: [{ name: 'Bash', input_schema: { type: 'object' } }], messages: [{ role: 'user', content: 'ls' }] };
+const ccReq: any = { on: () => {}, headers: { 'anthropic-version': '2023-06-01', 'anthropic-beta': 'fine-grained-tool-streaming-2025-05-14' } };
+res = fakeRes();
+const outMsg = await claudeMessages(ccReq, res, ccBody);
+assert.equal(msgCalls, 2, '401 -> refresh -> retry once');
+assert.equal(msgBodies[1].headers.Authorization, 'Bearer fresh-at');
+assert.deepEqual(msgBodies[1].body.tools, ccBody.tools, 'tools forwarded untouched');
+assert.equal(msgBodies[1].body.system.length, 1, 'identity not duplicated');
+assert.match(msgBodies[1].headers['anthropic-beta'], /fine-grained-tool-streaming-2025-05-14.*oauth-2025-04-20/);
+assert.equal(res.chunks.map((c: any) => Buffer.from(c).toString()).join(''), msgSse, 'SSE bytes passed through unchanged');
+assert.deepEqual([outMsg.inTok, outMsg.outTok], [42, 7]);
+res = fakeRes();
+res.send = (b: string) => { res.body = b; };
+await claudeMessages(ccReq, res, { model: 'claude-sonnet-5', messages: [] }, '/v1/messages/count_tokens');
+assert.equal(res.body, '{"input_tokens":12}');
 
 removeAccount('claude');
 assert.ok(!listAccounts().some((a) => a.provider === 'claude'));

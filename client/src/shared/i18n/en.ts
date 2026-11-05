@@ -779,7 +779,7 @@ export const en = {
   'aiGateway.statsStatus': 'Gateway Status',
   'aiGateway.statusOnline': 'Online & Ready',
   'aiGateway.claudeCodeTitle': 'Claude Code CLI Setup',
-  'aiGateway.claudeCodeDesc': "Route Anthropic's official Claude Code CLI through your 7Server gateway. Master keys remain secure on the server.",
+  'aiGateway.claudeCodeDesc': "Run Claude Code on your logged-in Claude account (or an Anthropic API key) through 7Server. Tools, thinking and streaming pass through unchanged.",
   'aiGateway.selectKey': 'Select Virtual Key',
   'aiGateway.copyCommand': 'Copy Configuration',
   'aiGateway.copied': 'Copied to clipboard!',

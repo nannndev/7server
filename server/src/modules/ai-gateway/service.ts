@@ -6,7 +6,8 @@ import {
   addUsageLog
 } from './store.js';
 import type { VirtualApiKey, AiProviderId } from './types.js';
-import { resolveModel, subscriptionChat, subscriptionModels, UpstreamError } from './subscription.js';
+import { resolveModel, subscriptionChat, subscriptionModels, claudeMessages, UpstreamError } from './subscription.js';
+import { isConnected } from './accounts.js';
 
 export function authenticateVirtualKey(req: Request): VirtualApiKey | null {
   const authHeader = req.headers['authorization'];
@@ -38,19 +39,42 @@ export async function handleAnthropicMessages(req: Request, res: Response): Prom
     return;
   }
 
-  if (key.allowedProviders && !key.allowedProviders.includes('anthropic')) {
-    res.status(403).json({
-      type: 'error',
-      error: {
-        type: 'permission_error',
-        message: 'This 7Server virtual key does not have permission to access the Anthropic provider.'
-      }
-    });
+  // Logged-in Claude account: used for `cc/<model>`, and for plain Claude model names when no
+  // Anthropic API key is configured (that is what Claude Code sends).
+  const cfg = getInternalConfig();
+  const provider = cfg.providers.anthropic;
+  const requested = String(req.body?.model || '');
+  const sub = resolveModel(requested);
+  const hasApiKey = !!(provider?.enabled && provider.apiKey);
+  if ((sub?.provider === 'claude' || (!sub && !hasApiKey)) && isConnected('claude')) {
+    if (key.allowedProviders && !key.allowedProviders.includes('claude')) {
+      res.status(403).json({ type: 'error', error: { type: 'permission_error', message: 'This 7Server virtual key does not have permission to use the Claude account.' } });
+      return;
+    }
+    const body = sub ? { ...req.body, model: sub.model } : req.body;
+    try {
+      const out = await claudeMessages(req, res, body, req.path.endsWith('count_tokens') ? '/v1/messages/count_tokens' : '/v1/messages');
+      recordKeyUsage(key.id, out.inTok, out.outTok);
+      addUsageLog({ keyId: key.id, keyName: key.name, provider: 'claude', model: requested, inputTokens: out.inTok, outputTokens: out.outTok,
+        durationMs: Date.now() - startTime, status: out.status < 400 ? 'success' : 'error', statusCode: out.status, error: out.error, streaming: !!req.body?.stream, ip: clientIp });
+    } catch (err: any) {
+      const status = err instanceof UpstreamError ? err.status : 502;
+      addUsageLog({ keyId: key.id, keyName: key.name, provider: 'claude', model: requested, inputTokens: 0, outputTokens: 0,
+        durationMs: Date.now() - startTime, status: 'error', statusCode: status, error: String(err.message).slice(0, 250), streaming: !!req.body?.stream, ip: clientIp });
+      if (!res.headersSent) res.status(status).json({ type: 'error', error: { type: 'api_error', message: err.message } });
+      else res.end();
+    }
+    return;
+  }
+  if (sub) {
+    res.status(400).json({ type: 'error', error: { type: 'invalid_request_error', message: `/v1/messages supports Claude models only (cc/…). Use /v1/chat/completions for ${requested}.` } });
     return;
   }
 
-  const cfg = getInternalConfig();
-  const provider = cfg.providers.anthropic;
+  if (key.allowedProviders && !key.allowedProviders.includes('anthropic')) {
+    res.status(403).json({ type: 'error', error: { type: 'permission_error', message: 'This 7Server virtual key does not have permission to access the Anthropic provider.' } });
+    return;
+  }
 
   if (!provider || !provider.enabled || !provider.apiKey) {
     res.status(503).json({

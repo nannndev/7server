@@ -36,7 +36,7 @@ aiGatewayPublicRoutes.get('/health', (req: Request, res: Response) => {
 });
 
 aiGatewayPublicRoutes.post(
-  ['/v1/messages', '/messages', '/v1/v1/messages'],
+  ['/v1/messages', '/messages', '/v1/v1/messages', '/v1/messages/count_tokens', '/messages/count_tokens'],
   (req: Request, res: Response) => {
     handleAnthropicMessages(req, res);
   }

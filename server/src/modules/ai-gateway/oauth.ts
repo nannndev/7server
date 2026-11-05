@@ -273,7 +273,7 @@ const LEAD_MS: Record<OAuthProviderId, number> = { claude: 5 * 60_000, codex: 5 
 export const needsRefresh = (provider: OAuthProviderId, c: OAuthCredential, now = Date.now()) =>
   provider === 'copilot'
     ? !c.apiToken || !c.apiTokenExpiresAt || c.apiTokenExpiresAt - now < LEAD_MS.copilot
-    : !!c.expiresAt && c.expiresAt - now < LEAD_MS[provider];
+    : c.expiresAt !== undefined && c.expiresAt - now < LEAD_MS[provider]; // 0 = forced by markExpired()
 
 export async function refreshCredential(provider: OAuthProviderId, c: OAuthCredential): Promise<OAuthCredential> {
   if (provider === 'copilot') return { ...c, ...(await fetchCopilotApiToken(c.accessToken)) };

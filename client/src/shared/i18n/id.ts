@@ -772,7 +772,7 @@ export const id: Record<keyof typeof en, string> = {
   'aiGateway.statsStatus': 'Status Gateway',
   'aiGateway.statusOnline': 'Online & Siap',
   'aiGateway.claudeCodeTitle': 'Konfigurasi Claude Code CLI',
-  'aiGateway.claudeCodeDesc': 'Arahkan CLI resmi Claude Code dari Anthropic melalui gateway 7Server Anda. Master key tetap aman di server.',
+  'aiGateway.claudeCodeDesc': 'Jalankan Claude Code memakai akun Claude yang sudah login (atau API key Anthropic) lewat 7Server. Tools, thinking, dan streaming diteruskan apa adanya.',
   'aiGateway.selectKey': 'Pilih Kunci Virtual',
   'aiGateway.copyCommand': 'Salin Konfigurasi',
   'aiGateway.copied': 'Berhasil disalin ke clipboard!',
