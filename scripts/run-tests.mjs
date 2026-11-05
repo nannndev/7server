@@ -14,12 +14,15 @@ let failed = 0;
 for (const pkg of ['server', 'client']) {
   for (const file of find(path.join(root, pkg, 'src'))) {
     const rel = path.relative(root, file);
+    const t0 = Date.now();
     try {
-      execFileSync(tsx, [path.relative(path.join(root, pkg), file)], { cwd: path.join(root, pkg), stdio: 'pipe' });
-      console.log(`ok    ${rel}`);
+      // timeout: a hung test (open socket, timer) fails loudly instead of stalling CI for hours
+      execFileSync(tsx, [path.relative(path.join(root, pkg), file)], { cwd: path.join(root, pkg), stdio: ['ignore', 'pipe', 'pipe'], timeout: 120_000, killSignal: 'SIGKILL' });
+      console.log(`ok    ${rel} (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
     } catch (e) {
       failed++;
-      console.log(`FAIL  ${rel}\n${String(e.stdout || '')}${String(e.stderr || '')}`);
+      const why = e.signal === 'SIGKILL' ? 'timed out after 120s' : `exit ${e.status}`;
+      console.log(`FAIL  ${rel} (${why})\n${String(e.stdout || '')}${String(e.stderr || '')}`);
     }
   }
 }
