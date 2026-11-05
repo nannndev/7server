@@ -14,6 +14,7 @@ import { usageOf } from './usage.js';
 import { listenForCallback } from './callbackServer.js';
 import {
   getAllKeys,
+  publicKey,
   createVirtualKey,
   deleteVirtualKey,
   toggleVirtualKey,
@@ -73,7 +74,7 @@ aiGatewayManagementRoutes.post('/ai-copilot/chat', need('copilot.chat'), (req: R
 aiGatewayManagementRoutes.use('/ai-gateway', need('gateway.manage'));
 
 aiGatewayManagementRoutes.get('/ai-gateway/keys', (req: Request, res: Response) => {
-  const keys = getAllKeys();
+  const keys = getAllKeys().map(publicKey);
   res.json({ keys });
 });
 
@@ -99,7 +100,7 @@ aiGatewayManagementRoutes.patch('/ai-gateway/keys/:id/toggle', (req: Request, re
     res.status(404).json({ error: 'Virtual key not found' });
     return;
   }
-  res.json({ key: updated });
+  res.json({ key: publicKey(updated) });
 });
 
 aiGatewayManagementRoutes.get('/ai-gateway/config', (req: Request, res: Response) => {

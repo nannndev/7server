@@ -19,14 +19,20 @@ console.log('Testing 7Server AI Gateway store & service...');
 // 1. Virtual Key Management
 const testKeyName = 'Test-Claude-Code-CLI';
 const createdKey = createVirtualKey(testKeyName, ['anthropic']);
+const secret = createdKey.key!; // only returned at creation
 assert.ok(createdKey.id, 'Key ID should be generated');
-assert.ok(createdKey.key.startsWith('7s-sk-'), 'Key should start with 7s-sk-');
+assert.ok(secret.startsWith('7s-sk-'), 'Key should start with 7s-sk-');
+assert.equal((createdKey as any).keyHash, undefined, 'creation response carries the key, not the hash');
+// Stored form: hash only, never the key.
+const stored = getAllKeys().find((k) => k.id === createdKey.id)!;
+assert.equal(stored.key, undefined, 'full key is never stored');
+assert.match(stored.keyHash!, /^[0-9a-f]{64}$/);
 assert.strictEqual(createdKey.name, testKeyName);
 assert.strictEqual(createdKey.enabled, true);
 assert.deepStrictEqual(createdKey.allowedProviders, ['anthropic']);
 
 // Lookup by secret
-const foundKey = getKeyBySecret(createdKey.key);
+const foundKey = getKeyBySecret(secret);
 assert.ok(foundKey, 'Key should be found by exact secret');
 assert.strictEqual(foundKey?.id, createdKey.id);
 
@@ -47,12 +53,12 @@ assert.strictEqual(authenticatedFromHeader?.id, createdKey.id);
 
 // Disable key test
 toggleVirtualKey(createdKey.id, false);
-const disabledLookup = getKeyBySecret(createdKey.key);
+const disabledLookup = getKeyBySecret(secret);
 assert.strictEqual(disabledLookup, null, 'Disabled key should not be returned by secret lookup');
 
 // Re-enable
 toggleVirtualKey(createdKey.id, true);
-assert.ok(getKeyBySecret(createdKey.key), 'Re-enabled key should be found');
+assert.ok(getKeyBySecret(secret), 'Re-enabled key should be found');
 
 // 2. Upstream Master Key Encryption & Masking
 const dummyMasterKey = 'sk-ant-api03-abcdef1234567890-XYZ';
@@ -101,7 +107,7 @@ assert.ok(stats.totalOutputTokens >= 75);
 
 // Clean up test key and dummy config
 deleteVirtualKey(createdKey.id);
-assert.strictEqual(getKeyBySecret(createdKey.key), null, 'Deleted key should no longer exist');
+assert.strictEqual(getKeyBySecret(secret), null, 'Deleted key should no longer exist');
 
 saveGatewayConfig({
   providers: {

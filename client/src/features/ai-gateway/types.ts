@@ -3,7 +3,8 @@ export type AiProviderId = 'anthropic' | 'openai' | 'gemini' | 'deepseek' | 'oll
 export interface VirtualApiKey {
   id: string;
   name: string;
-  key: string;
+  /** Full key: only in the response that creates it (stored as a hash). */
+  key?: string;
   keyPrefix: string;
   createdAt: string;
   lastUsedAt?: string;

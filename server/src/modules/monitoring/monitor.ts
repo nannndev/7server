@@ -1,18 +1,18 @@
 // Background monitor: polls every server on the backend (no browser needed), keeps history on disk,
 // checks nginx domains for HTTP/SSL health, and sends Discord alerts on state changes.
-import fs from 'fs';
 import path from 'path';
 import tls from 'tls';
-import { dataFile } from '../../config.js';
+import { getKv, setKv } from '../../infra/db.js';
 import { getAllServers, updateServer } from '../servers/store.js';
 import { fetchServerMetrics } from '../metrics/service.js';
 import { fetchNginxSites } from '../webapps/service.js';
 import { encrypt, decrypt } from '../../infra/crypto.js';
 import { badRequest } from '../../http/errors.js';
 
-const SETTINGS_FILE = dataFile('monitor.json');
-const HISTORY_FILE = dataFile('history.json');
-const UPTIME_FILE = dataFile('uptime.json');
+// Settings, metric history and uptime results are single values in 7server.db (kv table).
+const SETTINGS_FILE = 'monitor_settings';
+const HISTORY_FILE = 'metric_history';
+const UPTIME_FILE = 'uptime';
 
 export type Thresholds = { cpu: number; mem: number; disk: number };
 export interface MonitorSettings {
@@ -33,13 +33,10 @@ const DEFAULTS: MonitorSettings = {
   discordWebhook: ''
 };
 
-const readJSON = <T>(file: string, fallback: T): T => {
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; }
+const readJSON = <T>(key: string, fallback: T): T => {
+  try { return getKv<T>(key, fallback); } catch { return fallback; }
 };
-const writeJSON = (file: string, data: unknown) => {
-  fs.writeFileSync(`${file}.tmp`, JSON.stringify(data));
-  fs.renameSync(`${file}.tmp`, file);
-};
+const writeJSON = (key: string, data: unknown) => setKv(key, data);
 
 let settings: MonitorSettings = { ...DEFAULTS, ...readJSON(SETTINGS_FILE, {}) };
 settings.thresholds = { ...DEFAULTS.thresholds, ...settings.thresholds };

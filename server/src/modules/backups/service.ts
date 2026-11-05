@@ -1,7 +1,6 @@
-import fs from 'fs';
 import path from 'path';
 import { executeCommand } from '../../infra/ssh.js';
-import { dataFile } from '../../config.js';
+import { listDocs, replaceDocs } from '../../infra/db.js';
 import type { ServerCredentials } from '../servers/types.js';
 import type {
   BackupItem,
@@ -14,22 +13,9 @@ import type {
   BackupType
 } from './types.js';
 
-const PROFILES_FILE = dataFile('backup-profiles.json');
-
-function readProfilesData(): BackupProfile[] {
-  try {
-    if (!fs.existsSync(PROFILES_FILE)) return [];
-    return JSON.parse(fs.readFileSync(PROFILES_FILE, 'utf8'));
-  } catch {
-    return [];
-  }
-}
-
-function writeProfilesData(profiles: BackupProfile[]): void {
-  const tmp = `${PROFILES_FILE}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(profiles, null, 2));
-  fs.renameSync(tmp, PROFILES_FILE);
-}
+// Backup profiles live in 7server.db (collection backup_profiles).
+const readProfilesData = (): BackupProfile[] => listDocs<BackupProfile>('backup_profiles');
+const writeProfilesData = (profiles: BackupProfile[]): void => replaceDocs('backup_profiles', profiles, (p) => p.id);
 
 export function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';

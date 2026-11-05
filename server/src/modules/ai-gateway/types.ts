@@ -5,7 +5,10 @@ export type AiProviderId = 'anthropic' | 'openai' | 'gemini' | 'deepseek' | 'oll
 export interface VirtualApiKey {
   id: string;
   name: string;
-  key: string;              // full key e.g. "7s-sk-..."
+  /** Full key: only present in the response that creates it. Never stored. */
+  key?: string;
+  /** sha256 of the full key, hex. What is stored and compared. */
+  keyHash?: string;
   keyPrefix: string;        // masked prefix e.g. "7s-sk-...a1b2"
   createdAt: string;
   lastUsedAt?: string;

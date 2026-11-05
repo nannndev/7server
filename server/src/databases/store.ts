@@ -1,7 +1,5 @@
-// Saved database connections (data/databases.json). Passwords are encrypted at rest and never returned to the UI.
-import fs from 'fs';
-import path from 'path';
-import { dataFile } from '../config.js';
+// Saved database connections (7server.db, collection db_connections). Passwords are encrypted at rest and never returned to the UI.
+import { listDocs, replaceDocs } from '../infra/db.js';
 import { v4 as uuidv4 } from 'uuid';
 import { encrypt, decrypt } from '../infra/crypto.js';
 import { getAdapter } from './registry.js';
@@ -9,17 +7,10 @@ import { DbConnection } from './types.js';
 import { CONTAINER_RE } from './shell.js';
 import { badRequest } from '../http/errors.js';
 
-const FILE = dataFile('databases.json');
-
 type Stored = Omit<DbConnection, 'password'> & { encryptedPassword?: string | null };
 
-const read = (): Stored[] => {
-  try { return JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch { return []; }
-};
-const write = (list: Stored[]) => {
-  fs.writeFileSync(`${FILE}.tmp`, JSON.stringify(list, null, 2), { mode: 0o600 });
-  fs.renameSync(`${FILE}.tmp`, FILE);
-};
+const read = (): Stored[] => listDocs<Stored>('db_connections');
+const write = (list: Stored[]) => replaceDocs('db_connections', list, (c) => c.id);
 
 export type PublicConnection = Omit<Stored, 'encryptedPassword'> & { hasPassword: boolean };
 

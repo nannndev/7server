@@ -1,10 +1,6 @@
-// Append-only audit log (JSON lines) of every state-changing API call and terminal session.
-import fs from 'fs';
-import path from 'path';
-import { dataFile } from '../config.js';
-
-const AUDIT_FILE = dataFile('audit.log');
-const MAX_BYTES = 5 * 1024 * 1024;
+// Append-only audit log of every state-changing API call and terminal session (7server.db, table audit,
+// capped at the newest 50k rows).
+import { appendAudit, readAuditRows } from './db.js';
 
 // Only these body fields are recorded; credentials and file contents never are.
 const SAFE_FIELDS = [
@@ -36,9 +32,7 @@ export interface AuditEntry {
 
 export function writeAudit(entry: AuditEntry) {
   try {
-    // shortcut: single rotation to audit.log.1 at 5MB; enough for one dashboard, ship to syslog if it grows
-    if (fs.existsSync(AUDIT_FILE) && fs.statSync(AUDIT_FILE).size > MAX_BYTES) fs.renameSync(AUDIT_FILE, `${AUDIT_FILE}.1`);
-    fs.appendFileSync(AUDIT_FILE, JSON.stringify(entry) + '\n', { mode: 0o600 });
+    appendAudit(entry as any);
   } catch (e: any) {
     console.warn('[audit] write failed:', e.message);
   }
@@ -47,10 +41,9 @@ export function writeAudit(entry: AuditEntry) {
 export function readAudit(options: { limit?: number; user?: string; server?: string; search?: string } = {}): AuditEntry[] {
   const limit = options.limit ?? 200;
   try {
-    const raw = fs.readFileSync(AUDIT_FILE, 'utf8').trim();
-    if (!raw) return [];
-    let entries: AuditEntry[] = raw.split('\n').filter(Boolean).map((l) => JSON.parse(l));
-
+    // Filters other than user need the decoded rows: read a wider window, filter, then cut to limit.
+    const filtered = !!(options.server || options.search);
+    let entries: AuditEntry[] = readAuditRows(filtered ? Math.max(limit * 20, 5000) : limit, options.user || undefined);
     if (options.user) {
       const u = options.user.toLowerCase();
       entries = entries.filter((e) => (e.user || '').toLowerCase() === u);
@@ -68,7 +61,7 @@ export function readAudit(options: { limit?: number; user?: string; server?: str
       );
     }
 
-    return entries.slice(-limit).reverse();
+    return entries.slice(0, limit); // rows come newest first
   } catch {
     return [];
   }

@@ -74,7 +74,9 @@ assert.equal(textOf(null), '');
 
 // ---- accounts: encrypted at rest, never plaintext on disk
 saveAccount('claude', { accessToken: 'sk-ant-oat-SECRET', refreshToken: 'REFRESH-SECRET', expiresAt: Date.now() + 3_600_000, email: 'a@b.c' });
-const raw = fs.readFileSync(path.join(process.env.VPSHUB_DATA_DIR!, 'ai-gateway-accounts.json'), 'utf8');
+// Read the database file's bytes: the token must not appear anywhere in it (WAL included).
+const dir = process.env.VPSHUB_DATA_DIR!;
+const raw = fs.readdirSync(dir).filter((f) => f.startsWith('7server.db')).map((f) => fs.readFileSync(path.join(dir, f)).toString('latin1')).join('');
 assert.ok(!raw.includes('SECRET'), 'tokens must be encrypted at rest');
 assert.equal(listAccounts()[0].email, 'a@b.c');
 assert.equal((listAccounts()[0] as any).secret, undefined);

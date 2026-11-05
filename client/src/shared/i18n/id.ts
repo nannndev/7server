@@ -1441,5 +1441,8 @@ export const id: Record<keyof typeof en, string> = {
   'mon.expired': "KEDALUWARSA",
   'mon.days': "{n} hari",
   'mon.auditDesc': "Semua aksi yang mengubah sesuatu + sesi terminal. Password & isi file tidak dicatat.",
-  'mon.auditEmpty': "Belum ada aktivitas tercatat."
+  'mon.auditEmpty': "Belum ada aktivitas tercatat.",
+  // hashed virtual keys
+  'aiGw.keyHashedHint': "Disimpan sebagai hash. Key lengkap hanya ditampilkan sekali saat dibuat; buat key baru kalau hilang.",
+  'aiGw.quickstartKeyHint': "Ganti 7s-sk-your-key dengan key yang kamu simpan saat membuatnya."
 };

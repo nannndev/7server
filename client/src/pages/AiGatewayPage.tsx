@@ -210,7 +210,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
 
       setKeys(keysData);
       if (keysData.length > 0 && !selectedKeyId) {
-        setSelectedKeyId(keysData[0].key || keysData[0].keyPrefix);
+        setSelectedKeyId(keysData[0].id);
       }
       setConfig(configData);
       setUsage(usageData);
@@ -299,9 +299,9 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
 
     try {
       const newKey = await createGatewayKey(newKeyName.trim(), newKeyProviders);
-      setCreatedKeySecret(newKey.key);
+      setCreatedKeySecret(newKey.key ?? null);
       setKeys((prev) => [newKey, ...prev]);
-      setSelectedKeyId(newKey.key);
+      setSelectedKeyId(newKey.id);
       setNewKeyName('');
       setNewKeyProviders([]);
       toast.success(t('aiGateway.keyCreatedTitle'));
@@ -357,9 +357,10 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
   }, []);
 
   const activeKeyForQuickstart = useMemo(() => {
-    const found = keys.find((k) => k.key === selectedKeyId || k.id === selectedKeyId);
-    if (found) return found.key || found.keyPrefix;
-    return selectedKeyId || (keys.length > 0 ? keys[0].key || keys[0].keyPrefix : '7s-sk-your-virtual-key');
+    // Keys are stored hashed: the full key exists only in the creation response. Otherwise use a
+    // placeholder the user replaces with the key they saved.
+    if (createdKeySecret) return createdKeySecret;
+    return '7s-sk-your-key';
   }, [keys, selectedKeyId]);
 
   const connectedCount = useMemo(() => {
@@ -697,16 +698,8 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                         </td>
                         <td className="py-3 px-3 font-mono text-xs text-[var(--muted-foreground)]">
                           <div className="flex items-center gap-1.5">
-                            <span>{k.key ? `${k.key.slice(0, 10)}...${k.key.slice(-4)}` : k.keyPrefix}</span>
-                            {k.key && (
-                              <button
-                                onClick={() => copyToClipboard(k.key, k.id)}
-                                className="p-1 hover:text-[var(--foreground)]"
-                                title={t('aiGw.copyKey')}
-                              >
-                                {copiedSection === k.id ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                              </button>
-                            )}
+                            {/* stored as a hash: only the masked form exists after creation */}
+                            <span title={t('aiGw.keyHashedHint')}>{k.keyPrefix}</span>
                           </div>
                         </td>
                         <td className="py-3 px-3">
@@ -771,7 +764,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
               </div>
               <div>
                 <div className="text-xs font-semibold text-[var(--foreground)]">{t('aiGateway.selectKey')}</div>
-                <div className="text-[11px] text-[var(--muted-foreground)]">{t('aiGw.selectKeyDesc')}</div>
+                <div className="text-[11px] text-[var(--muted-foreground)]">{createdKeySecret ? t('aiGw.selectKeyDesc') : t('aiGw.quickstartKeyHint')}</div>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -782,7 +775,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                   className="h-8 px-2.5 text-xs rounded-lg bg-[var(--background)] border border-[var(--border)] text-[var(--foreground)] focus:ring-1 focus:ring-[var(--ring)]"
                 >
                   {keys.map((k) => (
-                    <option key={k.id} value={k.key || k.keyPrefix}>
+                    <option key={k.id} value={k.id}>
                       {k.name} ({k.keyPrefix})
                     </option>
                   ))}

@@ -1,11 +1,9 @@
-import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
-import { dataFile } from '../../config.js';
+import { listDocs, replaceDocs } from '../../infra/db.js';
 import { User, SafeUser, Session, Role } from './types.js';
 import { hashPassword, hashToken, generateToken } from './passwords.js';
 
-const USERS_FILE = dataFile('users.json');
-const SESSIONS_FILE = dataFile('sessions.json');
+// Users and sessions live in 7server.db (collections users, sessions); sessions keep only a token hash.
 const DEFAULT_SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 let memoryUsers: User[] = [];
@@ -14,11 +12,9 @@ let initialized = false;
 
 function loadUsers(): User[] {
   try {
-    if (fs.existsSync(USERS_FILE)) {
-      return JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
-    }
+    return listDocs<User>('users');
   } catch (e: any) {
-    console.warn('[users] Failed to read users.json:', e.message);
+    console.warn('[users] Failed to read users:', e.message);
   }
   return [];
 }
@@ -26,21 +22,18 @@ function loadUsers(): User[] {
 function saveUsers(users: User[]) {
   memoryUsers = users;
   try {
-    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), { mode: 0o600 });
+    replaceDocs('users', users, (u) => u.id);
   } catch (e: any) {
-    console.error('[users] Failed to write users.json:', e.message);
+    console.error('[users] Failed to write users:', e.message);
   }
 }
 
 function loadSessions(): Session[] {
   try {
-    if (fs.existsSync(SESSIONS_FILE)) {
-      const all: Session[] = JSON.parse(fs.readFileSync(SESSIONS_FILE, 'utf8'));
-      const now = Date.now();
-      return all.filter((s) => s.expiresAt > now);
-    }
+    const now = Date.now();
+    return listDocs<Session>('sessions').filter((s) => s.expiresAt > now);
   } catch (e: any) {
-    console.warn('[sessions] Failed to read sessions.json:', e.message);
+    console.warn('[sessions] Failed to read sessions:', e.message);
   }
   return [];
 }
@@ -48,9 +41,9 @@ function loadSessions(): Session[] {
 function saveSessions(sessions: Session[]) {
   memorySessions = sessions;
   try {
-    fs.writeFileSync(SESSIONS_FILE, JSON.stringify(sessions, null, 2), { mode: 0o600 });
+    replaceDocs('sessions', sessions, (x) => x.id);
   } catch (e: any) {
-    console.error('[sessions] Failed to write sessions.json:', e.message);
+    console.error('[sessions] Failed to write sessions:', e.message);
   }
 }
 
@@ -262,3 +255,4 @@ export function deleteSessionsByUserId(userId: string): number {
   }
   return removed;
 }
+

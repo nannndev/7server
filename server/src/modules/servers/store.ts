@@ -1,35 +1,11 @@
-import fs from 'fs';
-import path from 'path';
-import { DATA_DIR } from '../../config.js';
 import { v4 as uuidv4 } from 'uuid';
+import { listDocs, replaceDocs } from '../../infra/db.js';
 import { encrypt, decrypt } from '../../infra/crypto.js';
 import { RawServer, SafeServer, ServerCredentials } from './types.js';
 
-const DB_FILE = path.join(DATA_DIR, 'servers.json');
-
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
-
-// Start with an empty inventory; servers are added from the UI (credentials are encrypted on save).
-if (!fs.existsSync(DB_FILE)) {
-  fs.writeFileSync(DB_FILE, '[]');
-}
-
-function readData(): RawServer[] {
-  try {
-    const raw = fs.readFileSync(DB_FILE, 'utf8');
-    return JSON.parse(raw);
-  } catch (e) {
-    return [];
-  }
-}
-
-function writeData(data: RawServer[]): void {
-  const tmpFile = `${DB_FILE}.tmp`;
-  fs.writeFileSync(tmpFile, JSON.stringify(data, null, 2));
-  fs.renameSync(tmpFile, DB_FILE);
-}
+// Stored in 7server.db (collection "servers"); credentials are encrypted before they get here.
+const readData = (): RawServer[] => listDocs<RawServer>('servers');
+const writeData = (data: RawServer[]): void => replaceDocs('servers', data, (s) => s.id);
 
 export function getAllServers(includeCredentials?: false): SafeServer[];
 export function getAllServers(includeCredentials: true): ServerCredentials[];

@@ -1448,5 +1448,8 @@ export const en = {
   'mon.expired': "EXPIRED",
   'mon.days': "{n} days",
   'mon.auditDesc': "Every action that changes something, plus terminal sessions. Passwords and file contents are not logged.",
-  'mon.auditEmpty': "No activity recorded yet."
+  'mon.auditEmpty': "No activity recorded yet.",
+  // hashed virtual keys
+  'aiGw.keyHashedHint': "Stored as a hash. The full key was shown once when it was created; create a new key if it is lost.",
+  'aiGw.quickstartKeyHint': "Replace 7s-sk-your-key with the key you saved when creating it."
 };

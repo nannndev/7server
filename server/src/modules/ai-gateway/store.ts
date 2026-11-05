@@ -1,6 +1,5 @@
-import fs from 'fs';
 import crypto from 'crypto';
-import { dataFile } from '../../config.js';
+import { listDocs, replaceDocs, getKv, setKv, appendUsage, readUsageRows, allUsageRows, clearUsage, compact } from '../../infra/db.js';
 import { encrypt, decrypt } from '../../infra/crypto.js';
 import type {
   VirtualApiKey,
@@ -10,38 +9,43 @@ import type {
   AiGatewayStats
 } from './types.js';
 
-const KEYS_FILE = dataFile('ai-gateway-keys.json');
-const CONFIG_FILE = dataFile('ai-gateway-config.json');
-const USAGE_FILE = dataFile('ai-gateway-usage.json');
-const MAX_USAGE_LOGS = 1000;
+const MAX_USAGE_LOGS = 1000; // returned to the UI; the table keeps more and trims itself
 
-function safeReadJson<T>(filePath: string, fallback: T): T {
-  try {
-    if (!fs.existsSync(filePath)) return fallback;
-    const content = fs.readFileSync(filePath, 'utf8');
-    return JSON.parse(content);
-  } catch {
-    return fallback;
-  }
-}
-
-function safeWriteJson<T>(filePath: string, data: T): void {
-  const tmp = `${filePath}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
-  fs.renameSync(tmp, filePath);
-}
+// Keys are documents, config is one value, usage is an append-only table (infra/db.ts).
+const readKeys = () => listDocs<VirtualApiKey>('ai_keys');
+const writeKeys = (keys: VirtualApiKey[]) => replaceDocs('ai_keys', keys, (k) => k.id);
+const readConfig = () => getKv<AiGatewayConfig>('ai_gateway_config', DEFAULT_CONFIG);
+const writeConfig = (cfg: AiGatewayConfig) => setKv('ai_gateway_config', cfg);
 
 // ------------------- KEYS STORE -------------------
 
-export function getAllKeys(): VirtualApiKey[] {
-  return safeReadJson<VirtualApiKey[]>(KEYS_FILE, []);
+// Keys are stored as a sha256 hash only. A 24-byte random secret needs no salt or slow hash: it can't
+// be guessed, and a hash lets every request look it up without being able to recover the key.
+export const hashKey = (secret: string) => crypto.createHash('sha256').update(secret.trim()).digest('hex');
+
+/** Older rows stored the key itself: hash it once, drop the plain value. */
+function upgradeStoredKeys(keys: VirtualApiKey[]): VirtualApiKey[] {
+  let changed = false;
+  for (const k of keys) {
+    if (k.key && !k.keyHash) { k.keyHash = hashKey(k.key); changed = true; }
+    if (k.key) { delete k.key; changed = true; }
+  }
+  if (changed) { writeKeys(keys); compact(); } // one-time: scrub the old plain keys from the file
+  return keys;
 }
+
+/** Keys as stored (hash, never the secret). */
+export function getAllKeys(): VirtualApiKey[] {
+  return upgradeStoredKeys(readKeys());
+}
+
+/** For API responses: no hash either. */
+export const publicKey = ({ keyHash, key, ...rest }: VirtualApiKey): VirtualApiKey => rest;
 
 export function getKeyBySecret(secret: string): VirtualApiKey | null {
   if (!secret) return null;
-  const keys = getAllKeys();
-  const trimmed = secret.trim();
-  return keys.find((k) => k.key === trimmed && k.enabled) || null;
+  const h = Buffer.from(hashKey(secret), 'hex');
+  return getAllKeys().find((k) => k.enabled && k.keyHash && crypto.timingSafeEqual(Buffer.from(k.keyHash, 'hex'), h)) || null;
 }
 
 export function createVirtualKey(name: string, allowedProviders?: AiProviderId[]): VirtualApiKey {
@@ -51,7 +55,7 @@ export function createVirtualKey(name: string, allowedProviders?: AiProviderId[]
   const newKey: VirtualApiKey = {
     id: crypto.randomUUID(),
     name: name.trim() || 'Default Key',
-    key: rawSecret,
+    keyHash: hashKey(rawSecret),
     keyPrefix: `7s-sk-...${suffix}`,
     createdAt: new Date().toISOString(),
     enabled: true,
@@ -61,15 +65,16 @@ export function createVirtualKey(name: string, allowedProviders?: AiProviderId[]
     totalOutputTokens: 0
   };
   keys.unshift(newKey);
-  safeWriteJson(KEYS_FILE, keys);
-  return newKey;
+  writeKeys(keys);
+  // The only time the full key leaves the server: the caller shows it once.
+  return { ...publicKey(newKey), key: rawSecret };
 }
 
 export function deleteVirtualKey(id: string): boolean {
   const keys = getAllKeys();
   const next = keys.filter((k) => k.id !== id);
   if (next.length === keys.length) return false;
-  safeWriteJson(KEYS_FILE, next);
+  writeKeys(next);
   return true;
 }
 
@@ -78,7 +83,7 @@ export function toggleVirtualKey(id: string, enabled?: boolean): VirtualApiKey |
   const target = keys.find((k) => k.id === id);
   if (!target) return null;
   target.enabled = typeof enabled === 'boolean' ? enabled : !target.enabled;
-  safeWriteJson(KEYS_FILE, keys);
+  writeKeys(keys);
   return target;
 }
 
@@ -90,7 +95,7 @@ export function recordKeyUsage(keyId: string, inputTokens: number, outputTokens:
   target.totalRequests = (target.totalRequests || 0) + 1;
   target.totalInputTokens = (target.totalInputTokens || 0) + inputTokens;
   target.totalOutputTokens = (target.totalOutputTokens || 0) + outputTokens;
-  safeWriteJson(KEYS_FILE, keys);
+  writeKeys(keys);
 }
 
 // ------------------- CONFIG STORE -------------------
@@ -109,7 +114,7 @@ const DEFAULT_CONFIG: AiGatewayConfig = {
 };
 
 export function getInternalConfig(): AiGatewayConfig {
-  const stored = safeReadJson<AiGatewayConfig>(CONFIG_FILE, DEFAULT_CONFIG);
+  const stored = readConfig();
   const cfg: AiGatewayConfig = {
     ...DEFAULT_CONFIG,
     ...stored,
@@ -127,7 +132,7 @@ export function getInternalConfig(): AiGatewayConfig {
 }
 
 export function getClientConfig(): AiGatewayConfig {
-  const stored = safeReadJson<AiGatewayConfig>(CONFIG_FILE, DEFAULT_CONFIG);
+  const stored = readConfig();
   const cfg: AiGatewayConfig = {
     ...DEFAULT_CONFIG,
     ...stored,
@@ -152,7 +157,7 @@ export function getClientConfig(): AiGatewayConfig {
 }
 
 export function saveGatewayConfig(updates: Partial<AiGatewayConfig>): AiGatewayConfig {
-  const currentStored = safeReadJson<AiGatewayConfig>(CONFIG_FILE, DEFAULT_CONFIG);
+  const currentStored = readConfig();
   const merged: AiGatewayConfig = {
     ...currentStored,
     ...updates,
@@ -182,7 +187,7 @@ export function saveGatewayConfig(updates: Partial<AiGatewayConfig>): AiGatewayC
     }
   }
 
-  safeWriteJson(CONFIG_FILE, merged);
+  writeConfig(merged);
   return getClientConfig();
 }
 
@@ -192,7 +197,7 @@ export function connectProvider(
   baseUrl?: string,
   latencyMs?: number
 ): AiGatewayConfig {
-  const currentStored = safeReadJson<AiGatewayConfig>(CONFIG_FILE, DEFAULT_CONFIG);
+  const currentStored = readConfig();
   const target = currentStored.providers[providerId] || {
     enabled: true,
     connected: true,
@@ -212,12 +217,12 @@ export function connectProvider(
     error: undefined
   };
 
-  safeWriteJson(CONFIG_FILE, currentStored);
+  writeConfig(currentStored);
   return getClientConfig();
 }
 
 export function disconnectProvider(providerId: AiProviderId): AiGatewayConfig {
-  const currentStored = safeReadJson<AiGatewayConfig>(CONFIG_FILE, DEFAULT_CONFIG);
+  const currentStored = readConfig();
   if (currentStored.providers[providerId]) {
     currentStored.providers[providerId] = {
       ...currentStored.providers[providerId]!,
@@ -227,39 +232,33 @@ export function disconnectProvider(providerId: AiProviderId): AiGatewayConfig {
       error: undefined
     };
   }
-  safeWriteJson(CONFIG_FILE, currentStored);
+  writeConfig(currentStored);
   return getClientConfig();
 }
 
 // ------------------- USAGE STORE -------------------
 
 export function getUsageLogs(limit = 100): AiUsageLog[] {
-  const logs = safeReadJson<AiUsageLog[]>(USAGE_FILE, []);
-  return logs.slice(0, limit);
+  return readUsageRows(Math.min(limit, MAX_USAGE_LOGS)) as AiUsageLog[];
 }
 
 export function addUsageLog(logData: Omit<AiUsageLog, 'id' | 'timestamp' | 'totalTokens'>): void {
-  const logs = safeReadJson<AiUsageLog[]>(USAGE_FILE, []);
   const newLog: AiUsageLog = {
     ...logData,
     id: crypto.randomUUID(),
     timestamp: new Date().toISOString(),
     totalTokens: (logData.inputTokens || 0) + (logData.outputTokens || 0)
   };
-  logs.unshift(newLog);
-  if (logs.length > MAX_USAGE_LOGS) {
-    logs.length = MAX_USAGE_LOGS;
-  }
-  safeWriteJson(USAGE_FILE, logs);
+  appendUsage(newLog as any);
 }
 
 export function clearUsageLogs(): void {
-  safeWriteJson(USAGE_FILE, []);
+  clearUsage();
 }
 
 export function getGatewayStats(): AiGatewayStats {
   const keys = getAllKeys();
-  const logs = safeReadJson<AiUsageLog[]>(USAGE_FILE, []);
+  const logs = allUsageRows() as AiUsageLog[];
 
   const totalRequests = logs.length;
   let totalInputTokens = 0;

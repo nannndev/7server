@@ -1,11 +1,8 @@
 // Logged-in subscription accounts (one per OAuth provider). Tokens are encrypted at rest with the same
 // key as SSH credentials, refreshed lazily before use, and never returned to the browser.
-import fs from 'fs';
-import { dataFile } from '../../config.js';
 import { encrypt, decrypt } from '../../infra/crypto.js';
+import { listDocs, replaceDocs } from '../../infra/db.js';
 import { OAUTH_PROVIDER_IDS, needsRefresh, refreshCredential, type OAuthCredential, type OAuthProviderId } from './oauth.js';
-
-const FILE = dataFile('ai-gateway-accounts.json');
 
 interface StoredAccount {
   provider: OAuthProviderId;
@@ -26,13 +23,11 @@ export interface PublicAccount {
   lastError?: string;
 }
 
-const read = (): Partial<Record<OAuthProviderId, StoredAccount>> => {
-  try { return JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch { return {}; }
-};
-const write = (all: Partial<Record<OAuthProviderId, StoredAccount>>) => {
-  fs.writeFileSync(`${FILE}.tmp`, JSON.stringify(all, null, 2), { mode: 0o600 });
-  fs.renameSync(`${FILE}.tmp`, FILE);
-};
+// One document per provider in 7server.db (collection ai_accounts); `secret` stays AES-256-GCM encrypted.
+const read = (): Partial<Record<OAuthProviderId, StoredAccount>> =>
+  Object.fromEntries(listDocs<StoredAccount>('ai_accounts').map((a) => [a.provider, a]));
+const write = (all: Partial<Record<OAuthProviderId, StoredAccount>>) =>
+  replaceDocs('ai_accounts', Object.values(all).filter(Boolean) as StoredAccount[], (a) => a.provider);
 const open = (a: StoredAccount): OAuthCredential => JSON.parse(decrypt(a.secret));
 
 export function listAccounts(): PublicAccount[] {
