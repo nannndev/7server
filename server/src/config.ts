@@ -24,5 +24,13 @@ export const config = {
    * Reverse proxies allowed to set X-Forwarded-For (Express "trust proxy"): e.g. "loopback" when
    * nginx runs on this machine, or "10.0.0.5". Empty = trust nobody and use the socket address.
    */
-  trustProxy: process.env.TRUST_PROXY || ''
+  trustProxy: process.env.TRUST_PROXY || '',
+  /**
+   * Built dashboard (vite build output) to serve on the same port as the API. Defaults to
+   * ../client/dist when it exists; in dev the Vite server on :3000 serves the UI instead.
+   */
+  staticDir: process.env.STATIC_DIR ? path.resolve(process.env.STATIC_DIR) : path.resolve(SERVER_ROOT, '..', 'client', 'dist'),
+  /** Treat Docker bridge peers (172.16/12) as internal for the AI gateway. Off by default: with
+   * published ports Docker can make internet callers look like the bridge gateway. */
+  trustDockerBridge: process.env.AI_GATEWAY_TRUST_DOCKER_BRIDGE === '1'
 };

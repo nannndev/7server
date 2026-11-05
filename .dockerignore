@@ -1,0 +1,23 @@
+# Keep secrets and local data out of the image (an image pushed to a registry is as public as a repo).
+**/.env
+**/.env.*
+!**/.env.example
+!.env.docker.example
+server/data
+**/*.db
+**/*.db-wal
+**/*.db-shm
+**/secret.key
+**/*.pem
+**/*.key
+docs/.private
+
+# Build output and dependencies are rebuilt inside the image.
+**/node_modules
+**/dist
+landing
+.git
+.claude
+graphify-out
+*.log
+.DS_Store

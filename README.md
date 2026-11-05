@@ -47,6 +47,25 @@ Dashboard akan otomatis aktif di:
 
 ---
 
+## 🐳 Docker (VPS / server lokal)
+
+Satu container berisi dashboard, API, dan AI Gateway di satu port. Data (`7server.db` + `secret.key`) ada di volume `7server-data`.
+
+```bash
+cp .env.docker.example .env      # isi DASHBOARD_PASSWORD
+docker compose up -d
+```
+
+Buka `http://localhost:5001`, login sebagai `admin` dengan password tadi. Kalau `DASHBOARD_PASSWORD` kosong, password acak ada di:
+`docker compose exec 7server cat /data/dashboard.password`.
+
+- **Port sengaja hanya di `127.0.0.1`.** Untuk akses dari luar, pasang nginx/Caddy dengan HTTPS di depannya dan set `TRUST_PROXY` di `.env` (nginx di host yang sama: `172.16.0.0/12`).
+- **AI Gateway:** di dalam container, alamat bridge Docker (`172.16/12`) tidak dianggap "dalam sistem", karena port yang di-publish bisa membuat pemanggil dari internet terlihat seperti bridge. Ubah lewat `AI_GATEWAY_TRUST_DOCKER_BRIDGE=1` hanya kalau semua yang di bridge memang tepercaya.
+- **Update:** `git pull && docker compose up -d --build`. Data di volume tidak tersentuh.
+- **Backup:** salin `7server.db` **dan** `secret.key` bersama-sama (tanpa `secret.key`, kredensial SSH di database tidak bisa dibuka):
+  `docker run --rm -v 7server-data:/data -v "$PWD":/backup alpine tar czf /backup/7server-backup.tgz -C /data .`
+- Image tidak berisi data atau rahasia apa pun (`.dockerignore`), berjalan sebagai user non-root, dengan healthcheck.
+
 ## 📁 Struktur Direktori
 
 ```

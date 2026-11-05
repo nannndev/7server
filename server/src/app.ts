@@ -1,4 +1,6 @@
 // Express app: middleware + routers, no listen() (so tests can boot it on any port).
+import fs from 'fs';
+import path from 'path';
 import express from 'express';
 import cors from 'cors';
 import { config } from './config.js';
@@ -48,5 +50,15 @@ export function createApp() {
     logsRoutes, filesRoutes, dockerRoutes, databasesRoutes, execRoutes, softwareRoutes, cronRoutes, certificateRoutes, securityRoutes, backupRoutes);
 
   app.use(errorHandler);
+
+  // Production / Docker: one port serves the API above and the built dashboard. Unknown /api paths
+  // already ended in the routers or the error handler, so everything left is the SPA.
+  if (fs.existsSync(path.join(config.staticDir, 'index.html'))) {
+    app.use(express.static(config.staticDir, { index: false, maxAge: '1h', setHeaders: noCacheHtml }));
+    app.get(/^\/(?!api\/|ws\/).*/, (_req, res) => res.sendFile(path.join(config.staticDir, 'index.html'), { headers: { 'Cache-Control': 'no-cache' } }));
+  }
   return app;
 }
+
+// Hashed assets can be cached; index.html must not be, or a new release keeps loading old chunks.
+const noCacheHtml = (res: express.Response, file: string) => { if (file.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache'); };

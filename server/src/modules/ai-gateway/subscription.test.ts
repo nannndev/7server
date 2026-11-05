@@ -40,6 +40,8 @@ assert.equal(resolveModel('cc/'), null);
 for (const ip of ['127.0.0.1', '::1', '::ffff:127.0.0.1', '10.1.2.3', '172.17.0.2', '192.168.1.5', 'fd00::1']) assert.ok(isPrivateIp(ip), ip);
 for (const ip of ['8.8.8.8', '172.32.0.1', '103.181.183.164', '2001:db8::1']) assert.ok(!isPrivateIp(ip), ip);
 assert.equal(normalizeIp('::ffff:10.0.0.1'), '10.0.0.1');
+// In a container the Docker bridge is not trusted unless asked for.
+assert.ok(!isPrivateIp('172.17.0.1', false) && isPrivateIp('172.17.0.1', true) && isPrivateIp('10.0.0.5', false));
 
 // ---- refresh timing
 assert.ok(needsRefresh('claude', { accessToken: 'a', expiresAt: Date.now() + 60_000 }));

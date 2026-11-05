@@ -1,7 +1,9 @@
 // The gateway proxies paid subscription accounts, so its public endpoints only answer callers inside
 // the 7Server system: this machine (loopback), private networks (docker bridges, VPN), the VPS hosts
 // registered in the dashboard, and any extra IPs listed in AI_GATEWAY_ALLOWED_IPS.
+import fs from 'fs';
 import net from 'net';
+import { config } from '../../config.js';
 import dns from 'dns/promises';
 import type { Request, Response, NextFunction } from 'express';
 import { getAllServers } from '../servers/store.js';
@@ -11,12 +13,16 @@ const extra = () => (process.env.AI_GATEWAY_ALLOWED_IPS || '').split(',').map((s
 /** IPv4-mapped IPv6 (::ffff:1.2.3.4) → 1.2.3.4 */
 export const normalizeIp = (ip: string) => (ip || '').replace(/^::ffff:/i, '').trim();
 
-export function isPrivateIp(ip: string): boolean {
+// Inside a Docker container, published ports can make an internet caller arrive from the bridge
+// gateway (172.17.0.1), so 172.16/12 counts as internal there only when explicitly allowed.
+const IN_CONTAINER = fs.existsSync('/.dockerenv') || process.env.RUNNING_IN_DOCKER === '1';
+
+export function isPrivateIp(ip: string, trustBridge = !IN_CONTAINER || config.trustDockerBridge): boolean {
   const a = normalizeIp(ip);
   if (a === '::1' || a === '127.0.0.1' || a.startsWith('127.')) return true;
   if (net.isIPv4(a)) {
     const [x, y] = a.split('.').map(Number);
-    return x === 10 || (x === 172 && y >= 16 && y <= 31) || (x === 192 && y === 168);
+    return x === 10 || (trustBridge && x === 172 && y >= 16 && y <= 31) || (x === 192 && y === 168);
   }
   // fc00::/7 unique-local
   return net.isIPv6(a) && /^f[cd]/i.test(a);

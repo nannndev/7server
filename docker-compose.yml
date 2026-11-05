@@ -1,0 +1,25 @@
+# 7Server
+#   1. cp .env.docker.example .env   (set DASHBOARD_PASSWORD)
+#   2. docker compose up -d
+#   3. open http://localhost:5001  (or put nginx with HTTPS in front, see README / docs)
+#
+# Data lives in the "7server-data" volume: 7server.db + secret.key. Back up BOTH together.
+services:
+  7server:
+    build: .
+    image: 7server:latest
+    container_name: 7server
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Behind a reverse proxy on this host, set TRUST_PROXY in .env (e.g. 172.16.0.0/12 or loopback).
+      VPSHUB_DATA_DIR: /data
+    ports:
+      # Bound to localhost on purpose: expose it through nginx/Caddy with HTTPS, not directly.
+      # Change to "5001:5001" only on a private network you trust.
+      - "127.0.0.1:5001:5001"
+    volumes:
+      - 7server-data:/data
+
+volumes:
+  7server-data:
