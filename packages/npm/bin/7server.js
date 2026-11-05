@@ -18,7 +18,7 @@ if (maj < 22 || (maj === 22 && min < 13)) {
   process.exit(1);
 }
 
-const HELP = `7server ${pkg.version}: self-hosted dashboard for your VPS fleet
+const HELP = `7server ${pkg.version}: self-hosted dashboard for your servers
 
 Usage: 7server [options]
 

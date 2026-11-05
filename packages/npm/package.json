@@ -1,7 +1,7 @@
 {
   "name": "7server",
   "version": "0.1.0",
-  "description": "Self-hosted dashboard for your VPS fleet: monitoring, browser terminal, Docker, Nginx, cron, backups, databases and an AI copilot. Agentless, over SSH.",
+  "description": "Self-hosted dashboard for your servers: monitoring, browser terminal, Docker, Nginx, cron, backups, databases and an AI copilot. Agentless, over SSH.",
   "type": "module",
   "bin": {
     "7server": "bin/7server.js"
@@ -15,13 +15,15 @@
     "node": ">=22.13.0"
   },
   "keywords": [
-    "vps",
     "server-management",
-    "ssh",
-    "dashboard",
     "self-hosted",
+    "dashboard",
+    "ssh",
+    "vps",
+    "homelab",
     "docker",
     "monitoring",
+    "devops",
     "ai-gateway"
   ],
   "repository": {

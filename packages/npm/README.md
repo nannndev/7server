@@ -1,6 +1,6 @@
 # 7server
 
-Self-hosted dashboard for your VPS fleet. It connects over the SSH access you already have: nothing is installed on your servers.
+Self-hosted dashboard for your servers. It connects over the SSH access you already have: nothing is installed on your servers.
 
 Monitoring with Discord alerts, a browser terminal, Docker and Compose, Nginx and SSL, cron, services, backups, a database workbench, and an AI copilot that checks the server itself and asks before it changes anything.
 
