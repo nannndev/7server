@@ -40,6 +40,7 @@ import { confirmModal } from '@/shared/ui/confirm-dialog';
 import { useI18n, useT, type MessageKey } from '@/shared/i18n';
 import { BrandIcon } from '@/shared/ui/brand-icon';
 import { SubscriptionAccounts } from '@/features/ai-gateway/SubscriptionAccounts';
+import { Combos } from '@/features/ai-gateway/Combos';
 import type { AiGatewayTab } from '@/app/router';
 import {
   fetchGatewayKeys,
@@ -519,6 +520,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
             <p className="text-[11px] text-[var(--muted-foreground)]">{t('aiGw.subsDesc')} <code className="font-mono">alias/model</code> · <code className="font-mono">cc/claude-sonnet-5</code> · <code className="font-mono">/v1/chat/completions</code></p>
           </div>
           <SubscriptionAccounts />
+          <Combos />
 
           <h3 className="text-sm font-semibold text-[var(--foreground)] pt-2">{t('aiGw.apiKeyTitle')}</h3>
           {/* Providers Grid */}

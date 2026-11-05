@@ -6,7 +6,8 @@ import {
   addUsageLog
 } from './store.js';
 import type { VirtualApiKey, AiProviderId } from './types.js';
-import { resolveModel, subscriptionChat, subscriptionModels, claudeMessages, UpstreamError } from './subscription.js';
+import { resolveModel, subscriptionChat, subscriptionModels, claudeMessages, UpstreamError, comboName, isRetryable, COMBO_PREFIX } from './subscription.js';
+import { isCoolingDown } from './usage.js';
 import { isConnected } from './accounts.js';
 
 export function authenticateVirtualKey(req: Request): VirtualApiKey | null {
@@ -25,7 +26,7 @@ export function authenticateVirtualKey(req: Request): VirtualApiKey | null {
 
 export async function handleAnthropicMessages(req: Request, res: Response): Promise<void> {
   const startTime = Date.now();
-  const clientIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '';
+  const clientIp = req.ip || req.socket.remoteAddress || ''; // trusted only via TRUST_PROXY
   const key = authenticateVirtualKey(req);
 
   if (!key) {
@@ -279,7 +280,7 @@ export async function handleAnthropicMessages(req: Request, res: Response): Prom
 
 export async function handleOpenAiChatCompletions(req: Request, res: Response): Promise<void> {
   const startTime = Date.now();
-  const clientIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '';
+  const clientIp = req.ip || req.socket.remoteAddress || ''; // trusted only via TRUST_PROXY
   const key = authenticateVirtualKey(req);
 
   if (!key) {
@@ -293,29 +294,49 @@ export async function handleOpenAiChatCompletions(req: Request, res: Response): 
     return;
   }
 
-  // 9Router-style "alias/model" (cc/, cx/, gh/, gc/) → logged-in subscription account.
-  const sub = resolveModel(req.body?.model);
-  if (sub) {
-    if (key.allowedProviders && !key.allowedProviders.includes(sub.provider as AiProviderId)) {
-      res.status(403).json({ error: { message: `This 7Server virtual key does not have permission to access provider ${sub.provider}.`, type: 'invalid_request_error' } });
+  // 9Router-style "alias/model" (cc/, cx/, gh/, gc/) → logged-in subscription account, or a combo
+  // "auto/<name>" that tries each target in order until one answers.
+  const combo = comboName(req.body?.model);
+  const chain = combo ? getInternalConfig().combos?.[combo] : undefined;
+  if (combo && !chain?.length) {
+    res.status(404).json({ error: { message: `Unknown combo "${combo}". Define it in 7Server → AI Gateway → Combos.`, type: 'invalid_request_error' } });
+    return;
+  }
+  const targets = (chain || [String(req.body?.model || '')]).map(resolveModel).filter((t): t is NonNullable<typeof t> => !!t);
+  if (targets.length) {
+    if (!Array.isArray(req.body?.messages) || req.body.messages.length === 0) {
+      res.status(400).json({ error: { message: 'messages is required', type: 'invalid_request_error' } });
       return;
     }
-    try {
-      if (!Array.isArray(req.body?.messages) || req.body.messages.length === 0) {
-        res.status(400).json({ error: { message: 'messages is required', type: 'invalid_request_error' } });
-        return;
-      }
-      const out = await subscriptionChat(req, res, req.body, sub);
-      recordKeyUsage(key.id, out.inTok, out.outTok);
-      addUsageLog({ keyId: key.id, keyName: key.name, provider: sub.provider as AiProviderId, model: req.body.model, inputTokens: out.inTok, outputTokens: out.outTok,
-        durationMs: Date.now() - startTime, status: 'success', statusCode: 200, streaming: !!req.body.stream, ip: clientIp });
-    } catch (err: any) {
-      const status = err instanceof UpstreamError ? err.status : 502;
-      addUsageLog({ keyId: key.id, keyName: key.name, provider: sub.provider as AiProviderId, model: String(req.body?.model), inputTokens: 0, outputTokens: 0,
-        durationMs: Date.now() - startTime, status: 'error', statusCode: status, error: String(err.message).slice(0, 250), streaming: !!req.body?.stream, ip: clientIp });
-      if (!res.headersSent) res.status(status).json({ error: { message: err.message, type: 'api_error' } });
-      else res.end();
+    const allowed = targets.filter((t) => !key.allowedProviders || key.allowedProviders.includes(t.provider as AiProviderId));
+    if (!allowed.length) {
+      res.status(403).json({ error: { message: `This 7Server virtual key does not have permission to access provider ${targets[0].provider}.`, type: 'invalid_request_error' } });
+      return;
     }
+    // Accounts that just returned 429 go last instead of being retried first.
+    const ordered = [...allowed.filter((t) => !isCoolingDown(t.provider)), ...allowed.filter((t) => isCoolingDown(t.provider))];
+    const tried: string[] = [];
+    let lastErr: any;
+    for (const target of ordered) {
+      const name = `${target.provider}/${target.model}`;
+      try {
+        const out = await subscriptionChat(req, res, req.body, target);
+        recordKeyUsage(key.id, out.inTok, out.outTok);
+        addUsageLog({ keyId: key.id, keyName: key.name, provider: target.provider as AiProviderId, model: combo ? `auto/${combo} → ${name}` : String(req.body.model), inputTokens: out.inTok, outputTokens: out.outTok,
+          durationMs: Date.now() - startTime, status: 'success', statusCode: 200, streaming: !!req.body.stream, ip: clientIp, ...(tried.length ? { error: `fell back after: ${tried.join(', ')}` } : {}) });
+        return;
+      } catch (err: any) {
+        lastErr = err;
+        tried.push(`${name} (${err instanceof UpstreamError ? err.status : 'error'})`);
+        // Once bytes went out the stream can't be restarted on another account.
+        if (res.headersSent || !combo || !isRetryable(err)) break;
+      }
+    }
+    const status = lastErr instanceof UpstreamError ? lastErr.status : 502;
+    addUsageLog({ keyId: key.id, keyName: key.name, provider: ordered[0].provider as AiProviderId, model: String(req.body?.model), inputTokens: 0, outputTokens: 0,
+      durationMs: Date.now() - startTime, status: 'error', statusCode: status, error: `${tried.join(' → ')}: ${String(lastErr?.message).slice(0, 200)}`, streaming: !!req.body?.stream, ip: clientIp });
+    if (!res.headersSent) res.status(status).json({ error: { message: combo ? `All targets of auto/${combo} failed: ${tried.join(', ')}. Last: ${lastErr?.message}` : lastErr?.message, type: 'api_error' } });
+    else res.end();
     return;
   }
 
@@ -561,7 +582,11 @@ export async function handleListModels(req: Request, res: Response): Promise<voi
   const connected = new Set(Object.entries(cfg.providers).filter(([, p]) => p?.connected).map(([id]) => (id === 'gemini' ? 'google' : id)));
   res.json({
     object: 'list',
-    data: [...(await subscriptionModels()), ...staticModels.filter((m) => connected.has(m.owned_by))]
+    data: [
+      ...Object.keys(getInternalConfig().combos || {}).map((name) => ({ id: `${COMBO_PREFIX}${name}`, object: 'model', owned_by: '7server-combo' })),
+      ...(await subscriptionModels()),
+      ...staticModels.filter((m) => connected.has(m.owned_by))
+    ]
   });
 }
 

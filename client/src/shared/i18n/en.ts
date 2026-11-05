@@ -998,5 +998,20 @@ export const en = {
   'subs.waitingApproval': "Waiting for approval…",
   'subs.test': "Test",
   'subs.relogin': "Log in again",
-  'subs.login': "Log in"
+  'subs.login': "Log in",
+  // quota + combos
+  'subs.quotaUnknown': "Quota not available for this account",
+  'subs.quotaLeft': "{n}% left",
+  'subs.quotaRefresh': "Refresh quota",
+  'combo.title': "Combos (automatic fallback)",
+  'combo.desc': "Call model auto/<name> and 7Server tries each account in order. A limit (429), a logged-out account or an upstream error moves on to the next one.",
+  'combo.name': "Name",
+  'combo.targets': "Models in order",
+  'combo.add': "Add model",
+  'combo.save': "Save combo",
+  'combo.empty': "No combos yet.",
+  'combo.delete': "Delete combo",
+  'combo.saved': "Combo saved",
+  'combo.pick': "Pick a model…",
+  'combo.namePh': "e.g. coding"
 };

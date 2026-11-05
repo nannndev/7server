@@ -9,7 +9,8 @@ import { verifyProviderConnection } from './verifier.js';
 import { internalOnly } from './internalOnly.js';
 import { startLogin, completeLogin, pollDeviceLogin, isOAuthProvider } from './oauth.js';
 import { listAccounts, saveAccount, removeAccount, getCredential } from './accounts.js';
-import { MODELS } from './subscription.js';
+import { MODELS, resolveModel } from './subscription.js';
+import { usageOf } from './usage.js';
 import { listenForCallback } from './callbackServer.js';
 import {
   getAllKeys,
@@ -18,6 +19,7 @@ import {
   toggleVirtualKey,
   getClientConfig,
   saveGatewayConfig,
+  getInternalConfig,
   connectProvider,
   disconnectProvider,
   getUsageLogs,
@@ -189,6 +191,33 @@ aiGatewayManagementRoutes.delete('/ai-gateway/accounts/:provider', (req: Request
   const p = oauthProvider(req, res); if (!p) return;
   removeAccount(p);
   res.json({ accounts: listAccounts() });
+});
+
+aiGatewayManagementRoutes.get('/ai-gateway/accounts/usage', async (req: Request, res: Response) => {
+  const fresh = req.query.fresh === '1';
+  const usage = await Promise.all(listAccounts().map((a) => usageOf(a.provider, fresh)));
+  res.json({ usage });
+});
+
+// Combos: name -> ordered `alias/model` list. Each entry must be a subscription model we can route.
+aiGatewayManagementRoutes.get('/ai-gateway/combos', (_req: Request, res: Response) => {
+  res.json({ combos: getInternalConfig().combos || {} });
+});
+aiGatewayManagementRoutes.put('/ai-gateway/combos/:name', (req: Request, res: Response) => {
+  const name = String(req.params.name || '').trim();
+  if (!/^[a-z0-9][a-z0-9._-]{0,39}$/.test(name)) { res.status(400).json({ error: 'Name: 1–40 chars, lowercase letters, digits, . _ -' }); return; }
+  const targets = Array.isArray(req.body?.targets) ? req.body.targets.map((t: unknown) => String(t).trim()).filter(Boolean) : [];
+  const bad = targets.filter((t: string) => !resolveModel(t));
+  if (!targets.length || targets.length > 8 || bad.length) { res.status(400).json({ error: bad.length ? `Not a subscription model: ${bad.join(', ')}` : 'Give 1–8 targets like cc/claude-sonnet-5' }); return; }
+  const combos = { ...(getInternalConfig().combos || {}), [name]: targets };
+  saveGatewayConfig({ combos });
+  res.json({ combos });
+});
+aiGatewayManagementRoutes.delete('/ai-gateway/combos/:name', (req: Request, res: Response) => {
+  const combos = { ...(getInternalConfig().combos || {}) };
+  delete combos[String(req.params.name)];
+  saveGatewayConfig({ combos });
+  res.json({ combos });
 });
 
 // In-Dashboard AI Copilot Chat Endpoint (SSE Streaming)

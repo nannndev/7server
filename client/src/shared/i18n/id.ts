@@ -991,5 +991,20 @@ export const id: Record<keyof typeof en, string> = {
   'subs.waitingApproval': "Menunggu persetujuan…",
   'subs.test': "Tes",
   'subs.relogin': "Login ulang",
-  'subs.login': "Login akun"
+  'subs.login': "Login akun",
+  // quota + combos
+  'subs.quotaUnknown': "Kuota tidak tersedia untuk akun ini",
+  'subs.quotaLeft': "sisa {n}%",
+  'subs.quotaRefresh': "Muat ulang kuota",
+  'combo.title': "Combo (fallback otomatis)",
+  'combo.desc': "Panggil model auto/<nama>, 7Server mencoba tiap akun berurutan. Kena limit (429), akun logout, atau error upstream langsung pindah ke berikutnya.",
+  'combo.name': "Nama",
+  'combo.targets': "Model berurutan",
+  'combo.add': "Tambah model",
+  'combo.save': "Simpan combo",
+  'combo.empty': "Belum ada combo.",
+  'combo.delete': "Hapus combo",
+  'combo.saved': "Combo disimpan",
+  'combo.pick': "Pilih model…",
+  'combo.namePh': "mis. coding"
 };

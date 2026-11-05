@@ -32,6 +32,8 @@ export interface AiGatewayConfig {
   providers: Partial<Record<AiProviderId, ProviderConfig>>;
   defaultProvider: AiProviderId;
   defaultModel: string;
+  /** Fallback chains: model "auto/<name>" tries each `alias/model` in order (9Router "combo"). */
+  combos?: Record<string, string[]>;
 }
 
 export interface ProviderVerificationResult {

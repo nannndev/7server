@@ -7,9 +7,10 @@ import { Input } from '@/shared/ui/input';
 import { toast } from '@/shared/ui/toast';
 import { confirmModal } from '@/shared/ui/confirm-dialog';
 import {
+  fetchAccountUsage,
   fetchAccounts, startAccountLogin, completeAccountLogin, pollAccountLogin, testAccount, disconnectAccount
 } from './api';
-import type { LoginStart, OAuthProviderId, SubscriptionAccount } from './types';
+import type { AccountUsage, LoginStart, OAuthProviderId, SubscriptionAccount } from './types';
 import { useI18n, type MessageKey } from '@/shared/i18n';
 import { BrandIcon } from '@/shared/ui/brand-icon';
 
@@ -24,6 +25,35 @@ const PROVIDERS: { id: OAuthProviderId; alias: string; name: string; plan: strin
 /** Login flow state for one provider card. */
 type Flow = { provider: OAuthProviderId; start: LoginStart; pasted: string; busy: boolean };
 
+/** Remaining quota per window: a thin gauge per limit, red when nearly used up. */
+function QuotaBars({ usage, onRefresh }: { usage?: AccountUsage; onRefresh: () => void }) {
+  const { t, locale } = useI18n();
+  if (!usage) return null;
+  if (usage.error || !usage.windows.length) {
+    return <div className="text-[10px] text-[var(--muted-foreground)]">{t('subs.quotaUnknown')}</div>;
+  }
+  return (
+    <div className="pt-1.5 space-y-1.5">
+      {usage.windows.slice(0, 3).map((w) => {
+        const left = Math.max(0, 100 - w.usedPercent);
+        const tone = w.usedPercent >= 90 ? 'bg-red-500' : w.usedPercent >= 70 ? 'bg-amber-500' : 'bg-[var(--ok)]';
+        return (
+          <div key={w.name}>
+            <div className="flex justify-between text-[10px]">
+              <span className="text-[var(--foreground)]">{w.name}{w.total ? ` · ${w.total - (w.used || 0)}/${w.total}` : ''}</span>
+              <span className="font-mono">{t('subs.quotaLeft', { n: Math.round(left) })}{w.resetsAt ? ` · ${new Date(w.resetsAt).toLocaleString(locale, { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}` : ''}</span>
+            </div>
+            <div className="mt-0.5 h-1 rounded-full bg-[var(--muted)] overflow-hidden" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(left)} aria-label={w.name}>
+              <div className={`h-full rounded-full ${tone} transition-[width] duration-500`} style={{ width: `${left}%` }} />
+            </div>
+          </div>
+        );
+      })}
+      <button type="button" onClick={onRefresh} className="text-[10px] underline-offset-2 hover:underline">{t('subs.quotaRefresh')}</button>
+    </div>
+  );
+}
+
 export function SubscriptionAccounts({ onChange }: { onChange?: (accounts: SubscriptionAccount[]) => void }) {
   const { t } = useI18n();
   const fmtExpiry = (ms?: number) => {
@@ -34,6 +64,9 @@ export function SubscriptionAccounts({ onChange }: { onChange?: (accounts: Subsc
   };
   const [accounts, setAccounts] = useState<SubscriptionAccount[]>([]);
   const [models, setModels] = useState<Partial<Record<OAuthProviderId, string[]>>>({});
+  const [usage, setUsage] = useState<Partial<Record<OAuthProviderId, AccountUsage>>>({});
+  const loadUsage = (fresh = false) =>
+    fetchAccountUsage(fresh).then((list) => setUsage(Object.fromEntries(list.map((u) => [u.provider, u])))).catch(() => {});
   const [flow, setFlow] = useState<Flow | null>(null);
   const [busy, setBusy] = useState<OAuthProviderId | null>(null);
   const pollTimer = useRef<number | undefined>(undefined);
@@ -42,6 +75,7 @@ export function SubscriptionAccounts({ onChange }: { onChange?: (accounts: Subsc
 
   useEffect(() => {
     fetchAccounts().then((r) => { apply(r.accounts); setModels(r.models); }).catch((e) => toast.error(e.message));
+    loadUsage();
     return () => window.clearTimeout(pollTimer.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -167,6 +201,7 @@ export function SubscriptionAccounts({ onChange }: { onChange?: (accounts: Subsc
                 <div className="text-[11px] space-y-0.5 text-[var(--muted-foreground)]">
                   {acc.email && <div className="text-[var(--foreground)]">{acc.email}</div>}
                   {fmtExpiry(acc.expiresAt) && <div>{fmtExpiry(acc.expiresAt)}</div>}
+                  <QuotaBars usage={usage[p.id]} onRefresh={() => loadUsage(true)} />
                   {acc.lastError && <div className="text-red-500 break-words">{acc.lastError}</div>}
                   <div className="font-mono truncate">model: {(models[p.id] || []).slice(0, 3).map((m) => `${p.alias}/${m}`).join(', ')}…</div>
                 </div>

@@ -3,6 +3,7 @@
 //   GET  /v1/models                                              (every model of every connected account)
 import type { Request, Response } from 'express';
 import { getCredential, isConnected, markExpired } from './accounts.js';
+import { markRateLimited } from './usage.js';
 import { COPILOT, type OAuthCredential, type OAuthProviderId } from './oauth.js';
 import {
   type ChatRequest, CLAUDE_CODE_SYSTEM, toClaude, claudeToOpenAi, claudeEvent, toCodex, codexEvent, toGemini, geminiEvent,
@@ -34,6 +35,15 @@ export function resolveModel(model: unknown): { provider: OAuthProviderId; model
 export class UpstreamError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
+
+/** Errors that mean "try the next account in a combo": quota, rate limit, not logged in, upstream down. */
+export const isRetryable = (e: unknown) => e instanceof UpstreamError && (e.status === 429 || e.status === 503 || e.status === 401 || e.status === 403 || e.status >= 500);
+
+export const COMBO_PREFIX = 'auto/';
+export const comboName = (model: unknown) => {
+  const m = String(model || '');
+  return m.startsWith(COMBO_PREFIX) && m.length > COMBO_PREFIX.length ? m.slice(COMBO_PREFIX.length) : null;
+};
 
 async function call(provider: OAuthProviderId, cred: OAuthCredential, model: string, req: ChatRequest, signal: AbortSignal) {
   const json = (url: string, headers: Record<string, string>, body: unknown) =>
@@ -83,6 +93,18 @@ async function call(provider: OAuthProviderId, cred: OAuthCredential, model: str
   }, { ...req, model });
 }
 
+/** When a 429 says the limit resets (Retry-After header or Codex's resets_at), cool down until then. */
+function resetOf(up: globalThis.Response, text: string): number | undefined {
+  const ra = Number(up.headers.get('retry-after'));
+  if (ra > 0) return Date.now() + ra * 1000;
+  try {
+    const e = JSON.parse(text)?.error || {};
+    if (e.resets_at > 0) return e.resets_at * 1000;
+    if (e.resets_in_seconds > 0) return Date.now() + e.resets_in_seconds * 1000;
+  } catch { /* not JSON */ }
+  return undefined;
+}
+
 export interface ChatOutcome { inTok: number; outTok: number; status: number; error?: string }
 
 /** Runs one chat request and writes an OpenAI-shaped response (JSON or SSE) to `res`. */
@@ -105,6 +127,7 @@ export async function subscriptionChat(req: Request, res: Response, body: ChatRe
   }
   if (!up.ok) {
     const text = await up.text();
+    if (up.status === 429) markRateLimited(provider, resetOf(up, text));
     throw new UpstreamError(up.status, `${provider} ${up.status}: ${text.slice(0, 400)}`);
   }
 

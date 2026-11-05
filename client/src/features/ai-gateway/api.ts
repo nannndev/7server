@@ -1,3 +1,4 @@
+import type { AccountUsage } from './types';
 import type { OAuthProviderId, SubscriptionAccount, LoginStart } from './types';
 import { API_BASE, apiFetch, jsonPost, unwrap } from '@/shared/api/client';
 import type {
@@ -140,3 +141,12 @@ export const testAccount = async (p: OAuthProviderId) =>
   (await body<{ accounts: SubscriptionAccount[] }>(await apiFetch(acct(p, 'test'), jsonPost({})), 'Token invalid')).accounts;
 export const disconnectAccount = async (p: OAuthProviderId) =>
   (await body<{ accounts: SubscriptionAccount[] }>(await apiFetch(acct(p), { method: 'DELETE' }), 'Failed to disconnect')).accounts;
+
+// ---- Quota and combos
+export const fetchAccountUsage = async (fresh = false) =>
+  (await body<{ usage: AccountUsage[] }>(await apiFetch(`${API_BASE}/ai-gateway/accounts/usage${fresh ? '?fresh=1' : ''}`), 'Failed to read quota')).usage;
+export const fetchCombos = async () => (await body<{ combos: Record<string, string[]> }>(await apiFetch(`${API_BASE}/ai-gateway/combos`), 'Failed to load combos')).combos;
+export const saveCombo = async (name: string, targets: string[]) =>
+  (await body<{ combos: Record<string, string[]> }>(await apiFetch(`${API_BASE}/ai-gateway/combos/${encodeURIComponent(name)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ targets }) }), 'Failed to save combo')).combos;
+export const deleteCombo = async (name: string) =>
+  (await body<{ combos: Record<string, string[]> }>(await apiFetch(`${API_BASE}/ai-gateway/combos/${encodeURIComponent(name)}`, { method: 'DELETE' }), 'Failed to delete combo')).combos;

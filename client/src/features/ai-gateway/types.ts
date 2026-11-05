@@ -79,3 +79,6 @@ export interface SubscriptionAccount {
 export type LoginStart =
   | { kind: 'redirect'; sessionId: string; authUrl: string; redirectUri: string; autoCallback?: boolean }
   | { kind: 'device'; sessionId: string; userCode: string; verificationUri: string; interval: number; expiresIn: number };
+
+export interface QuotaWindow { name: string; usedPercent: number; resetsAt?: string; used?: number; total?: number }
+export interface AccountUsage { provider: OAuthProviderId; plan?: string; windows: QuotaWindow[]; exhausted: boolean; checkedAt: string; error?: string }
