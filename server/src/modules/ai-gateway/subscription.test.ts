@@ -59,7 +59,8 @@ const chat = { model: 'x', messages: [
 const c = toClaude(chat, 'claude-sonnet-5');
 assert.equal(c.system[0].text, CLAUDE_CODE_SYSTEM); // OAuth tokens require the Claude Code identity first
 assert.equal(c.system[1].text, 'Be brief.');
-assert.deepEqual(c.messages, [{ role: 'user', content: 'Hi\n\nthere' }, { role: 'assistant', content: 'Hello' }, { role: 'user', content: 'Bye' }]);
+// consecutive user turns merge into one turn with two text blocks; single-text turns stay plain strings
+assert.deepEqual(c.messages, [{ role: 'user', content: [{ type: 'text', text: 'Hi' }, { type: 'text', text: 'there' }] }, { role: 'assistant', content: 'Hello' }, { role: 'user', content: 'Bye' }]);
 const x = toCodex(chat, 'gpt-6-sol');
 assert.equal(x.instructions, 'Be brief.');
 assert.equal(x.store, false);

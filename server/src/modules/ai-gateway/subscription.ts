@@ -6,7 +6,7 @@ import { getCredential, isConnected, markExpired } from './accounts.js';
 import { markRateLimited } from './usage.js';
 import { COPILOT, type OAuthCredential, type OAuthProviderId } from './oauth.js';
 import {
-  type ChatRequest, CLAUDE_CODE_SYSTEM, toClaude, claudeToOpenAi, claudeEvent, toCodex, codexEvent, toGemini, geminiEvent,
+  type ChatRequest, type StreamPart, type ToolDelta, CLAUDE_CODE_SYSTEM, toClaude, claudeToOpenAi, claudeEvent, claudeParser, toCodex, codexParser, toGemini, geminiParser,
   completion, chunk, sseEvents
 } from './formats.js';
 
@@ -156,15 +156,29 @@ export async function subscriptionChat(req: Request, res: Response, body: ChatRe
     return { inTok: j.usage?.input_tokens || 0, outTok: j.usage?.output_tokens || 0, status: 200 };
   }
   if (!body.stream && provider === 'gemini-cli') {
-    const g = geminiEvent(await up.json());
-    res.json(completion(publicModel, g.text || '', g.finish || 'stop', g.inTok, g.outTok));
+    const g = geminiParser()(await up.json());
+    const calls = (g.tools || []).map((t) => ({ id: t.id!, type: 'function' as const, function: { name: t.name!, arguments: t.args || '{}' } }));
+    res.json(completion(publicModel, g.text || '', g.finish || 'stop', g.inTok, g.outTok, calls));
     return { inTok: g.inTok || 0, outTok: g.outTok || 0, status: 200 };
   }
 
   // Everything else is an upstream SSE stream we translate event by event (Codex always streams).
-  const parse = provider === 'claude' ? claudeEvent : provider === 'codex' ? codexEvent : geminiEvent;
+  const parse: (ev: any) => StreamPart & { tools?: ToolDelta[] } = provider === 'claude' ? claudeParser() : provider === 'codex' ? codexParser() : geminiParser();
   const id = `chatcmpl-${Date.now().toString(36)}`;
   let text = '', inTok = 0, outTok = 0, finish = 'stop';
+  // Tool calls collected for non-streaming callers (and to know the finish reason).
+  const calls: { id: string; type: 'function'; function: { name: string; arguments: string } }[] = [];
+  const onTool = (t: ToolDelta) => {
+    const c = (calls[t.index] ||= { id: t.id || `call_${t.index}`, type: 'function', function: { name: t.name || '', arguments: '' } });
+    if (t.id) c.id = t.id;
+    if (t.name) c.function.name = t.name;
+    c.function.arguments += t.args || '';
+    if (body.stream) {
+      // OpenAI streams id/type/name once (first delta of a call), then argument pieces.
+      const first = !!(t.id || t.name);
+      res.write(chunk(id, publicModel, { tool_calls: [{ index: t.index, ...(first ? { id: c.id, type: 'function' } : {}), function: { ...(first ? { name: c.function.name } : {}), arguments: t.args || '' } }] }));
+    }
+  };
   if (body.stream) {
     res.status(200).set({ 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-cache, no-transform', 'X-Accel-Buffering': 'no' });
     res.write(chunk(id, publicModel, { role: 'assistant', content: '' }));
@@ -179,12 +193,15 @@ export async function subscriptionChat(req: Request, res: Response, body: ChatRe
       text += e.text;
       if (body.stream) res.write(chunk(id, publicModel, { content: e.text }));
     }
+    if (e.tool) onTool(e.tool);
+    for (const t of e.tools || []) onTool(t);
   }
+  if (calls.length) finish = 'tool_calls';
   if (body.stream) {
     res.write(chunk(id, publicModel, {}, finish));
     res.end('data: [DONE]\n\n');
   } else {
-    res.json(completion(publicModel, text, finish, inTok, outTok));
+    res.json(completion(publicModel, text, finish, inTok, outTok, calls.filter(Boolean)));
   }
   return { inTok, outTok, status: 200 };
 }
