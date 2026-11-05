@@ -23,9 +23,7 @@ execFileSync('npx', ['vite', 'build', '--outDir', path.join(DIST, 'client'), '--
 // 2. server: one file. ssh2 stays a real dependency (its optional native addon can't be bundled);
 // everything else is pure JS and gets inlined.
 const external = ['ssh2', 'cpu-features'];
-await esbuild.build({
-  entryPoints: [path.join(ROOT, 'server', 'src', 'index.ts')],
-  outfile: path.join(DIST, 'server.js'),
+const shared = {
   bundle: true,
   platform: 'node',
   target: 'node22',
@@ -36,7 +34,9 @@ await esbuild.build({
   // CJS deps bundled into ESM need require/__dirname.
   banner: { js: "import { createRequire as __cr } from 'node:module'; import { fileURLToPath as __fu } from 'node:url'; import { dirname as __dn } from 'node:path'; const require = __cr(import.meta.url); const __filename = __fu(import.meta.url); const __dirname = __dn(__filename);" },
   logLevel: 'info'
-});
+};
+await esbuild.build({ ...shared, entryPoints: [path.join(ROOT, 'server', 'src', 'index.ts')], outfile: path.join(DIST, 'server.js') });
+await esbuild.build({ ...shared, entryPoints: [path.join(ROOT, 'server', 'src', 'resetPassword.ts')], outfile: path.join(DIST, 'reset-password.js') });
 
 // 3. dependency versions follow the server's package.json, so the package can't drift.
 const serverPkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'server', 'package.json'), 'utf8'));

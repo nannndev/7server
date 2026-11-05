@@ -298,8 +298,7 @@ function GetStarted() {
         </div>
         <p className="mt-4 text-sm">{cur.note}</p>
         <p className="mt-4 text-sm leading-relaxed">
-          Sign in as <code style={{ color: 'var(--anatomy-strong)' }}>admin</code> with <code style={{ color: 'var(--anatomy-strong)' }}>DASHBOARD_PASSWORD</code>, or the random password written to{' '}
-          <code style={{ color: 'var(--anatomy-strong)' }}>dashboard.password</code> in the data directory on first start. Back up <code style={{ color: 'var(--anatomy-strong)' }}>7server.db</code> and <code style={{ color: 'var(--anatomy-strong)' }}>secret.key</code> together.
+          On the first visit you create the admin account in the browser. From another machine it also asks for the 6-digit setup code printed in the terminal. Back up <code style={{ color: 'var(--anatomy-strong)' }}>7server.db</code> and <code style={{ color: 'var(--anatomy-strong)' }}>secret.key</code> together.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <a href={REPO} className="btn-silver inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold">

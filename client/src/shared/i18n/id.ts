@@ -1637,5 +1637,17 @@ export const id: Record<keyof typeof en, string> = {
   'firewall.statusEnforced': "Aktif",
   'firewall.toggleDisabled': "Firewall dimatikan",
   'firewall.toggleEnabled': "Firewall diaktifkan",
-  'firewall.toggleFailed': "Gagal mengubah status firewall"
+  'firewall.toggleFailed': "Gagal mengubah status firewall",
+  // first-run setup
+  'setup.title': "Buat akun admin",
+  'setup.subtitle': "Pertama kali dijalankan: belum ada akun.",
+  'setup.intro': "Pilih username dan password untuk admin pertama. Orang lain bisa ditambahkan nanti di halaman Users.",
+  'setup.password': "Password (min. 8)",
+  'setup.confirm': "Ulangi password",
+  'setup.code': "Kode setup",
+  'setup.codeHint': "Kamu tidak sedang di mesin yang menjalankan 7Server, jadi masukkan kode 6 digit yang dicetak saat 7Server mulai.",
+  'setup.minChars': "Password minimal 8 karakter",
+  'setup.mismatch': "Password tidak sama",
+  'setup.failed': "Gagal membuat akun",
+  'setup.submit': "Buat akun dan masuk"
 };

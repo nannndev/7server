@@ -97,7 +97,7 @@ export function SupportPage() {
     { name: 'Saweria', href: 'https://saweria.co/nannndev', note: 'QRIS, e-wallet, bank (Indonesia)' }
   ];
   const faq: [string, ReactNode][] = [
-    ['I forgot my password.', <>Another admin can reset it on the Users page. <code>DASHBOARD_PASSWORD</code> only sets the first admin, when no user exists yet. If you are the only admin and locked out, ask on GitHub Issues: there is no reset command yet.</>],
+    ['I forgot my password.', <>Another admin can reset it on the Users page. If you are the only admin, run <code>7server reset-password admin</code> on the machine that holds the data (Docker: <code>docker compose exec 7server node --import tsx src/resetPassword.ts admin</code>).</>],
     ['Where is my data?', <>In the data directory: <code>~/.7server</code> for npm, the <code>7server-data</code> volume for Docker, <code>server/data</code> from source. Back up <code>7server.db</code> and <code>secret.key</code> together; one is useless without the other.</>],
     ['Does it install anything on my servers?', <>No. It runs ordinary commands over SSH with the credentials you add. Remove a server from the dashboard and nothing is left behind on it.</>],
     ['Which Node.js version do I need?', <>22.13 or newer for the npm package (it uses the built-in SQLite). Docker brings its own.</>],

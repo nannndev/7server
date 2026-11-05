@@ -47,15 +47,16 @@ function saveSessions(sessions: Session[]) {
   }
 }
 
-export async function initUsersStore(fallbackPassword = 'admin') {
+export async function initUsersStore(seedPassword?: string) {
   if (initialized) return;
   memoryUsers = loadUsers();
   memorySessions = loadSessions();
 
-  // Seamless migration: if users.json doesn't exist or is empty, create initial admin
-  if (memoryUsers.length === 0) {
-    console.log('[users] Initializing users.json with admin user...');
-    const hashed = await hashPassword(fallbackPassword);
+  // No users yet: seed an admin only when a password was given explicitly (DASHBOARD_PASSWORD, or the
+  // dashboard.password of an older install). Otherwise the first visitor sets one up (setup.ts).
+  if (memoryUsers.length === 0 && seedPassword) {
+    console.log('[users] Creating admin user from the configured password...');
+    const hashed = await hashPassword(seedPassword);
     const adminUser: User = {
       id: uuidv4(),
       username: 'admin',
@@ -77,8 +78,8 @@ export function toSafeUser(user: User): SafeUser {
 }
 
 export function getUsers(): User[] {
-  if (!initialized) memoryUsers = loadUsers();
-  return memoryUsers;
+  // Always from the database: another process (7server reset-password) may have changed it.
+  return (memoryUsers = loadUsers());
 }
 
 export function getSafeUsers(): SafeUser[] {
@@ -173,7 +174,7 @@ export function recordUserLogin(userId: string) {
 // ---------------- Sessions ----------------
 
 export function getAllSessions(): Session[] {
-  if (!initialized) memorySessions = loadSessions();
+  memorySessions = loadSessions(); // shared with other processes, see getUsers()
   const now = Date.now();
   return memorySessions.filter((s) => s.expiresAt > now);
 }

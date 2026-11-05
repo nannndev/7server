@@ -15,7 +15,13 @@ npm install -g sevenserver
 7server
 ```
 
-It opens `http://127.0.0.1:5001`. Sign in as `admin` with `DASHBOARD_PASSWORD`, or with the random password written to `~/.7server/dashboard.password` on first start.
+It opens `http://127.0.0.1:5001`. On the first visit you create the admin account in the browser: choose the username and password. Opened from another machine, it also asks for the 6-digit setup code that `7server` prints in the terminal.
+
+To skip that step, start it once with `DASHBOARD_PASSWORD=… 7server`: the admin (`admin`) is created with that password.
+
+Forgot the password? `7server reset-password admin` (on the machine that holds the data).
+
+`7server` checks npm once a day and tells you when a newer version is out (turn off with `--no-update-check`).
 
 ## Options
 

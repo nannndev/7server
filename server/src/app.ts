@@ -5,6 +5,7 @@ import express from 'express';
 import cors from 'cors';
 import { config } from './config.js';
 import { loginHandler, requireAuth } from './http/auth.js';
+import { needsSetup, setupNeedsCode, completeSetup } from './modules/users/setup.js';
 import { auditMiddleware } from './http/audit.js';
 import { errorHandler } from './http/errors.js';
 import { monitoringRoutes } from './modules/monitoring/routes.js';
@@ -41,6 +42,19 @@ export function createApp() {
   app.use('/api/ai', aiGatewayPublicRoutes);
 
   app.post('/api/login', loginHandler);
+  // First run: no user exists yet -> the UI shows "create admin" (see modules/users/setup.ts).
+  app.get('/api/setup', (req, res) => res.json({ needsSetup: needsSetup(), needsCode: needsSetup() && setupNeedsCode(req.ip || req.socket.remoteAddress || '') }));
+  app.post('/api/setup', async (req, res) => {
+    try {
+      const ip = req.ip || req.socket.remoteAddress || '';
+      await completeSetup(req.body || {}, ip);
+      // Sign the new admin in right away.
+      req.body = { username: String(req.body?.username || '').trim().toLowerCase(), password: req.body?.password };
+      return loginHandler(req, res);
+    } catch (e: any) {
+      res.status(e.status || 400).json({ success: false, error: e.message });
+    }
+  });
   // Everything under /api below this line requires the token; keep routers after requireAuth.
   app.use('/api', requireAuth, auditMiddleware);
 

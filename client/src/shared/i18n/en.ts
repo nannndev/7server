@@ -1644,5 +1644,17 @@ export const en = {
   'firewall.statusEnforced': "Enforced",
   'firewall.toggleDisabled': "Firewall disabled",
   'firewall.toggleEnabled': "Firewall enabled",
-  'firewall.toggleFailed': "Could not change the firewall state"
+  'firewall.toggleFailed': "Could not change the firewall state",
+  // first-run setup
+  'setup.title': "Create the admin account",
+  'setup.subtitle': "First run: no account exists yet.",
+  'setup.intro': "Choose the username and password for the first admin. You can add more people later on the Users page.",
+  'setup.password': "Password (min. 8)",
+  'setup.confirm': "Repeat password",
+  'setup.code': "Setup code",
+  'setup.codeHint': "You are not on the machine running 7Server, so enter the 6-digit code it printed when it started.",
+  'setup.minChars': "The password needs at least 8 characters",
+  'setup.mismatch': "The passwords do not match",
+  'setup.failed': "Could not create the account",
+  'setup.submit': "Create account and sign in"
 };

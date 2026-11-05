@@ -84,7 +84,7 @@ export function attachTerminalWs(server: Server) {
         };
         touchSession(session.id);
       }
-    } else if (safeEqual(token, AUTH_TOKEN)) {
+    } else if (AUTH_TOKEN && safeEqual(token, AUTH_TOKEN)) {
       user = {
         id: 'admin-root',
         username: 'admin',

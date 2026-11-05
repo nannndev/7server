@@ -25,21 +25,20 @@ declare global {
   }
 }
 
+// Older installs wrote a random password here; it still seeds the admin for them if no user exists.
+// New installs never create it: the first visitor sets up the admin (modules/users/setup.ts).
 const PW_FILE = dataFile('dashboard.password');
+const legacyPassword = () => (fs.existsSync(PW_FILE) ? fs.readFileSync(PW_FILE, 'utf8').trim() : '');
 
-function loadPassword(): string {
-  if (config.dashboardPassword) return config.dashboardPassword;
-  if (!fs.existsSync(PW_FILE)) fs.writeFileSync(PW_FILE, crypto.randomBytes(12).toString('base64url'), { mode: 0o600 });
-  console.log(`[auth] DASHBOARD_PASSWORD not set; using password from ${PW_FILE}`);
-  return fs.readFileSync(PW_FILE, 'utf8').trim();
-}
+export const DASHBOARD_PASSWORD = config.dashboardPassword || legacyPassword();
+// Stateless master token (HMAC of the password), kept for scripts and the contract test. Only when a
+// password was set explicitly via DASHBOARD_PASSWORD: otherwise anyone holding the password file
+// would have a session-less admin login.
+export const AUTH_TOKEN = config.dashboardPassword
+  ? crypto.createHmac('sha256', config.dashboardPassword).update('vps-hub-token').digest('hex')
+  : '';
 
-export const DASHBOARD_PASSWORD = loadPassword();
-// Legacy stateless token fallback: survives restarts, acts as master fallback.
-export const AUTH_TOKEN = crypto.createHmac('sha256', DASHBOARD_PASSWORD).update('vps-hub-token').digest('hex');
-
-// Initialize user store with admin user on boot
-initUsersStore(DASHBOARD_PASSWORD).catch((err) => {
+export const usersReady = initUsersStore(DASHBOARD_PASSWORD || undefined).catch((err) => {
   console.error('[auth] Failed to initialize users store:', err);
 });
 
@@ -127,8 +126,8 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     return next();
   }
 
-  // 2. Legacy token fallback (e.g. for contract tests or direct master script calls)
-  if (safeEqual(token, AUTH_TOKEN)) {
+  // 2. Master token (only when DASHBOARD_PASSWORD is set): scripts and the contract test
+  if (AUTH_TOKEN && safeEqual(token, AUTH_TOKEN)) {
     const adminUser = getUserByUsername('admin');
     req.user = {
       id: adminUser?.id || 'admin-root',

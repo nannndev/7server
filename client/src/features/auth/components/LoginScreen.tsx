@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Lock,
   User,
@@ -17,12 +17,18 @@ import {
 import { useAuth } from '@/features/auth/AuthContext';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { useI18n, LANGS } from '@/shared/i18n';
+import SetupForm from './SetupForm';
 
 const LOGO = '/icons/icon-opt2-server-blade.jpg';
 
 export default function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) {
   const { t, lang, setLang } = useI18n();
-  const { login } = useAuth();
+  const { login, refreshUser } = useAuth();
+  // First run (no account yet): show "create admin" instead of the sign-in form.
+  const [setup, setSetup] = useState<{ needsSetup: boolean; needsCode: boolean } | null>(null);
+  useEffect(() => {
+    fetch('/api/setup').then((r) => r.json()).then(setSetup).catch(() => setSetup({ needsSetup: false, needsCode: false }));
+  }, []);
   const { theme, toggleTheme } = useTheme();
 
   const [username, setUsername] = useState('admin');
@@ -128,15 +134,18 @@ export default function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) 
               control panel · rbac active
             </p>
             <h1 className="silver-text text-balance text-2xl sm:text-3xl font-semibold tracking-tight">
-              {t('auth.title')}
+              {setup?.needsSetup ? t('setup.title') : t('auth.title')}
             </h1>
             <p className="text-xs text-[var(--muted-foreground)] leading-relaxed max-w-xs mx-auto">
-              {t('auth.subtitle')}
+              {setup?.needsSetup ? t('setup.subtitle') : t('auth.subtitle')}
             </p>
           </div>
 
           {/* Machined Metal Form Card */}
           <div className="metal rounded-2xl p-6 sm:p-7 space-y-4">
+            {setup?.needsSetup ? (
+              <SetupForm needsCode={setup.needsCode} onDone={async () => { await refreshUser(); onLoggedIn(); }} />
+            ) : (
             <form onSubmit={submit} className="space-y-3.5">
               {/* Username Field */}
               <div className="space-y-1.5">
@@ -145,9 +154,6 @@ export default function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) 
                     <User className="w-3.5 h-3.5 text-[var(--foreground)]" />
                     <span>{t('auth.username')}</span>
                   </label>
-                  <span className="text-[10px] text-[var(--muted-foreground)]">
-                    default: admin
-                  </span>
                 </div>
                 <div className="well rounded-xl px-3 py-2 flex items-center gap-2 focus-within:ring-1 focus-within:ring-[var(--accent)]">
                   <span className="text-xs font-mono text-[var(--muted-foreground)] select-none">#</span>
@@ -196,7 +202,7 @@ export default function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) 
                     onClick={() => setShowPassword(!showPassword)}
                     tabIndex={-1}
                     className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] p-1 transition"
-                    title={showPassword ? 'Sembunyikan password' : 'Lihat password'}
+                    title={showPassword ? t('common.hide') : t('common.show')}
                   >
                     {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                   </button>
@@ -233,6 +239,7 @@ export default function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) 
                 )}
               </button>
             </form>
+            )}
 
             {/* Card Sub-Features Strip */}
             <div className="pt-3 border-t border-[var(--line)] flex items-center justify-between text-[11px] font-mono text-[var(--muted-foreground)]">
