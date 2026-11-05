@@ -13,6 +13,9 @@ import FileManagerModal from '@/features/files/components/FileManagerModal';
 import MonitoringPage from '@/features/monitoring/components/MonitoringPage';
 import FleetPage from '@/pages/FleetPage';
 import ServerPage from '@/pages/ServerPage';
+import AiGatewayPage from '@/pages/AiGatewayPage';
+import AiCopilotDrawer from '@/features/copilot/components/AiCopilotDrawer';
+import AiCopilotTrigger from '@/features/copilot/components/AiCopilotTrigger';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { Button } from '@/shared/ui/button';
 import { Skeleton } from '@/shared/ui/skeleton';
@@ -42,9 +45,11 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingServer, setEditingServer] = useState<ServerItem | null>(null);
   const [terminalServer, setTerminalServer] = useState<ServerItem | null>(null);
+  const [terminalInitialCommand, setTerminalInitialCommand] = useState<string | undefined>(undefined);
   const [processServer, setProcessServer] = useState<ServerItem | null>(null);
   const [filesServer, setFilesServer] = useState<ServerItem | null>(null);
   const [showBatchModal, setShowBatchModal] = useState(false);
+  const [copilotOpen, setCopilotOpen] = useState(false);
 
   // Fleet view comes from the URL; the last one used is remembered for the plain "#/" link.
   const [lastView, setLastView] = useState<FleetView>(readView);
@@ -55,6 +60,12 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
       try { localStorage.setItem(VIEW_KEY, route.view); } catch { /* private mode */ }
     }
   }, [route]);
+
+  useEffect(() => {
+    const handleAsk = () => setCopilotOpen(true);
+    window.addEventListener('7server-copilot-ask', handleAsk);
+    return () => window.removeEventListener('7server-copilot-ask', handleAsk);
+  }, []);
 
   const managedServerId = route.page === 'server' ? route.id : null;
   const managedServer = servers.find((s) => s.id === managedServerId) || null;
@@ -122,6 +133,7 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
           onAddServer={openAdd}
           onImported={reload}
           onLogout={onLogout}
+          onToggleCopilot={() => setCopilotOpen((v) => !v)}
         />
 
         <main id="main" key={route.page === 'server' ? `server:${route.id}` : route.page} className="page-enter flex-1 w-full max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
@@ -131,6 +143,11 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
               onTabChange={(t) => navigate({ page: 'monitoring', tab: t })}
               onThresholdsSaved={monitor.setThresholds}
               onAlertsChanged={monitor.setActiveAlertCount}
+            />
+          ) : route.page === 'ai-gateway' ? (
+            <AiGatewayPage
+              tab={route.tab || 'quickstart'}
+              onTabChange={(t) => navigate({ page: 'ai-gateway', tab: t })}
             />
           ) : route.page === 'server' ? (
             managedServer ? (
@@ -198,10 +215,35 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
       {showAddModal && (
         <AddServerModal server={editingServer} onSave={handleSaveServer} onClose={() => { setShowAddModal(false); setEditingServer(null); }} />
       )}
-      {terminalServer && <TerminalModal server={terminalServer} onClose={() => setTerminalServer(null)} />}
+      {terminalServer && (
+        <TerminalModal
+          server={terminalServer}
+          initialCommand={terminalInitialCommand}
+          onClose={() => {
+            setTerminalServer(null);
+            setTerminalInitialCommand(undefined);
+          }}
+        />
+      )}
       {processServer && <ProcessServiceModal server={processServer} onClose={() => setProcessServer(null)} />}
       {filesServer && <FileManagerModal server={filesServer} onClose={() => setFilesServer(null)} />}
       {showBatchModal && <BatchCommandModal servers={servers} onClose={() => setShowBatchModal(false)} />}
+
+      <AiCopilotDrawer
+        open={copilotOpen}
+        onClose={() => setCopilotOpen(false)}
+        servers={servers}
+        activeServer={managedServer}
+        activeTab={route.page === 'server' ? route.tab : undefined}
+        onRunInTerminal={(cmd, srv) => {
+          setTerminalInitialCommand(cmd);
+          setTerminalServer(srv);
+        }}
+      />
+      <AiCopilotTrigger
+        open={copilotOpen}
+        onClick={() => setCopilotOpen(true)}
+      />
     </div>
   );
 }

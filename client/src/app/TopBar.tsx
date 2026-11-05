@@ -1,6 +1,6 @@
 // Sticky top bar: mobile menu button, breadcrumb, and page-level actions (refresh, batch, settings, add).
 import React, { useRef, useState } from 'react';
-import { Plus, Terminal, RefreshCw, Download, Upload, LogOut, Settings2, Menu, ChevronRight, Eye, EyeOff } from 'lucide-react';
+import { Plus, Terminal, RefreshCw, Download, Upload, LogOut, Settings2, Menu, ChevronRight, Eye, EyeOff, Sparkles } from 'lucide-react';
 import { usePrivacy } from '@/shared/hooks/usePrivacy';
 import type { ServerItem } from '@/features/servers/types';
 import type { Route } from '@/app/router';
@@ -25,9 +25,10 @@ interface TopBarProps {
   onAddServer: () => void;
   onImported: () => void;
   onLogout: () => void;
+  onToggleCopilot?: () => void;
 }
 
-export default function TopBar({ route, navigate, managedServer, serverCount, mobileNavOpen, setMobileNavOpen, isRefreshingAll, onRefreshAll, onOpenBatch, refreshSec, setRefreshSec, onAddServer, onImported, onLogout }: TopBarProps) {
+export default function TopBar({ route, navigate, managedServer, serverCount, mobileNavOpen, setMobileNavOpen, isRefreshingAll, onRefreshAll, onOpenBatch, refreshSec, setRefreshSec, onAddServer, onImported, onLogout, onToggleCopilot }: TopBarProps) {
   const [showSettings, setShowSettings] = useState(false);
   const { t, lang, setLang } = useI18n();
   const importRef = useRef<HTMLInputElement>(null);
@@ -169,6 +170,17 @@ export default function TopBar({ route, navigate, managedServer, serverCount, mo
             </>
           )}
         </div>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onToggleCopilot}
+          className="gap-1.5 border-purple-500/30 text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 transition-colors"
+          title="7Server AI Copilot (⌘J)"
+        >
+          <Sparkles className="w-3.5 h-3.5 text-purple-400 animate-pulse" />
+          <span className="hidden md:inline font-medium">Copilot</span>
+        </Button>
 
         <Button
           variant="default"

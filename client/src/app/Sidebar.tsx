@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   LayoutDashboard, LayoutGrid, Box, Network, Activity, Server, Plus, Bell, Globe, ScrollText,
-  PanelLeftClose, PanelLeftOpen, Sun, Moon, Search, X
+  PanelLeftClose, PanelLeftOpen, Sun, Moon, Search, X, Bot
 } from 'lucide-react';
 import { ServerItem } from '@/features/servers/types';
 import { Route, FleetView } from '@/app/router';
@@ -345,6 +345,16 @@ export default function Sidebar(p: SidebarProps) {
               <Item rail={rail} tip={tipProps} active={monTab === 'audit'} onClick={() => go({ page: 'monitoring', tab: 'audit' })} icon={ScrollText} label={t('nav.audit')} />
             </>
           )}
+
+          <Section rail={rail} title={t('nav.aiGateway')} />
+          <Item
+            rail={rail}
+            tip={tipProps}
+            active={p.route.page === 'ai-gateway'}
+            onClick={() => go({ page: 'ai-gateway', tab: 'quickstart' })}
+            icon={Bot}
+            label={t('nav.aiGateway')}
+          />
         </nav>
 
         {/* Footer */}

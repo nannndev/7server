@@ -14,7 +14,12 @@ const cases: [string, Route][] = [
   ['#/servers/abc-123/backups', { page: 'server', id: 'abc-123', tab: 'backups' }],
   ['#/servers/abc-123/audit', { page: 'server', id: 'abc-123', tab: 'audit' }],
   ['#/monitoring', { page: 'monitoring', tab: 'alerts' }],
-  ['#/monitoring/audit', { page: 'monitoring', tab: 'audit' }]
+  ['#/monitoring/audit', { page: 'monitoring', tab: 'audit' }],
+  ['#/ai-gateway', { page: 'ai-gateway', tab: 'providers' }],
+  ['#/ai-gateway/providers', { page: 'ai-gateway', tab: 'providers' }],
+  ['#/ai-gateway/keys', { page: 'ai-gateway', tab: 'keys' }],
+  ['#/ai-gateway/quickstart', { page: 'ai-gateway', tab: 'quickstart' }],
+  ['#/ai-gateway/usage', { page: 'ai-gateway', tab: 'usage' }]
 ];
 for (const [hash, route] of cases) {
   assert.deepEqual(parseRoute(hash), route, hash);
