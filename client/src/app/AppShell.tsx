@@ -16,6 +16,10 @@ import ServerPage from '@/pages/ServerPage';
 import AiGatewayPage from '@/pages/AiGatewayPage';
 import AiCopilotDrawer from '@/features/copilot/components/AiCopilotDrawer';
 import AiCopilotTrigger from '@/features/copilot/components/AiCopilotTrigger';
+import UsersManagementModal from '@/features/users/components/UsersManagementModal';
+import ActiveSessionsModal from '@/features/users/components/ActiveSessionsModal';
+import ChangePasswordModal from '@/features/users/components/ChangePasswordModal';
+import { useAuth, useCan } from '@/features/auth/AuthContext';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { Button } from '@/shared/ui/button';
 import { Skeleton } from '@/shared/ui/skeleton';
@@ -50,6 +54,10 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
   const [filesServer, setFilesServer] = useState<ServerItem | null>(null);
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [copilotOpen, setCopilotOpen] = useState(false);
+  const [showUsersModal, setShowUsersModal] = useState(false);
+  const [showSessionsModal, setShowSessionsModal] = useState(false);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const { user } = useAuth();
 
   // Fleet view comes from the URL; the last one used is remembered for the plain "#/" link.
   const [lastView, setLastView] = useState<FleetView>(readView);
@@ -134,6 +142,9 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
           onImported={reload}
           onLogout={onLogout}
           onToggleCopilot={() => setCopilotOpen((v) => !v)}
+          onOpenUsers={() => setShowUsersModal(true)}
+          onOpenSessions={() => setShowSessionsModal(true)}
+          onOpenChangePassword={() => setShowChangePasswordModal(true)}
         />
 
         <main id="main" key={route.page === 'server' ? `server:${route.id}` : route.page} className="page-enter flex-1 w-full max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
@@ -228,6 +239,27 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
       {processServer && <ProcessServiceModal server={processServer} onClose={() => setProcessServer(null)} />}
       {filesServer && <FileManagerModal server={filesServer} onClose={() => setFilesServer(null)} />}
       {showBatchModal && <BatchCommandModal servers={servers} onClose={() => setShowBatchModal(false)} />}
+
+      {showUsersModal && (
+        <UsersManagementModal
+          open={showUsersModal}
+          onClose={() => setShowUsersModal(false)}
+          servers={servers}
+          currentUserId={user?.id}
+        />
+      )}
+      {showSessionsModal && (
+        <ActiveSessionsModal
+          open={showSessionsModal}
+          onClose={() => setShowSessionsModal(false)}
+        />
+      )}
+      {showChangePasswordModal && (
+        <ChangePasswordModal
+          open={showChangePasswordModal}
+          onClose={() => setShowChangePasswordModal(false)}
+        />
+      )}
 
       <AiCopilotDrawer
         open={copilotOpen}

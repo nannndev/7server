@@ -1,4 +1,4 @@
-import { API_BASE, apiFetch, jsonPost, unwrap } from '@/shared/api/client';
+import { API_BASE, apiFetch, jsonPost, unwrap, downloadBlob } from '@/shared/api/client';
 
 // ----------------- MONITOR / UPTIME / AUDIT ----------------- //
 
@@ -30,7 +30,17 @@ export interface UptimeResult {
   sslDaysLeft?: number | null;
   checkedAt: number;
 }
-export interface AuditEntry { t: string; ip: string; method: string; path: string; detail: string; status?: number }
+export interface AuditEntry {
+  t: string;
+  ip: string;
+  method: string;
+  path: string;
+  detail: string;
+  status?: number;
+  user?: string;
+  role?: string;
+  sessionId?: string;
+}
 
 export const fetchMonitor = async () =>
   unwrap<{ settings: MonitorSettings; status: MonitorStatus }>(await apiFetch(`${API_BASE}/monitor`), 'Failed to load monitor');
@@ -47,5 +57,16 @@ export async function testDiscord(): Promise<void> {
 export const fetchUptime = async () => unwrap<UptimeResult[]>(await apiFetch(`${API_BASE}/uptime`), 'Failed to load uptime');
 export const runUptime = async () =>
   unwrap<UptimeResult[]>(await apiFetch(`${API_BASE}/uptime/run`, { method: 'POST' }), 'Uptime check failed');
-export const fetchAudit = async (limit = 300) =>
-  unwrap<AuditEntry[]>(await apiFetch(`${API_BASE}/audit?limit=${limit}`), 'Failed to load audit log');
+export const fetchAudit = async (limit = 300, user?: string, search?: string) => {
+  const p = new URLSearchParams({ limit: String(limit) });
+  if (user) p.set('user', user);
+  if (search) p.set('search', search);
+  return unwrap<AuditEntry[]>(await apiFetch(`${API_BASE}/audit?${p.toString()}`), 'Failed to load audit log');
+};
+
+export const exportAuditCsv = (user?: string, server?: string) => {
+  const p = new URLSearchParams();
+  if (user) p.set('user', user);
+  if (server) p.set('server', server);
+  return downloadBlob(`${API_BASE}/audit/export?${p.toString()}`, '7server-audit-log.csv');
+};

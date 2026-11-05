@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { withServer, sftpTarget } from '../../http/handlers.js';
 import { withSftp } from '../../infra/ssh.js';
+import { need } from '../../http/auth.js';
 import path from 'path';
 import {
   scanBackups,
@@ -25,6 +26,7 @@ backupRoutes.get(
 // Trigger a backup immediately
 backupRoutes.post(
   '/servers/:id/backups/run',
+  need('service.control'),
   withServer(async (target, req: Request) => {
     return await executeBackup(target, req.body);
   })
@@ -33,6 +35,7 @@ backupRoutes.post(
 // Restore a backup
 backupRoutes.post(
   '/servers/:id/backups/restore',
+  need('service.control'),
   withServer(async (target, req: Request) => {
     return await restoreBackup(target, req.body);
   })
@@ -41,6 +44,7 @@ backupRoutes.post(
 // Delete a backup archive file
 backupRoutes.delete(
   '/servers/:id/backups/file',
+  need('service.control'),
   withServer(async (target, req: Request) => {
     const { filepath } = req.body;
     if (!filepath) throw new Error('Filepath is required');
@@ -88,6 +92,7 @@ backupRoutes.get(
 
 backupRoutes.post(
   '/servers/:id/backups/profiles',
+  need('service.control'),
   withServer(async (target, req: Request) => {
     return saveProfile(target.id, req.body);
   })
@@ -95,6 +100,7 @@ backupRoutes.post(
 
 backupRoutes.delete(
   '/servers/:id/backups/profiles/:profileId',
+  need('service.control'),
   withServer(async (target, req: Request) => {
     deleteProfile(target.id, String(req.params.profileId));
     return { success: true };

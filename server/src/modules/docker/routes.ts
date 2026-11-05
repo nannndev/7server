@@ -2,9 +2,9 @@ import { Router } from 'express';
 import { composeCommand, containerCommand, fetchDockerOverview, imageRemoveCommand, inspectContainer, pruneCommand } from './service.js';
 import { executeCommand } from '../../infra/ssh.js';
 import { withServer } from '../../http/handlers.js';
+import { need } from '../../http/auth.js';
 
 export const dockerRoutes = Router();
-
 
 // Run a prebuilt (already validated) docker command and return its output.
 const runDocker = async (target: any, cmd: string, timeoutMs = 60000) => {
@@ -15,10 +15,13 @@ const runDocker = async (target: any, cmd: string, timeoutMs = 60000) => {
 
 dockerRoutes.get('/servers/:id/docker', withServer((t, req) => fetchDockerOverview(t, req.query.stats !== '0')));
 dockerRoutes.get('/servers/:id/docker/inspect/:cid', withServer((t, req) => inspectContainer(t, req.params.cid)));
-dockerRoutes.post('/servers/:id/docker/container', withServer((t, req) =>
+
+dockerRoutes.post('/servers/:id/docker/container', need('service.control'), withServer((t, req) =>
   runDocker(t, `${containerCommand(req.body?.containerId, String(req.body?.action))} 2>&1`, 30000)));
-dockerRoutes.post('/servers/:id/docker/compose', withServer((t, req) =>
+
+dockerRoutes.post('/servers/:id/docker/compose', need('service.control'), withServer((t, req) =>
   // pull/up can download images: allow up to 5 minutes
   runDocker(t, composeCommand(req.body?.project, req.body?.workingDir, String(req.body?.action), req.body?.configFiles), 300000)));
-dockerRoutes.post('/servers/:id/docker/prune', withServer((t, req) => runDocker(t, pruneCommand(String(req.body?.what)), 120000)));
-dockerRoutes.post('/servers/:id/docker/image/rm', withServer((t, req) => runDocker(t, imageRemoveCommand(req.body?.image), 60000)));
+
+dockerRoutes.post('/servers/:id/docker/prune', need('service.control'), withServer((t, req) => runDocker(t, pruneCommand(String(req.body?.what)), 120000)));
+dockerRoutes.post('/servers/:id/docker/image/rm', need('service.control'), withServer((t, req) => runDocker(t, imageRemoveCommand(req.body?.image), 60000)));

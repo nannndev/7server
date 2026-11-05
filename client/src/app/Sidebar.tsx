@@ -7,6 +7,7 @@ import { ServerItem } from '@/features/servers/types';
 import { Route, FleetView } from '@/app/router';
 import { SERVER_SECTION_GROUPS, SERVER_SECTIONS } from '@/app/serverNav';
 import { useT, type MessageKey } from '@/shared/i18n';
+import { useCan } from '@/features/auth/AuthContext';
 
 const MIN_W = 208;
 const MAX_W = 360;
@@ -132,6 +133,7 @@ function Section({ rail, title, action }: { rail: boolean; title: string; action
 
 export default function Sidebar(p: SidebarProps) {
   const t = useT();
+  const canManageServer = useCan('server.manage');
   const [{ collapsed, width }, setLayout] = useState<Saved>(load);
   const [dragging, setDragging] = useState(false);
   const [tip, setTip] = useState<{ text: string; top: number; left: number } | null>(null);
@@ -274,9 +276,11 @@ export default function Sidebar(p: SidebarProps) {
           <Section rail={rail}
             title={t('nav.servers', { n: p.servers.length })}
             action={
-              <button onClick={p.onAddServer} className="p-1 rounded-md text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--sidebar-hover)] transition" aria-label="Add Server">
-                <Plus className="w-3.5 h-3.5" />
-              </button>
+              canManageServer ? (
+                <button onClick={p.onAddServer} className="p-1 rounded-md text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--sidebar-hover)] transition" aria-label="Add Server">
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              ) : undefined
             }
           />
           {!rail && p.servers.length > 6 && (
@@ -329,7 +333,7 @@ export default function Sidebar(p: SidebarProps) {
                 </React.Fragment>
               );
             })}
-            {rail && !activeServerId && (
+            {rail && !activeServerId && canManageServer && (
               <Item rail={rail} tip={tipProps} active={false} onClick={p.onAddServer} icon={Plus} label={t('nav.addServer')} />
             )}
             {!rail && servers.length === 0 && (

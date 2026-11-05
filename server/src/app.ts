@@ -22,6 +22,8 @@ import { certificateRoutes } from './modules/certificates/routes.js';
 import { securityRoutes } from './modules/security/routes.js';
 import { backupRoutes } from './modules/backups/routes.js';
 import { aiGatewayPublicRoutes, aiGatewayManagementRoutes } from './modules/ai-gateway/routes.js';
+import { usersRoutes } from './modules/users/routes.js';
+import { firewallRoutes } from './modules/firewall/routes.js';
 
 export function createApp() {
   const app = express();
@@ -42,7 +44,7 @@ export function createApp() {
 
   // Order matters where paths overlap (e.g. /servers/test and /servers/batch-exec vs /servers/:id):
   // this is the order the routes had in the old single-file server.
-  app.use('/api', aiGatewayManagementRoutes, monitoringRoutes, transferRoutes, serversRoutes, diagnosticsRoutes, metricsRoutes, processesRoutes,
+  app.use('/api', usersRoutes, firewallRoutes, aiGatewayManagementRoutes, monitoringRoutes, transferRoutes, serversRoutes, diagnosticsRoutes, metricsRoutes, processesRoutes,
     logsRoutes, filesRoutes, dockerRoutes, databasesRoutes, execRoutes, softwareRoutes, cronRoutes, certificateRoutes, securityRoutes, backupRoutes);
 
   app.use(errorHandler);

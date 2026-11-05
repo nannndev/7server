@@ -36,6 +36,7 @@ import { AgentSettings } from './AgentSettings';
 import { useI18n } from '@/shared/i18n';
 import { loadPreferences, savePreferences, preferencesPayload, type AgentPreferences } from '../preferences';
 import { fetchAccounts } from '@/features/ai-gateway/api';
+import { useCan } from '@/features/auth/AuthContext';
 import type { ChatMessage, CommandRun, CopilotContext } from '../types';
 import type { ServerItem } from '@/features/servers/types';
 
@@ -144,6 +145,7 @@ export default function AiCopilotDrawer({
   onRunInTerminal
 }: AiCopilotDrawerProps) {
   const { t, locale } = useI18n();
+  const canExecute = useCan('copilot.execute') && useCan('terminal.open');
   // Stay mounted while the exit animation plays; `shown` drives the enter/exit classes.
   const [mounted, setMounted] = useState(open);
   const [shown, setShown] = useState(false);
@@ -431,7 +433,7 @@ export default function AiCopilotDrawer({
                   <button onClick={() => copyCode(seg.code, blockId)} className="px-1.5 py-0.5 rounded hover:bg-zinc-800 text-zinc-300" title={t('copilot.copy')}>
                     {copiedCodeId === blockId ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                   </button>
-                  {seg.shell && targetServer && (
+                  {seg.shell && targetServer && canExecute && (
                     <button onClick={() => onRunInTerminal(seg.code, targetServer)} className="px-1.5 py-0.5 rounded hover:bg-zinc-800 text-zinc-300" title={t('copilot.openTerminal', { name: targetServer.name })}>
                       <Terminal className="w-3 h-3" />
                     </button>
@@ -439,7 +441,7 @@ export default function AiCopilotDrawer({
                 </div>
               </div>
               <pre className="p-3 overflow-x-auto font-mono text-[11px] text-zinc-200 leading-normal"><code>{seg.code}</code></pre>
-              {run?.status === 'pending' && !run.auto && !msg.fed && (
+              {run?.status === 'pending' && !run.auto && !msg.fed && canExecute && (
                 <div className="flex items-center justify-between gap-2 px-3 py-2 border-t border-zinc-800 bg-amber-500/5">
                   <span className="text-[10px] text-amber-300/90">{t('copilot.needsApproval')}</span>
                   <div className="flex gap-1.5">

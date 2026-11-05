@@ -10,7 +10,8 @@ import {
   Terminal,
   Activity,
   User,
-  Globe
+  Globe,
+  Download
 } from 'lucide-react';
 import { Card } from '@/shared/ui/card';
 import { Button } from '@/shared/ui/button';
@@ -19,6 +20,7 @@ import { Input } from '@/shared/ui/input';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { useServerPage } from './context';
 import { fetchServerAudit, type ServerAuditEntry } from '@/features/servers/api';
+import { exportAuditCsv } from '@/features/monitoring/api';
 import { swr } from '@/shared/lib/cache';
 import { useT } from '@/shared/i18n';
 
@@ -53,6 +55,7 @@ export default function AuditTab() {
         e.path.toLowerCase().includes(q) ||
         e.detail.toLowerCase().includes(q) ||
         e.method.toLowerCase().includes(q) ||
+        (e.user && e.user.toLowerCase().includes(q)) ||
         (e.ip && e.ip.toLowerCase().includes(q))
     );
   }, [entries, searchQuery]);
@@ -75,6 +78,16 @@ export default function AuditTab() {
           </div>
 
           <div className="flex items-center gap-2.5">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportAuditCsv(undefined, server.id)}
+              className="gap-1.5 h-8 text-xs font-medium"
+              title="Ekspor CSV"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Ekspor CSV</span>
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -182,6 +195,13 @@ export default function AuditTab() {
                           }`}
                         >
                           HTTP {item.status}
+                        </span>
+                      )}
+                      {item.user && (
+                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-[var(--muted)] font-medium flex items-center gap-1 text-[var(--foreground)]">
+                          <User className="w-2.5 h-2.5 text-primary" />
+                          <span>{item.user}</span>
+                          {item.role && <span className="opacity-60 uppercase text-[9px]">({item.role})</span>}
                         </span>
                       )}
                     </div>

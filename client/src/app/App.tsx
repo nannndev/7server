@@ -1,29 +1,34 @@
-// Auth gate: login screen until there's a token, then the app shell. A 401 anywhere logs out.
-import React, { useEffect, useState } from 'react';
-import { getToken, setToken } from '@/shared/api/client';
+import React from 'react';
+import { AuthProvider, useAuth } from '@/features/auth/AuthContext';
 import LoginScreen from '@/features/auth/components/LoginScreen';
 import AppShell from './AppShell';
 import { ToastContainer } from '@/shared/ui/toast';
 import { ConfirmDialogContainer } from '@/shared/ui/confirm-dialog';
 
+function AppContent() {
+  const { user, loading, logout, refreshUser } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginScreen onLoggedIn={refreshUser} />;
+  }
+
+  return <AppShell onLogout={logout} />;
+}
+
 export default function App() {
-  const [authed, setAuthed] = useState(() => !!getToken());
-
-  useEffect(() => {
-    const onLogout = () => setAuthed(false);
-    window.addEventListener('vps-hub-logout', onLogout);
-    return () => window.removeEventListener('vps-hub-logout', onLogout);
-  }, []);
-
   return (
-    <>
-      {!authed ? (
-        <LoginScreen onLoggedIn={() => setAuthed(true)} />
-      ) : (
-        <AppShell onLogout={() => { setToken(''); setAuthed(false); }} />
-      )}
+    <AuthProvider>
+      <AppContent />
       <ToastContainer />
       <ConfirmDialogContainer />
-    </>
+    </AuthProvider>
   );
 }

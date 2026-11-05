@@ -22,7 +22,17 @@ export function auditSummary(body: any): string {
     .join(' ');
 }
 
-export interface AuditEntry { t: string; ip: string; method: string; path: string; detail: string; status?: number }
+export interface AuditEntry {
+  t: string;
+  ip: string;
+  method: string;
+  path: string;
+  detail: string;
+  status?: number;
+  user?: string;
+  role?: string;
+  sessionId?: string;
+}
 
 export function writeAudit(entry: AuditEntry) {
   try {
@@ -34,11 +44,48 @@ export function writeAudit(entry: AuditEntry) {
   }
 }
 
-export function readAudit(limit = 200): AuditEntry[] {
+export function readAudit(options: { limit?: number; user?: string; server?: string; search?: string } = {}): AuditEntry[] {
+  const limit = options.limit ?? 200;
   try {
-    const lines = fs.readFileSync(AUDIT_FILE, 'utf8').trim().split('\n');
-    return lines.slice(-limit).reverse().map((l) => JSON.parse(l));
+    const raw = fs.readFileSync(AUDIT_FILE, 'utf8').trim();
+    if (!raw) return [];
+    let entries: AuditEntry[] = raw.split('\n').filter(Boolean).map((l) => JSON.parse(l));
+
+    if (options.user) {
+      const u = options.user.toLowerCase();
+      entries = entries.filter((e) => (e.user || '').toLowerCase() === u);
+    }
+    if (options.server) {
+      const s = options.server.toLowerCase();
+      entries = entries.filter((e) => (e.detail || '').toLowerCase().includes(s) || (e.path || '').toLowerCase().includes(s));
+    }
+    if (options.search) {
+      const q = options.search.toLowerCase();
+      entries = entries.filter((e) =>
+        (e.detail || '').toLowerCase().includes(q) ||
+        (e.path || '').toLowerCase().includes(q) ||
+        (e.user || '').toLowerCase().includes(q)
+      );
+    }
+
+    return entries.slice(-limit).reverse();
   } catch {
     return [];
   }
+}
+
+export function exportAuditCsv(limit = 1000): string {
+  const entries = readAudit({ limit });
+  const headers = ['Timestamp', 'User', 'Role', 'Method', 'Path', 'Status', 'IP', 'Details'];
+  const rows = entries.map((e) => [
+    `"${e.t || ''}"`,
+    `"${e.user || 'anonymous'}"`,
+    `"${e.role || '-'}"`,
+    `"${e.method || ''}"`,
+    `"${e.path || ''}"`,
+    e.status ?? '',
+    `"${e.ip || ''}"`,
+    `"${(e.detail || '').replace(/"/g, '""')}"`
+  ]);
+  return [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
 }

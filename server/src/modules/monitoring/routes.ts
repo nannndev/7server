@@ -5,14 +5,17 @@ import { withServer } from '../../http/handlers.js';
 
 export const monitoringRoutes = Router();
 monitoringRoutes.get('/audit', (req: Request, res: Response) => {
-  res.json({ success: true, data: readAudit(Math.min(Number(req.query.limit) || 200, 2000)) });
+  const limit = Math.min(Number(req.query.limit) || 200, 2000);
+  const user = req.query.user ? String(req.query.user) : undefined;
+  const search = req.query.search ? String(req.query.search) : undefined;
+  res.json({ success: true, data: readAudit({ limit, user, search }) });
 });
 
 monitoringRoutes.get('/servers/:id/audit', withServer(async (target, req: Request) => {
   const limit = Math.min(Number(req.query.limit) || 150, 1000);
-  const all = readAudit(2000);
   const serverId = target.id;
   const host = target.host;
+  const all = readAudit({ limit: 2000, server: serverId });
   return all
     .filter((entry) => entry.path.includes(serverId) || entry.detail.includes(serverId) || entry.detail.includes(host))
     .slice(0, limit);

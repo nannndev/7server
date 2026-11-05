@@ -2,6 +2,8 @@ import express, { Router, Request, Response } from 'express';
 import { sftpTarget } from '../../http/handlers.js';
 import { withSftp } from '../../infra/ssh.js';
 
+import { need } from '../../http/auth.js';
+
 export const filesRoutes = Router();
 // Paths go to SFTP as arguments, never through a shell.
 
@@ -52,7 +54,7 @@ filesRoutes.get('/servers/:id/files/read', async (req: Request, res: Response) =
   res.json({ success: true, data: content });
 });
 
-filesRoutes.post('/servers/:id/files/write', async (req: Request, res: Response) => {
+filesRoutes.post('/servers/:id/files/write', need('terminal.open'), async (req: Request, res: Response) => {
   const target = sftpTarget(req, res); if (!target) return;
   const { path: file, content } = req.body || {};
   if (!file || typeof content !== 'string') return res.status(400).json({ success: false, error: 'path and content are required' });
@@ -62,7 +64,7 @@ filesRoutes.post('/servers/:id/files/write', async (req: Request, res: Response)
   res.json({ success: true });
 });
 
-filesRoutes.post('/servers/:id/files/upload', express.raw({ type: '*/*', limit: '100mb' }), async (req: Request, res: Response) => {
+filesRoutes.post('/servers/:id/files/upload', need('terminal.open'), express.raw({ type: '*/*', limit: '100mb' }), async (req: Request, res: Response) => {
   const target = sftpTarget(req, res); if (!target) return;
   const file = String(req.query.path || '');
   if (!file || !Buffer.isBuffer(req.body)) return res.status(400).json({ success: false, error: 'path and file body are required' });

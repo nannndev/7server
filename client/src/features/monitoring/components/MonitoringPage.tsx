@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { X, RefreshCw, Bell, Globe, ScrollText, Send, ShieldAlert, ExternalLink } from 'lucide-react';
-import { fetchMonitor, saveMonitor, testDiscord, fetchUptime, runUptime, fetchAudit, MonitorSettings, MonitorStatus, UptimeResult, AuditEntry } from '@/features/monitoring/api';
+import { X, RefreshCw, Bell, Globe, ScrollText, Send, ShieldAlert, ExternalLink, Download, User } from 'lucide-react';
+import { fetchMonitor, saveMonitor, testDiscord, fetchUptime, runUptime, fetchAudit, exportAuditCsv, MonitorSettings, MonitorStatus, UptimeResult, AuditEntry } from '@/features/monitoring/api';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { TableSkeleton } from '@/shared/ui/skeleton';
@@ -289,16 +289,19 @@ export default function MonitoringPage({ tab, onTabChange, onThresholdsSaved, on
 
                     {tab === 'audit' && (
                         <div className="space-y-3">
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                                 <Input placeholder={t('monitoring.auditSearch')} value={auditQuery} onChange={(e) => setAuditQuery(e.target.value)} className="h-8 text-xs max-w-sm" />
                                 <Button variant="outline" size="sm" className="gap-1" onClick={() => guard(async () => setAudit(await fetchAudit()))}>
                                     <RefreshCw className="w-3.5 h-3.5" /> {t('common.refresh')}
                                 </Button>
-                                <span className="text-[11px] text-[var(--muted-foreground)]">{t('mon.auditDesc')}</span>
+                                <Button variant="outline" size="sm" className="gap-1" onClick={() => exportAuditCsv()}>
+                                    <Download className="w-3.5 h-3.5" /> Ekspor CSV
+                                </Button>
+                                <span className="text-[11px] text-[var(--muted-foreground)] ml-auto">{t('mon.auditDesc')}</span>
                             </div>
                             {loadingAudit && audit.length === 0 ? (
                                 <div className="border border-[var(--border)] rounded-lg overflow-hidden">
-                                    <TableSkeleton rows={6} cols={5} colWidths={['w-1/5', 'w-1/6', 'w-1/5', 'w-1/3', 'w-16']} />
+                                    <TableSkeleton rows={6} cols={6} colWidths={['w-1/6', 'w-24', 'w-28', 'w-1/6', 'w-1/3', 'w-16']} />
                                 </div>
                             ) : (
                                 <div className="overflow-x-auto border border-[var(--border)] rounded-lg">
@@ -306,6 +309,7 @@ export default function MonitoringPage({ tab, onTabChange, onThresholdsSaved, on
                                         <thead className="bg-[var(--muted)] text-[var(--muted-foreground)] text-left">
                                             <tr>
                                                 <th className="py-2 px-3">{t('monitoring.thTimestamp')}</th>
+                                                <th className="py-2 px-3">User</th>
                                                 <th className="py-2 px-3">IP</th>
                                                 <th className="py-2 px-3">{t('monitoring.thAction')}</th>
                                                 <th className="py-2 px-3">{t('monitoring.thDetail')}</th>
@@ -316,6 +320,16 @@ export default function MonitoringPage({ tab, onTabChange, onThresholdsSaved, on
                                             {shownAudit.map((a, i) => (
                                                 <tr key={i}>
                                                     <td className="py-1.5 px-3 whitespace-nowrap text-[var(--muted-foreground)]">{new Date(a.t).toLocaleString()}</td>
+                                                    <td className="py-1.5 px-3 whitespace-nowrap">
+                                                        {a.user ? (
+                                                            <span className="flex items-center gap-1 font-sans text-xs">
+                                                                <span className="font-semibold text-[var(--foreground)]">{a.user}</span>
+                                                                {a.role && <span className="text-[10px] px-1 py-0.2 rounded bg-[var(--muted)] text-[var(--muted-foreground)] uppercase">{a.role}</span>}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-[var(--muted-foreground)] text-[11px]">-</span>
+                                                        )}
+                                                    </td>
                                                     <td className="py-1.5 px-3 text-[var(--muted-foreground)] sensitive">{a.ip.replace('::ffff:', '')}</td>
                                                     <td className="py-1.5 px-3 whitespace-nowrap">{a.method} {a.path.replace('/api/', '')}</td>
                                                     <td className="py-1.5 px-3 max-w-md truncate sensitive">{a.detail}</td>
@@ -327,7 +341,7 @@ export default function MonitoringPage({ tab, onTabChange, onThresholdsSaved, on
                                                 </tr>
                                             ))}
                                             {shownAudit.length === 0 && (
-                                                <tr><td colSpan={5} className="py-10 text-center text-[var(--muted-foreground)] font-sans">{t('mon.auditEmpty')}</td></tr>
+                                                <tr><td colSpan={6} className="py-10 text-center text-[var(--muted-foreground)] font-sans">{t('mon.auditEmpty')}</td></tr>
                                             )}
                                         </tbody>
                                     </table>

@@ -27,6 +27,8 @@ import {
   getGatewayStats
 } from './store.js';
 
+import { need } from '../../http/auth.js';
+
 // ------------------- PUBLIC AI GATEWAY PROXY ROUTES -------------------
 // Mounted at /api/ai (Before requireAuth, protected by Virtual API Key)
 export const aiGatewayPublicRoutes = Router();
@@ -61,6 +63,14 @@ aiGatewayPublicRoutes.get(
 // ------------------- MANAGEMENT ROUTES -------------------
 // Mounted at /api (After requireAuth, protected by 7Server Session/Token)
 export const aiGatewayManagementRoutes = Router();
+
+// In-Dashboard AI Copilot Chat Endpoint (SSE Streaming) - accessible by all users with copilot.chat
+aiGatewayManagementRoutes.post('/ai-copilot/chat', need('copilot.chat'), (req: Request, res: Response) => {
+  handleCopilotChat(req, res);
+});
+
+// All routes below require gateway.manage permission
+aiGatewayManagementRoutes.use('/ai-gateway', need('gateway.manage'));
 
 aiGatewayManagementRoutes.get('/ai-gateway/keys', (req: Request, res: Response) => {
   const keys = getAllKeys();

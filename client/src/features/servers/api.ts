@@ -240,6 +240,9 @@ export interface ServerAuditEntry {
   path: string;
   detail: string;
   status?: number;
+  user?: string;
+  role?: string;
+  sessionId?: string;
 }
 
 export const fetchServerAudit = async (id: string) =>
@@ -341,3 +344,38 @@ export const saveBackupProfile = async (serverId: string, profile: Partial<Backu
 
 export const deleteBackupProfile = async (serverId: string, profileId: string): Promise<void> =>
   unwrap<void>(await apiFetch(`${API_BASE}/servers/${serverId}/backups/profiles/${profileId}`, { method: 'DELETE' }), 'Failed to delete backup profile');
+
+// ---------------- Centralized Firewall (UFW) ----------------
+export interface UfwRule {
+  number: number;
+  to: string;
+  action: string;
+  from: string;
+  comment?: string;
+  isV6: boolean;
+  isSsh: boolean;
+}
+
+export interface FirewallStatus {
+  enabled: boolean;
+  defaultIncoming: string;
+  defaultOutgoing: string;
+  sshPort: number;
+  sshSafe: boolean;
+  rules: UfwRule[];
+}
+
+export const fetchFirewall = async (serverId: string): Promise<FirewallStatus> =>
+  unwrap<FirewallStatus>(await apiFetch(`${API_BASE}/servers/${serverId}/firewall`), 'Failed to fetch firewall status');
+
+export const addFirewallRule = async (
+  serverId: string,
+  rule: { port: number | string; protocol?: 'tcp' | 'udp' | 'any'; action?: 'allow' | 'deny'; fromIp?: string; comment?: string }
+): Promise<FirewallStatus> =>
+  unwrap<FirewallStatus>(await apiFetch(`${API_BASE}/servers/${serverId}/firewall/rules`, jsonPost(rule)), 'Failed to add firewall rule');
+
+export const deleteFirewallRule = async (serverId: string, ruleNumber: number): Promise<FirewallStatus> =>
+  unwrap<FirewallStatus>(await apiFetch(`${API_BASE}/servers/${serverId}/firewall/rules/${ruleNumber}`, { method: 'DELETE' }), 'Failed to delete firewall rule');
+
+export const toggleFirewall = async (serverId: string, enable: boolean): Promise<FirewallStatus> =>
+  unwrap<FirewallStatus>(await apiFetch(`${API_BASE}/servers/${serverId}/firewall/toggle`, jsonPost({ enable })), 'Failed to toggle firewall');

@@ -2,29 +2,45 @@ import { Router, Request, Response } from 'express';
 import { BatchResultItem } from './types.js';
 import { executeCommand } from '../../infra/ssh.js';
 import { getAllServers, getServerById } from '../servers/store.js';
+import { need } from '../../http/auth.js';
+import { isServerAllowed } from '../../http/handlers.js';
 
 export const execRoutes = Router();
 
-execRoutes.post('/servers/:id/exec', async (req: Request, res: Response) => {
+execRoutes.post('/servers/:id/exec', need('terminal.open'), async (req: Request, res: Response) => {
+  const serverId = req.params.id as string;
+  if (req.user && !isServerAllowed(req.user.servers, serverId)) {
+    return res.status(403).json({ success: false, error: 'Forbidden: Akses ke server ini dibatasi untuk akun Anda' });
+  }
+
   const { command } = req.body;
   if (!command) return res.status(400).json({ success: false, error: 'Command is required' });
 
-  const target = getServerById(req.params.id as string, true);
+  const target = getServerById(serverId, true);
   if (!target) return res.status(404).json({ success: false, error: 'Server not found' });
 
   const result = await executeCommand(target, command, 30000);
   res.json({ success: true, data: result });
 });
 
-execRoutes.post('/servers/batch-exec', async (req: Request, res: Response) => {
+execRoutes.post('/servers/batch-exec', need('terminal.open'), async (req: Request, res: Response) => {
   const { serverIds, command } = req.body;
   if (!command) return res.status(400).json({ success: false, error: 'Command is required' });
   if (!Array.isArray(serverIds) || serverIds.length === 0) {
     return res.status(400).json({ success: false, error: 'serverIds array is required' });
   }
 
+  // Filter serverIds by user's permitted server scope
+  const permittedIds = req.user && req.user.servers !== '*'
+    ? serverIds.filter((id) => isServerAllowed(req.user?.servers, id))
+    : serverIds;
+
+  if (permittedIds.length === 0) {
+    return res.status(403).json({ success: false, error: 'Forbidden: Anda tidak memiliki akses ke server yang dipilih' });
+  }
+
   const allServers = getAllServers(true);
-  const targetServers = allServers.filter((s) => serverIds.includes(s.id));
+  const targetServers = allServers.filter((s) => permittedIds.includes(s.id));
 
   const results = await Promise.allSettled(
     targetServers.map(async (serverItem): Promise<BatchResultItem> => {

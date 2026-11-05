@@ -36,6 +36,7 @@ import {
 } from '@/features/servers/api';
 import { swr } from '@/shared/lib/cache';
 import { useT } from '@/shared/i18n';
+import FirewallPanel from '@/features/servers/components/FirewallPanel';
 
 export default function SecurityTab() {
   const t = useT();
@@ -370,6 +371,9 @@ export default function SecurityTab() {
           </Card>
         </div>
       </div>
+
+      {/* Centralized Firewall (UFW) with Lockout Safeguard */}
+      <FirewallPanel serverId={server.id} serverName={server.name} />
 
       {/* Add SSH Key Modal */}
       {showAddKeyModal && (
