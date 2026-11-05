@@ -117,6 +117,8 @@ export const id: Record<keyof typeof en, string> = {
   'fleet.noMatchBody': 'Coba ubah pencarian atau filter tag.',
   'fleet.addFirst': 'Tambah server pertama',
   'fleet.loading': 'Memuat server…',
+  'fleet.deleteServer': 'Hapus server',
+  'fleet.deleted': 'Server dihapus',
   'fleet.deleteConfirm': 'Hapus server ini dari dashboard?',
   'fleet.deleteFailed': 'Gagal menghapus server: {error}',
 

@@ -90,7 +90,7 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
     try {
       await deleteServer(id);
       if (managedServerId === id) navigate({ page: 'fleet' }, { replace: true });
-      toast.success(t('fleet.deleted') || 'Server berhasil dihapus');
+      toast.success(t('fleet.deleted'));
       reload();
     } catch (err: any) {
       toast.error(t('fleet.deleteFailed', { error: err.message }));

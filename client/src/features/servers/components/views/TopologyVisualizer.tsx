@@ -46,7 +46,7 @@ export interface TopologyVisualizerProps {
   servers: ServerItem[];
   focusedServer?: ServerItem | null;
   onSelectServer?: (server: ServerItem) => void;
-  onOpenTerminal?: (cmdOrServer?: string | ServerItem) => void;
+  onOpenTerminal?: (server: ServerItem) => void;
   onOpenFiles?: (path?: string) => void;
   onOpenLogs?: (target: { type: 'service' | 'docker' | 'pm2' | 'supervisor'; name: string }) => void;
   onNavigateTab?: (tab: any) => void;
@@ -245,9 +245,9 @@ export default function TopologyVisualizer({
         ingressItems.push({
           id: `ing-cert-${idx}`,
           label: dom,
-          sub: `SSL: ${c.status} (${c.daysRemaining}h)`,
+          sub: `SSL: ${c.isValid ? (c.isExpiringSoon ? 'expiring' : 'valid') : 'invalid'} (${c.daysRemaining}d)`,
           url: `https://${dom}`,
-          valid: c.status === 'valid'
+          valid: c.isValid
         });
       });
     } else if (nodeApps.some((a) => a.domain)) {
@@ -1116,15 +1116,8 @@ export default function TopologyVisualizer({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  if (selectedNode.path) {
-                    onOpenTerminal(`cd ${selectedNode.path} && ls -la`);
-                  } else if (selectedNode.category === 'docker') {
-                    onOpenTerminal(`docker logs -f --tail 100 ${selectedNode.label}`);
-                  } else {
-                    onOpenTerminal();
-                  }
-                }}
+                // The terminal opens a plain shell on the server; it cannot take a startup command.
+                onClick={() => targetServer && onOpenTerminal(targetServer)}
                 className="gap-1.5 text-xs h-8"
               >
                 <TermIcon className="w-3.5 h-3.5" />

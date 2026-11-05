@@ -44,8 +44,7 @@ import {
   type BackupProfile,
   type BackupRunResult,
   type BackupRestoreResult,
-  type BackupDbEngine,
-  type BackupType
+  type BackupDbEngine
 } from '@/features/servers/api';
 import { swr } from '@/shared/lib/cache';
 import { useT } from '@/shared/i18n';
@@ -64,7 +63,7 @@ export default function BackupTab() {
   // Create Modal
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [modalMode, setModalMode] = useState<'instant' | 'profile'>('instant');
-  const [formType, setFormType] = useState<BackupType>('database');
+  const [formType, setFormType] = useState<'database' | 'files'>('database');
   const [formEngine, setFormEngine] = useState<BackupDbEngine>('mysql');
   const [formDbName, setFormDbName] = useState('');
   const [formSourcePath, setFormSourcePath] = useState('/var/www');
@@ -247,7 +246,7 @@ export default function BackupTab() {
     try {
       const res = await restoreBackup(server.id, {
         filepath: restoreItem.filepath,
-        type: restoreItem.type,
+        type: restoreItem.type as 'database' | 'files', // Restore button only exists for these two
         targetDatabase: restoreTargetDb.trim() || undefined,
         targetDir: restoreTargetDir.trim() || undefined
       });
@@ -502,6 +501,8 @@ export default function BackupTab() {
                       <span className="hidden sm:inline">{t('backup.download')}</span>
                     </Button>
 
+                    {/* the server can only restore database and file archives */}
+                    {(item.type === 'database' || item.type === 'files') && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -516,6 +517,7 @@ export default function BackupTab() {
                       <RotateCcw className="w-3.5 h-3.5" />
                       <span>{t('backup.restore')}</span>
                     </Button>
+                    )}
 
                     <Button
                       variant="ghost"

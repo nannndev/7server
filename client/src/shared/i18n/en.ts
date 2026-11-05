@@ -122,6 +122,8 @@ export const en = {
   'fleet.noMatchBody': 'Try a different search or tag filter.',
   'fleet.addFirst': 'Add your first server',
   'fleet.loading': 'Loading servers…',
+  'fleet.deleteServer': 'Delete server',
+  'fleet.deleted': 'Server deleted',
   'fleet.deleteConfirm': 'Remove this server from the dashboard?',
   'fleet.deleteFailed': 'Could not delete server: {error}',
 
