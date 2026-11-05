@@ -3,7 +3,7 @@ import React, { useRef, useState } from 'react';
 import {
   Plus, Terminal, RefreshCw, Download, Upload, LogOut, Settings2,
   Menu, ChevronRight, Eye, EyeOff, Sparkles, User, Users,
-  KeyRound, Shield, ShieldAlert, ChevronDown
+  KeyRound, Shield, ShieldAlert, ChevronDown, BookOpen
 } from 'lucide-react';
 import { usePrivacy } from '@/shared/hooks/usePrivacy';
 import { useAuth, useCan } from '@/features/auth/AuthContext';
@@ -384,6 +384,17 @@ export default function TopBar({
                       <span>{t('top.changePassword')}</span>
                     </button>
                   )}
+
+                  <a
+                    href="http://localhost:3002"
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={() => setShowUserMenu(false)}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left hover:bg-[var(--muted)] transition text-[var(--foreground)]"
+                  >
+                    <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>{t('top.documentation')}</span>
+                  </a>
 
                   <div className="pt-1 border-t border-[var(--border)]">
                     <button

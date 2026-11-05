@@ -66,6 +66,17 @@ export async function updateServer(id: string, payload: Partial<ServerItem> & { 
   return data.data;
 }
 
+export async function reorderServers(serverIds: string[]): Promise<ServerItem[]> {
+  const res = await apiFetch(`${API_BASE}/servers/reorder`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ serverIds })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to reorder servers');
+  return data.data;
+}
+
 export async function deleteServer(id: string): Promise<{ success: boolean }> {
   const res = await apiFetch(`${API_BASE}/servers/${id}`, { method: 'DELETE' });
   const data = await res.json();

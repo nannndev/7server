@@ -83,8 +83,8 @@ function Nav() {
           7Server
         </a>
         <nav className="hidden items-center gap-7 text-sm md:flex" aria-label="Sections">
-          {[['#how', 'How it works'], ['#features', 'Features'], ['#ai', 'AI'], ['#security', 'Security'], ['#start', 'Get started'], ['#/support', 'Support']].map(([href, label]) => (
-            <a key={href} href={href} className="transition-colors hover:text-[var(--anatomy-strong)]">{label}</a>
+          {[['#how', 'How it works'], ['#features', 'Features'], ['#ai', 'AI'], ['#security', 'Security'], ['http://localhost:3002', 'Docs'], ['#start', 'Get started']].map(([href, label]) => (
+            <a key={href} href={href} target={href.startsWith('http') ? '_blank' : undefined} rel={href.startsWith('http') ? 'noreferrer' : undefined} className="transition-colors hover:text-[var(--anatomy-strong)]">{label}</a>
           ))}
         </nav>
         <div className="flex items-center gap-1.5">

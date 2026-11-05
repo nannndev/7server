@@ -120,9 +120,11 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
         onOpenPalette={() => { setPaletteSignal((n) => n + 1); setMobileNavOpen(false); }}
         mobileOpen={mobileNavOpen}
         onMobileClose={() => setMobileNavOpen(false)}
+        onReorder={reorder}
+        onEditServer={openEdit}
       />
 
-      <div className="flex-1 min-w-0 flex flex-col">
+      <div className="flex-1 min-w-0 flex flex-col carbon-bg">
         <TopBar
           route={route}
           navigate={navigate}
@@ -174,6 +176,7 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
                 thresholds={monitor.thresholds}
                 onEdit={openEdit}
                 onMetricsUpdated={onMetricsUpdated}
+                onServerUpdated={reload}
               />
             ) : loading ? (
               <div role="status" aria-label={t('fleet.loading')} className="space-y-4">
@@ -208,6 +211,7 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
               setTerminalServer={setTerminalServer}
               setProcessServer={setProcessServer}
               setFilesServer={setFilesServer}
+              onReorder={reorder}
             />
           )}
         </main>

@@ -1,6 +1,6 @@
 // Fleet overview: aggregate KPIs, search/tag/view bar, and the server list in the chosen view.
 import React, { useState } from 'react';
-import { Server, Plus, Search, Filter, LayoutGrid, Box as BoxIcon, Cpu, Database, HardDrive, Network, Activity } from 'lucide-react';
+import { Server, Plus, Search, Filter, LayoutGrid, Box as BoxIcon, Cpu, Database, HardDrive, Network, Activity, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { ServerItem, ServerMetrics } from '@/features/servers/types';
 import type { HistoryPoint } from '@/features/servers/api';
 import type { FleetView, ServerTab } from '@/app/router';
@@ -30,6 +30,7 @@ interface FleetPageProps {
   setTerminalServer: (s: ServerItem) => void;
   setProcessServer: (s: ServerItem) => void;
   setFilesServer: (s: ServerItem) => void;
+  onReorder?: (ids: string[]) => void;
 }
 
 const formatGB = (mb: number) => `${(mb / 1024).toFixed(1)} GB`;
@@ -37,8 +38,19 @@ const formatGB = (mb: number) => `${(mb / 1024).toFixed(1)} GB`;
 export default function FleetPage(p: FleetPageProps) {
   const { servers, loading, history, view, setView, alertsFor, openManageServer, setTerminalServer, setProcessServer, setFilesServer, onMetricsUpdated } = p;
   const [searchQuery, setSearchQuery] = useState('');
+  const [reorderMode, setReorderMode] = useState(false);
   const t = useT();
   const [selectedTag, setSelectedTag] = useState('ALL');
+
+  const moveFleetServer = (index: number, direction: 'left' | 'right') => {
+    if (!p.onReorder) return;
+    const targetIndex = direction === 'left' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= p.servers.length) return;
+    const next = [...p.servers];
+    const [moved] = next.splice(index, 1);
+    next.splice(targetIndex, 0, moved);
+    p.onReorder(next.map((s) => s.id));
+  };
 
   const allTags = Array.from(new Set(servers.flatMap((s) => s.tags || []).filter(Boolean)));
   const filteredServers = servers.filter((s) => {
@@ -178,6 +190,21 @@ export default function FleetPage(p: FleetPageProps) {
                   #{tag}
                 </button>
               ))}
+
+              {p.onReorder && p.servers.length > 1 && view === 'grid' && (
+                <button
+                  onClick={() => setReorderMode(!reorderMode)}
+                  className={`ml-auto px-2.5 py-1 rounded-md text-[11px] font-medium transition flex items-center gap-1.5 border ${
+                    reorderMode
+                      ? 'bg-primary text-primary-foreground border-transparent shadow-sm'
+                      : 'bg-[var(--card)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] border-[var(--border)]'
+                  }`}
+                  title={reorderMode ? t('server.doneReordering') : t('server.reorder')}
+                >
+                  <ArrowUpDown className="w-3 h-3" />
+                  <span>{reorderMode ? t('server.doneReordering') : t('server.reorder')}</span>
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -234,20 +261,44 @@ export default function FleetPage(p: FleetPageProps) {
           />
         ) : (
           <div key={`${view}:${selectedTag}`} className="stagger grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4">
-            {filteredServers.map((server) => (
-              <ServerCard
-                key={server.id}
-                server={server}
-                onManage={(s, tab) => openManageServer(s, tab || 'overview')}
-                onOpenTerminal={(s) => openManageServer(s, 'terminal')}
-                onOpenProcesses={(s) => setProcessServer(s)}
-                onEdit={p.onEditServer}
-                onDelete={handleDeleteServer}
-                onMetricsUpdated={handleMetricsUpdated}
-                onOpenFiles={(s) => setFilesServer(s)}
-                history={history[server.id] || []}
-                alerts={alertsFor(server)}
-              />
+            {filteredServers.map((server, idx) => (
+              <div key={server.id} className="relative group/reorder">
+                {reorderMode && (
+                  <div className="absolute top-3 right-12 z-20 flex items-center gap-1 bg-[var(--card)]/95 backdrop-blur-sm border border-[var(--border)] rounded-lg p-1 shadow-md">
+                    <button
+                      type="button"
+                      disabled={idx === 0}
+                      onClick={(e) => { e.stopPropagation(); moveFleetServer(idx, 'left'); }}
+                      className="p-1 rounded hover:bg-[var(--muted)] disabled:opacity-20 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                      title={t('server.moveLeft')}
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="text-[10px] font-mono font-bold px-1 text-[var(--muted-foreground)]">#{idx + 1}</span>
+                    <button
+                      type="button"
+                      disabled={idx === filteredServers.length - 1}
+                      onClick={(e) => { e.stopPropagation(); moveFleetServer(idx, 'right'); }}
+                      className="p-1 rounded hover:bg-[var(--muted)] disabled:opacity-20 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                      title={t('server.moveRight')}
+                    >
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+                <ServerCard
+                  server={server}
+                  onManage={(s, tab) => openManageServer(s, tab || 'overview')}
+                  onOpenTerminal={(s) => openManageServer(s, 'terminal')}
+                  onOpenProcesses={(s) => setProcessServer(s)}
+                  onEdit={p.onEditServer}
+                  onDelete={handleDeleteServer}
+                  onMetricsUpdated={handleMetricsUpdated}
+                  onOpenFiles={(s) => setFilesServer(s)}
+                  history={history[server.id] || []}
+                  alerts={alertsFor(server)}
+                />
+              </div>
             ))}
           </div>
         )}

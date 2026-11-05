@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   LayoutDashboard, LayoutGrid, Box, Network, Activity, Server, Plus, Bell, Globe, ScrollText,
-  PanelLeftClose, PanelLeftOpen, Sun, Moon, Search, X, Bot, ShieldCheck
+  PanelLeftClose, PanelLeftOpen, Sun, Moon, Search, X, Bot, ShieldCheck,
+  ArrowUpDown, ChevronUp, ChevronDown, Pencil
 } from 'lucide-react';
 import { ServerItem } from '@/features/servers/types';
 import { Route, FleetView } from '@/app/router';
@@ -37,6 +38,8 @@ interface SidebarProps {
   onOpenPalette: () => void;
   mobileOpen: boolean;
   onMobileClose: () => void;
+  onReorder?: (ids: string[]) => void;
+  onEditServer?: (server: ServerItem) => void;
 }
 
 const FLEET_ITEMS: [FleetView, MessageKey, React.ElementType][] = [
@@ -138,7 +141,18 @@ export default function Sidebar(p: SidebarProps) {
   const [dragging, setDragging] = useState(false);
   const [tip, setTip] = useState<{ text: string; top: number; left: number } | null>(null);
   const [filter, setFilter] = useState('');
+  const [reorderMode, setReorderMode] = useState(false);
   const asideRef = useRef<HTMLElement>(null);
+
+  const moveServer = (index: number, direction: 'up' | 'down') => {
+    if (!p.onReorder) return;
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= p.servers.length) return;
+    const next = [...p.servers];
+    const [moved] = next.splice(index, 1);
+    next.splice(targetIndex, 0, moved);
+    p.onReorder(next.map((s) => s.id));
+  };
 
   useEffect(() => {
     try { localStorage.setItem(STORE_KEY, JSON.stringify({ collapsed, width })); } catch { /* private mode */ }
@@ -223,7 +237,7 @@ export default function Sidebar(p: SidebarProps) {
         ref={asideRef}
         aria-label={t('nav.main')}
         style={{ width: p.mobileOpen ? 280 : rail ? RAIL_W : width }}
-        className={`carbon-bg fixed md:sticky top-0 left-0 z-50 h-screen shrink-0 flex flex-col bg-[var(--sidebar-bg)] border-r border-[var(--border)]
+        className={`fixed md:sticky top-0 left-0 z-50 h-screen shrink-0 flex flex-col bg-[var(--sidebar-bg)] border-r border-[var(--border)]
           ${dragging ? '' : 'transition-[width,transform] duration-200 ease-[cubic-bezier(.2,.7,.2,1)]'}
           ${p.mobileOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'}`}
       >
@@ -277,9 +291,26 @@ export default function Sidebar(p: SidebarProps) {
             title={t('nav.servers', { n: p.servers.length })}
             action={
               canManageServer ? (
-                <button onClick={p.onAddServer} className="p-1 rounded-md text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--sidebar-hover)] transition" aria-label="Add Server">
-                  <Plus className="w-3.5 h-3.5" />
-                </button>
+                <div className="flex items-center gap-0.5">
+                  {p.servers.length > 1 && !rail && (
+                    <button
+                      type="button"
+                      onClick={() => setReorderMode(!reorderMode)}
+                      className={`p-1 rounded-md transition ${
+                        reorderMode
+                          ? 'text-primary bg-[var(--sidebar-hover)]'
+                          : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--sidebar-hover)]'
+                      }`}
+                      title={reorderMode ? t('server.doneReordering') : t('server.reorder')}
+                      aria-label={t('server.reorder')}
+                    >
+                      <ArrowUpDown className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  <button onClick={p.onAddServer} className="p-1 rounded-md text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--sidebar-hover)] transition" aria-label="Add Server">
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               ) : undefined
             }
           />
@@ -293,23 +324,59 @@ export default function Sidebar(p: SidebarProps) {
             />
           )}
           <div className="space-y-0.5">
-            {servers.map((s) => {
+            {servers.map((s, idx) => {
               const alerts = p.alertsFor(s);
               const dot = s.status === 'online' ? (alerts.length ? 'bg-amber-400' : 'bg-emerald-500') : s.status === 'offline' ? 'bg-red-500' : 'bg-zinc-400';
               const open = activeServerId === s.id;
               return (
                 <React.Fragment key={s.id}>
-                  <Item
-                    rail={rail}
-                    tip={tipProps}
-                    active={open && (rail || activeTab === 'overview')}
-                    onClick={() => go({ page: 'server', id: s.id, tab: 'overview' })}
-                    icon={Server}
-                    label={s.name}
-                    sub={s.host}
-                    dot={dot}
-                    badge={alerts.length || undefined}
-                  />
+                  <div className="relative group/server">
+                    <Item
+                      rail={rail}
+                      tip={tipProps}
+                      active={open && (rail || activeTab === 'overview')}
+                      onClick={() => go({ page: 'server', id: s.id, tab: 'overview' })}
+                      icon={Server}
+                      label={s.name}
+                      sub={s.host}
+                      dot={dot}
+                      badge={alerts.length || undefined}
+                    />
+                    {!rail && canManageServer && (
+                      <div className={`absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5 z-10 ${
+                        reorderMode ? 'opacity-100 pointer-events-auto' : 'opacity-0 group-hover/server:opacity-100 pointer-events-auto'
+                      } transition-opacity bg-[var(--sidebar-bg)]/90 backdrop-blur-sm rounded px-1 py-0.5 border border-[var(--border)] shadow-sm`}>
+                        <button
+                          type="button"
+                          disabled={idx === 0}
+                          onClick={(e) => { e.stopPropagation(); moveServer(idx, 'up'); }}
+                          className="p-0.5 rounded hover:bg-[var(--sidebar-hover)] disabled:opacity-25 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                          title={t('server.moveUp')}
+                        >
+                          <ChevronUp className="w-3 h-3" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={idx === servers.length - 1}
+                          onClick={(e) => { e.stopPropagation(); moveServer(idx, 'down'); }}
+                          className="p-0.5 rounded hover:bg-[var(--sidebar-hover)] disabled:opacity-25 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                          title={t('server.moveDown')}
+                        >
+                          <ChevronDown className="w-3 h-3" />
+                        </button>
+                        {p.onEditServer && (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); p.onEditServer?.(s); }}
+                            className="p-0.5 rounded hover:bg-[var(--sidebar-hover)] text-[var(--muted-foreground)] hover:text-primary ml-0.5"
+                            title={t('server.editServer')}
+                          >
+                            <Pencil className="w-2.5 h-2.5" />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   {/* Sections of the open server, nested under it. A guide line ties them to the parent. */}
                   {open && rail && (
                     <div className="mx-1.5 my-1 py-1 rounded-lg bg-[var(--sidebar-hover)]/60 space-y-px nav-expand" role="group" aria-label={t('nav.serverMenu', { name: s.name })}>

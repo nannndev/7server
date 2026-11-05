@@ -1,11 +1,12 @@
 // One server: header + output banner + the active tab. Each tab is its own component in pages/server/.
-import React, { useState } from 'react';
-import { Terminal as TermIcon, Settings, RefreshCw, Check, Copy, FolderOpen } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Terminal as TermIcon, Settings, RefreshCw, Check, Copy, FolderOpen, Pencil, X } from 'lucide-react';
 import type { ServerItem, ServerMetrics } from '@/features/servers/types';
-import { fetchServerMetrics, type HistoryPoint } from '@/features/servers/api';
+import { fetchServerMetrics, updateServer, type HistoryPoint } from '@/features/servers/api';
 import { apiFetch } from '@/shared/api/client';
 import type { Thresholds } from '@/features/monitoring/api';
 import { Button } from '@/shared/ui/button';
+import { toast } from '@/shared/ui/toast';
 import FileManagerModal from '@/features/files/components/FileManagerModal';
 import LogsModal from '@/features/logs/components/LogsModal';
 import { SERVER_SECTIONS, sectionLabel } from '@/app/serverNav';
@@ -57,9 +58,10 @@ interface ServerPageProps {
   thresholds?: Thresholds;
   onEdit: (server: ServerItem) => void;
   onMetricsUpdated: (id: string, metrics: ServerMetrics) => void;
+  onServerUpdated?: () => void;
 }
 
-export default function ServerPage({ server, tab, onTabChange, history = [], thresholds, onEdit, onMetricsUpdated }: ServerPageProps) {
+export default function ServerPage({ server, tab, onTabChange, history = [], thresholds, onEdit, onMetricsUpdated, onServerUpdated }: ServerPageProps) {
   const [refreshing, setRefreshing] = useState(false);
   const t = useT();
   const [copied, setCopied] = useState(false);
@@ -68,6 +70,35 @@ export default function ServerPage({ server, tab, onTabChange, history = [], thr
   const [filesModal, setFilesModal] = useState<{ path?: string; file?: string } | null>(null);
   const [logsModal, setLogsModal] = useState<LogsTarget | null>(null);
   const [terminalCmd, setTerminalCmd] = useState<string | undefined>(undefined);
+
+  // Quick inline rename
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [serverNameInput, setServerNameInput] = useState(server.name);
+  const [savingName, setSavingName] = useState(false);
+
+  useEffect(() => {
+    setServerNameInput(server.name);
+  }, [server.name]);
+
+  const handleSaveName = async () => {
+    const trimmed = serverNameInput.trim();
+    if (!trimmed || trimmed === server.name) {
+      setIsEditingName(false);
+      setServerNameInput(server.name);
+      return;
+    }
+    setSavingName(true);
+    try {
+      await updateServer(server.id, { name: trimmed });
+      toast.success(t('server.nameUpdated'));
+      setIsEditingName(false);
+      onServerUpdated?.();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update server name');
+    } finally {
+      setSavingName(false);
+    }
+  };
 
   const refreshMetrics = async () => {
     setRefreshing(true);
@@ -133,45 +164,114 @@ export default function ServerPage({ server, tab, onTabChange, history = [], thr
   return (
     <ServerPageProvider value={ctx}>
       <div className="space-y-6">
-        {/* Section navigation lives in the sidebar (nested under this server). */}
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+        {/* Server Identity Header */}
+        <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="min-w-0">
-            <h1 key={tab} className="fade-in text-xl font-semibold tracking-tight text-[var(--foreground)] flex items-center gap-2">
-              {Icon && <Icon className="w-5 h-5 text-[var(--muted-foreground)]" />}
-              {t(sectionLabel(tab))}
-            </h1>
-            <div className="flex items-center gap-2 text-xs text-[var(--muted-foreground)] font-mono mt-1">
-              <span className="truncate sensitive">{server.username}@{server.host}:{server.port || 22}</span>
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${server.status === 'online' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+              
+              {isEditingName ? (
+                <form
+                  onSubmit={(e) => { e.preventDefault(); handleSaveName(); }}
+                  className="flex items-center gap-1.5"
+                >
+                  <input
+                    type="text"
+                    value={serverNameInput}
+                    onChange={(e) => setServerNameInput(e.target.value)}
+                    autoFocus
+                    disabled={savingName}
+                    className="h-8 px-2.5 text-base font-bold rounded-lg bg-[var(--background)] border border-primary text-[var(--foreground)] outline-none"
+                    placeholder="Nama server..."
+                  />
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={savingName}
+                    className="h-8 px-2.5 bg-emerald-600 hover:bg-emerald-500 text-white gap-1"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>{t('common.save')}</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setIsEditingName(false); setServerNameInput(server.name); }}
+                    className="h-8 px-2"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </Button>
+                </form>
+              ) : (
+                <div className="flex items-center gap-2 group">
+                  <h2 className="text-lg sm:text-xl font-bold tracking-tight text-[var(--foreground)] truncate">
+                    {server.name}
+                  </h2>
+                  <button
+                    onClick={() => { setIsEditingName(true); setServerNameInput(server.name); }}
+                    className="p-1 rounded-md hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-primary transition"
+                    title={t('server.renameServer')}
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
+              {server.tags && server.tags.length > 0 && (
+                <div className="flex items-center gap-1 ml-1">
+                  {server.tags.map((tg) => (
+                    <span key={tg} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--muted)] text-[var(--muted-foreground)] border border-[var(--border)]">
+                      #{tg}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 text-xs text-[var(--muted-foreground)] font-mono">
+              <span className="sensitive">{server.username}@{server.host}:{server.port || 22}</span>
               <button
                 onClick={() => { navigator.clipboard.writeText(ssh); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
-                className="hover:text-[var(--foreground)] transition"
+                className="hover:text-[var(--foreground)] transition p-0.5"
                 aria-label={t('server.copySsh')}
                 title={t('server.copySsh')}
               >
                 {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
               </button>
+              <span className="text-[var(--border)]">•</span>
+              <span className="capitalize">{server.status}</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <Button variant="ghost" size="sm" onClick={refreshMetrics} disabled={refreshing} className="gap-1.5" title={t('server.refreshMetrics')}>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="ghost" size="sm" onClick={refreshMetrics} disabled={refreshing} className="gap-1.5 h-8 text-xs" title={t('server.refreshMetrics')}>
               <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
               <span>{t('common.refresh')}</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setFilesModal({ path: '/var/www' })} className="gap-1.5">
+            <Button variant="outline" size="sm" onClick={() => setFilesModal({ path: '/var/www' })} className="gap-1.5 h-8 text-xs">
               <FolderOpen className="w-3.5 h-3.5" />
               <span>{t('common.files')}</span>
             </Button>
             {tab !== 'terminal' && (
-              <Button variant="outline" size="sm" onClick={() => onTabChange('terminal')} className="gap-1.5">
+              <Button variant="outline" size="sm" onClick={() => onTabChange('terminal')} className="gap-1.5 h-8 text-xs">
                 <TermIcon className="w-3.5 h-3.5" />
                 <span>{t('common.terminal')}</span>
               </Button>
             )}
-            <Button variant="ghost" size="icon" onClick={() => onEdit(server)} title={t('server.editServer')} aria-label={t('server.editServer')}>
-              <Settings className="w-4 h-4" />
+            <Button variant="outline" size="sm" onClick={() => onEdit(server)} className="gap-1.5 h-8 text-xs" title={t('server.editServer')}>
+              <Settings className="w-3.5 h-3.5" />
+              <span>{t('server.editServer')}</span>
             </Button>
           </div>
+        </div>
+
+        {/* Section Heading */}
+        <div className="flex items-center justify-between pt-1">
+          <h1 key={tab} className="fade-in text-lg font-semibold tracking-tight text-[var(--foreground)] flex items-center gap-2">
+            {Icon && <Icon className="w-4 h-4 text-[var(--muted-foreground)]" />}
+            {t(sectionLabel(tab))}
+          </h1>
         </div>
 
         <div key={tab} className="page-enter space-y-6">

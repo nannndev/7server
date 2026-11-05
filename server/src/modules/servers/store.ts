@@ -107,6 +107,24 @@ export function updateServer(id: string, data: Partial<RawServer> & { password?:
   return getServerById(id, false);
 }
 
+export function reorderServers(orderedIds: string[]): SafeServer[] {
+  const servers = readData();
+  const idMap = new Map(servers.map((s) => [s.id, s]));
+  const reordered: RawServer[] = [];
+  for (const id of orderedIds) {
+    const s = idMap.get(id);
+    if (s) {
+      reordered.push(s);
+      idMap.delete(id);
+    }
+  }
+  for (const remaining of idMap.values()) {
+    reordered.push(remaining);
+  }
+  writeData(reordered);
+  return getAllServers(false);
+}
+
 export function deleteServer(id: string): boolean {
   const servers = readData();
   const filtered = servers.filter((s) => s.id !== id);

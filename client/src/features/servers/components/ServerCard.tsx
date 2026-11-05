@@ -109,6 +109,17 @@ export default function ServerCard({
                     {server.name}
                     <ChevronRight className="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover/title:opacity-100 group-hover/title:translate-x-0 transition" />
                   </h3>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit(server);
+                    }}
+                    title={t('serverCard.editServer')}
+                    className="p-1 rounded opacity-0 group-hover/title:opacity-100 hover:bg-[var(--muted)] hover:text-primary transition text-[var(--muted-foreground)]"
+                  >
+                    <Edit2 className="w-3 h-3" />
+                  </button>
                 </div>
                 <div className="flex items-center gap-1.5 mt-0.5 text-[var(--muted-foreground)] font-mono text-xs">
                   <span className="sensitive">
