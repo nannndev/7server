@@ -322,6 +322,8 @@ function Footer() {
         <nav className="flex gap-5" aria-label="More">
           <a href="#/contributors" className="transition-colors hover:text-[var(--anatomy-strong)]">Contributors</a>
           <a href="#/support" className="transition-colors hover:text-[var(--anatomy-strong)]">Support</a>
+          <a href="https://saweria.co/nannndev" target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-[var(--anatomy-strong)]">Saweria</a>
+          <a href="https://buymeacoffee.com/ekaprasety8" target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-[var(--anatomy-strong)]">Buy Me a Coffee</a>
         </nav>
         <a href={REPO} className="inline-flex items-center gap-2 transition-colors hover:text-[var(--anatomy-strong)]"><GithubIcon className="h-4 w-4" /> nannndev/7server</a>
       </div>

@@ -1,7 +1,7 @@
 // Contributors and Support pages. Facts only: contributors come from the GitHub API at view time
 // (no invented names or counts); support points at the real channels (GitHub issues, docs, security).
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowLeft, Bug, BookOpen, GitPullRequest, HeartHandshake, LifeBuoy, MessageSquare, ShieldAlert, Star } from 'lucide-react';
+import { ArrowLeft, Bug, BookOpen, Coffee, GitPullRequest, HeartHandshake, LifeBuoy, MessageSquare, ShieldAlert, Star } from 'lucide-react';
 import { GithubIcon } from './components/BrandIcons';
 
 export const REPO = 'https://github.com/nannndev/7server';
@@ -92,6 +92,10 @@ export function SupportPage() {
     { icon: ShieldAlert, title: 'Security issue? Don\'t post it publicly', body: 'Report vulnerabilities privately through GitHub security advisories so they can be fixed before anyone else hears about them.', href: `${REPO}/security/advisories/new`, cta: 'Report privately' },
     { icon: HeartHandshake, title: 'Support the project', body: 'Starring the repository and sending fixes or translations keeps it moving. It is free and open source.', href: REPO, cta: 'Star on GitHub' }
   ];
+  const donate = [
+    { name: 'Buy Me a Coffee', href: 'https://buymeacoffee.com/ekaprasety8', note: 'Card / PayPal' },
+    { name: 'Saweria', href: 'https://saweria.co/nannndev', note: 'QRIS, e-wallet, bank (Indonesia)' }
+  ];
   const faq: [string, ReactNode][] = [
     ['I forgot my password.', <>Another admin can reset it on the Users page. <code>DASHBOARD_PASSWORD</code> only sets the first admin, when no user exists yet. If you are the only admin and locked out, ask on GitHub Issues: there is no reset command yet.</>],
     ['Where is my data?', <>In the data directory: <code>~/.7server</code> for npm, the <code>7server-data</code> volume for Docker, <code>server/data</code> from source. Back up <code>7server.db</code> and <code>secret.key</code> together; one is useless without the other.</>],
@@ -110,6 +114,18 @@ export function SupportPage() {
             <a href={href} className="mt-4 text-sm font-semibold underline-offset-4 hover:underline" style={{ color: 'var(--anatomy-strong)' }}>{cta} →</a>
           </article>
         ))}
+      </div>
+
+      <div className="metal reveal mt-10 rounded-2xl p-6 sm:p-8">
+        <div className="flex items-center gap-2"><Coffee className="h-5 w-5" style={{ color: 'var(--accent)' }} aria-hidden /><h2 className="font-semibold" style={{ color: 'var(--anatomy-strong)' }}>Buy the developer a coffee</h2></div>
+        <p className="mt-2 max-w-2xl text-[15px] leading-relaxed">7Server is free. If it saves you time, a small donation helps keep it maintained.</p>
+        <div className="mt-5 flex flex-wrap gap-3">
+          {donate.map((d) => (
+            <a key={d.name} href={d.href} target="_blank" rel="noopener noreferrer" className="btn-silver inline-flex flex-col rounded-xl px-5 py-3 text-sm font-semibold">
+              <span>{d.name}</span><span className="text-[11px] font-normal opacity-70">{d.note}</span>
+            </a>
+          ))}
+        </div>
       </div>
 
       <h2 className="reveal mt-14 text-2xl font-semibold tracking-tight" style={{ color: 'var(--anatomy-strong)' }}>Common questions</h2>
