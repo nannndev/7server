@@ -19,5 +19,10 @@ export const dataFile = (name: string) => path.join(DATA_DIR, name);
 export const config = {
   port: Number(process.env.PORT) || 5001,
   corsOrigin: process.env.CORS_ORIGIN || '',
-  dashboardPassword: process.env.DASHBOARD_PASSWORD || ''
+  dashboardPassword: process.env.DASHBOARD_PASSWORD || '',
+  /**
+   * Reverse proxies allowed to set X-Forwarded-For (Express "trust proxy"): e.g. "loopback" when
+   * nginx runs on this machine, or "10.0.0.5". Empty = trust nobody and use the socket address.
+   */
+  trustProxy: process.env.TRUST_PROXY || ''
 };

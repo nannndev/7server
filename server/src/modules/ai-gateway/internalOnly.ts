@@ -45,10 +45,10 @@ export async function isInternalCaller(ip: string): Promise<boolean> {
   return isPrivateIp(a) || (await registeredIps()).has(a);
 }
 
-// Uses the socket address, never X-Forwarded-For: that header is client-controlled unless a trusted
-// proxy sets it, and spoofing it would open the gateway to the internet.
+// req.ip is the socket address unless TRUST_PROXY lists the proxy in front, so a client can't spoof
+// X-Forwarded-For to get in. Without TRUST_PROXY behind a local nginx, everyone looks like 127.0.0.1.
 export async function internalOnly(req: Request, res: Response, next: NextFunction) {
-  const ip = req.socket.remoteAddress || '';
+  const ip = req.ip || req.socket.remoteAddress || '';
   if (await isInternalCaller(ip)) return next();
   res.status(403).json({
     error: { type: 'permission_error', message: `7Server AI Gateway hanya bisa dipakai dari dalam sistem 7Server (IP ${normalizeIp(ip)} tidak terdaftar).` }

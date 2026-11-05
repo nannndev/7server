@@ -25,6 +25,9 @@ import { aiGatewayPublicRoutes, aiGatewayManagementRoutes } from './modules/ai-g
 
 export function createApp() {
   const app = express();
+  // Behind nginx every request comes from 127.0.0.1; with TRUST_PROXY set, req.ip is the real client
+  // (taken from X-Forwarded-For only when the hop that sent it is a listed proxy).
+  if (config.trustProxy) app.set('trust proxy', config.trustProxy.split(',').map((s) => s.trim()).filter(Boolean));
 
   // Same-origin via Vite proxy; set CORS_ORIGIN only if the UI is served elsewhere.
   if (config.corsOrigin) app.use(cors({ origin: config.corsOrigin }));
