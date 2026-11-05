@@ -84,7 +84,7 @@ Lupa password: `docker compose exec 7server node --import tsx src/resetPassword.
 - **Rilis**: dari `main` yang bersih, `npm run release patch` (atau `minor`/`major`/`1.2.3`) → bump versi `packages/npm`, commit, tag `vX.Y.Z`. Lalu `git push origin main vX.Y.Z`. Workflow `release.yml` publish `sevenserver` ke npm (dengan provenance), push image multi-arch ke GHCR, dan membuat GitHub Release dengan catatan otomatis. Versi `-beta.N` masuk tag npm `next` dan ditandai prerelease.
 - **Label**: daftar di `.github/labels.yml` (disinkronkan otomatis). PR diberi label dari file yang diubah (`area: …`) dan dari prefix judul (`feat:` → enhancement, `fix:` → bug, `feat!:` → breaking). Catatan rilis dikelompokkan per label (`.github/release.yml`).
 - **Info update di CLI**: `7server` mengecek npm sekali sehari dan menampilkan versi baru + link catatan rilisnya.
-- Secret yang perlu: `NPM_TOKEN` (Settings → Secrets → Actions).
+- Publish npm pakai **Trusted Publishing** (tanpa token): npmjs.com → sevenserver → Settings → Trusted Publisher → `nannndev/7server`, workflow `release.yml`.
 
 ## 📁 Struktur Direktori
 

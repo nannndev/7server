@@ -1,5 +1,5 @@
 # Runs when a version tag is pushed (node scripts/release.mjs patch && git push origin main vX.Y.Z).
-# Needs one repo secret: NPM_TOKEN (npmjs.com > Access Tokens > Granular, publish rights on sevenserver).
+# npm auth: Trusted Publishing (npmjs.com > sevenserver > Settings > Trusted Publisher: nannndev/7server, release.yml).
 name: Release
 on:
   push:
@@ -40,8 +40,9 @@ jobs:
       - run: npm test
       - run: npm run build:npm
 
+      # Trusted Publishing (OIDC, no token) needs npm >= 11.5.1; falls back to NPM_TOKEN if that secret is set.
       - name: Publish to npm
-        run: npm publish --provenance --access public --tag "$NPM_TAG"
+        run: npm install -g npm@^11.5.1 --no-audit --no-fund && npm publish --provenance --access public --tag "$NPM_TAG"
         working-directory: packages/npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
