@@ -76,7 +76,7 @@ export default function FirewallPanel({ serverId, serverName }: FirewallPanelPro
       message: willEnable
         ? `Apakah Anda yakin ingin mengaktifkan firewall UFW di "${serverName}"? Pastikan port layanan penting sudah dibuka.`
         : `Apakah Anda yakin ingin mematikan firewall UFW di "${serverName}"? Seluruh traffic masuk tidak akan lagi disaring oleh UFW.`,
-      variant: willEnable ? 'primary' : 'danger',
+      variant: willEnable ? 'warning' : 'danger', // enabling can still cut access: warn, never 'default'
       confirmText: willEnable ? 'Aktifkan Firewall' : 'Matikan Firewall'
     });
 
