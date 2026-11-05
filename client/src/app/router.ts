@@ -25,17 +25,20 @@ export const SERVER_TABS = [
 ] as const;
 export const MONITOR_TABS = ['alerts', 'uptime', 'audit'] as const;
 export const AI_GATEWAY_TABS = ['providers', 'keys', 'quickstart', 'usage', 'config'] as const;
+export const USERS_TABS = ['users', 'roles', 'sessions'] as const;
 
 export type FleetView = (typeof FLEET_VIEWS)[number];
 export type ServerTab = (typeof SERVER_TABS)[number];
 export type MonitorTab = (typeof MONITOR_TABS)[number];
 export type AiGatewayTab = (typeof AI_GATEWAY_TABS)[number];
+export type UsersTab = (typeof USERS_TABS)[number];
 
 export type Route =
   | { page: 'fleet'; view?: FleetView }
   | { page: 'server'; id: string; tab: ServerTab }
   | { page: 'monitoring'; tab: MonitorTab }
-  | { page: 'ai-gateway'; tab?: AiGatewayTab };
+  | { page: 'ai-gateway'; tab?: AiGatewayTab }
+  | { page: 'users'; tab?: UsersTab };
 
 const pick = <T extends string>(list: readonly T[], v: string | undefined, fallback: T): T =>
   list.includes(v as T) ? (v as T) : fallback;
@@ -45,6 +48,7 @@ export function parseRoute(hash: string): Route {
   if (parts[0] === 'servers' && parts[1]) return { page: 'server', id: parts[1], tab: pick(SERVER_TABS, parts[2], 'overview') };
   if (parts[0] === 'monitoring') return { page: 'monitoring', tab: pick(MONITOR_TABS, parts[1], 'alerts') };
   if (parts[0] === 'ai-gateway') return { page: 'ai-gateway', tab: pick(AI_GATEWAY_TABS, parts[1], 'providers') };
+  if (parts[0] === 'users') return { page: 'users', tab: pick(USERS_TABS, parts[1], 'users') };
   if (parts[0] === 'fleet' && FLEET_VIEWS.includes(parts[1] as FleetView)) return { page: 'fleet', view: parts[1] as FleetView };
   return { page: 'fleet' };
 }
@@ -53,6 +57,7 @@ export function routeToHash(r: Route): string {
   if (r.page === 'server') return `#/servers/${encodeURIComponent(r.id)}${r.tab === 'overview' ? '' : `/${r.tab}`}`;
   if (r.page === 'monitoring') return `#/monitoring${r.tab === 'alerts' ? '' : `/${r.tab}`}`;
   if (r.page === 'ai-gateway') return `#/ai-gateway${!r.tab || r.tab === 'providers' ? '' : `/${r.tab}`}`;
+  if (r.page === 'users') return `#/users${!r.tab || r.tab === 'users' ? '' : `/${r.tab}`}`;
   return r.view ? `#/fleet/${r.view}` : '#/';
 }
 

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Lock, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { Lock, Eye, EyeOff } from 'lucide-react';
 import { changePassword } from '@/features/auth/api';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { toast } from '@/shared/ui/toast';
+import { useT } from '@/shared/i18n';
 
 interface ChangePasswordModalProps {
   open: boolean;
@@ -11,6 +12,7 @@ interface ChangePasswordModalProps {
 }
 
 export default function ChangePasswordModal({ open, onClose }: ChangePasswordModalProps) {
+  const t = useT();
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -24,21 +26,21 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
     e.preventDefault();
     setError(null);
     if (newPassword.length < 8) {
-      setError('Password baru minimal 8 karakter');
+      setError(t('changePw.minChars'));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setError('Konfirmasi password tidak cocok');
+      setError(t('changePw.mismatch'));
       return;
     }
 
     setBusy(true);
     try {
       await changePassword(oldPassword, newPassword);
-      toast.success('Password berhasil diperbarui');
+      toast.success(t('changePw.success'));
       onClose();
     } catch (err: any) {
-      setError(err.message || 'Gagal mengubah password');
+      setError(err.message || t('changePw.failed'));
     } finally {
       setBusy(false);
     }
@@ -53,15 +55,15 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
               <Lock className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold">Ganti Password</h2>
-              <p className="text-[11px] text-[var(--muted-foreground)]">Perbarui password akun Anda</p>
+              <h2 className="text-sm font-semibold">{t('changePw.title')}</h2>
+              <p className="text-[11px] text-[var(--muted-foreground)]">{t('changePw.subtitle')}</p>
             </div>
           </div>
           <button
             onClick={() => setShowPasswords(!showPasswords)}
             type="button"
             className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] p-1 rounded"
-            title={showPasswords ? 'Sembunyikan password' : 'Tampilkan password'}
+            title={showPasswords ? t('common.hide') : t('common.show')}
           >
             {showPasswords ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
@@ -69,7 +71,7 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <label className="block space-y-1">
-            <span className="text-xs font-medium text-[var(--muted-foreground)]">Password Saat Ini</span>
+            <span className="text-xs font-medium text-[var(--muted-foreground)]">{t('changePw.current')}</span>
             <Input
               type={showPasswords ? 'text' : 'password'}
               required
@@ -81,7 +83,7 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
           </label>
 
           <label className="block space-y-1">
-            <span className="text-xs font-medium text-[var(--muted-foreground)]">Password Baru (Min. 8 Karakter)</span>
+            <span className="text-xs font-medium text-[var(--muted-foreground)]">{t('changePw.new')} (Min. 8)</span>
             <Input
               type={showPasswords ? 'text' : 'password'}
               required
@@ -92,7 +94,7 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
           </label>
 
           <label className="block space-y-1">
-            <span className="text-xs font-medium text-[var(--muted-foreground)]">Konfirmasi Password Baru</span>
+            <span className="text-xs font-medium text-[var(--muted-foreground)]">{t('changePw.confirm')}</span>
             <Input
               type={showPasswords ? 'text' : 'password'}
               required
@@ -110,10 +112,10 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
 
           <div className="flex items-center justify-end gap-2 pt-2">
             <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={busy}>
-              Batal
+              {t('common.cancel')}
             </Button>
             <Button type="submit" size="sm" disabled={busy || !oldPassword || !newPassword}>
-              {busy ? 'Menyimpan...' : 'Simpan Password Baru'}
+              {busy ? t('changePw.saving') : t('changePw.save')}
             </Button>
           </div>
         </form>
@@ -121,3 +123,4 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
     </div>
   );
 }
+

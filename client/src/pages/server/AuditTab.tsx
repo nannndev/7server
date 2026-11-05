@@ -83,10 +83,10 @@ export default function AuditTab() {
               size="sm"
               onClick={() => exportAuditCsv(undefined, server.id)}
               className="gap-1.5 h-8 text-xs font-medium"
-              title="Ekspor CSV"
+              title={t('audit.exportCsv')}
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Ekspor CSV</span>
+              <span>{t('audit.exportCsv')}</span>
             </Button>
             <Button
               variant="outline"
@@ -94,10 +94,10 @@ export default function AuditTab() {
               onClick={() => loadAudit(true)}
               disabled={loading}
               className="gap-1.5 h-8 text-xs font-medium"
-              title="Refresh Audit"
+              title={t('common.refresh')}
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-              <span>Refresh</span>
+              <span>{t('common.refresh')}</span>
             </Button>
           </div>
         </div>

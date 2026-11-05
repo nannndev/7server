@@ -1,7 +1,7 @@
 // Cmd/Ctrl+K quick jump. Owns its own open/query state and the global shortcut.
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Server, Terminal, Globe, Zap, FolderOpen, X, Command, ShieldCheck, Activity, Sun, Moon, Languages } from 'lucide-react';
+import { Server, Terminal, Globe, Zap, FolderOpen, X, Command, ShieldCheck, Activity, Sun, Moon, Languages, Bot, Users } from 'lucide-react';
 import { useI18n, LANGS } from '@/shared/i18n';
 import type { ServerItem } from '@/features/servers/types';
 import type { Route, ServerTab } from '@/app/router';
@@ -152,7 +152,9 @@ export default function CommandPalette({ servers, navigate, openManageServer, se
             {([
               [t('palette.monAlerts'), ShieldCheck, () => navigate({ page: 'monitoring', tab: 'alerts' })],
               [t('palette.monUptime'), Globe, () => navigate({ page: 'monitoring', tab: 'uptime' })],
-              [t('palette.monAudit'), Activity, () => navigate({ page: 'monitoring', tab: 'audit' })]
+              [t('palette.monAudit'), Activity, () => navigate({ page: 'monitoring', tab: 'audit' })],
+              ['AI Gateway', Bot, () => navigate({ page: 'ai-gateway', tab: 'quickstart' })],
+              ['Pengguna & RBAC', Users, () => navigate({ page: 'users', tab: 'users' })]
             ] as const)
               .filter(([label]) => !paletteQuery || label.toLowerCase().includes(paletteQuery.toLowerCase()))
               .map(([label, Icon, action]) => (

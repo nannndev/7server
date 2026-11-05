@@ -42,3 +42,4 @@ export interface ManagedUser {
   createdAt: string;
   lastLoginAt?: string;
 }
+

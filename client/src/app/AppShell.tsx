@@ -16,8 +16,7 @@ import ServerPage from '@/pages/ServerPage';
 import AiGatewayPage from '@/pages/AiGatewayPage';
 import AiCopilotDrawer from '@/features/copilot/components/AiCopilotDrawer';
 import AiCopilotTrigger from '@/features/copilot/components/AiCopilotTrigger';
-import UsersManagementModal from '@/features/users/components/UsersManagementModal';
-import ActiveSessionsModal from '@/features/users/components/ActiveSessionsModal';
+import UsersPage from '@/pages/UsersPage';
 import ChangePasswordModal from '@/features/users/components/ChangePasswordModal';
 import { useAuth, useCan } from '@/features/auth/AuthContext';
 import { useTheme } from '@/shared/hooks/useTheme';
@@ -54,8 +53,6 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
   const [filesServer, setFilesServer] = useState<ServerItem | null>(null);
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [copilotOpen, setCopilotOpen] = useState(false);
-  const [showUsersModal, setShowUsersModal] = useState(false);
-  const [showSessionsModal, setShowSessionsModal] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const { user } = useAuth();
 
@@ -142,8 +139,8 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
           onImported={reload}
           onLogout={onLogout}
           onToggleCopilot={() => setCopilotOpen((v) => !v)}
-          onOpenUsers={() => setShowUsersModal(true)}
-          onOpenSessions={() => setShowSessionsModal(true)}
+          onOpenUsers={() => navigate({ page: 'users', tab: 'users' })}
+          onOpenSessions={() => navigate({ page: 'users', tab: 'sessions' })}
           onOpenChangePassword={() => setShowChangePasswordModal(true)}
         />
 
@@ -159,6 +156,12 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
             <AiGatewayPage
               tab={route.tab || 'quickstart'}
               onTabChange={(t) => navigate({ page: 'ai-gateway', tab: t })}
+            />
+          ) : route.page === 'users' ? (
+            <UsersPage
+              tab={route.tab || 'users'}
+              onTabChange={(t) => navigate({ page: 'users', tab: t })}
+              servers={servers}
             />
           ) : route.page === 'server' ? (
             managedServer ? (
@@ -240,20 +243,6 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
       {filesServer && <FileManagerModal server={filesServer} onClose={() => setFilesServer(null)} />}
       {showBatchModal && <BatchCommandModal servers={servers} onClose={() => setShowBatchModal(false)} />}
 
-      {showUsersModal && (
-        <UsersManagementModal
-          open={showUsersModal}
-          onClose={() => setShowUsersModal(false)}
-          servers={servers}
-          currentUserId={user?.id}
-        />
-      )}
-      {showSessionsModal && (
-        <ActiveSessionsModal
-          open={showSessionsModal}
-          onClose={() => setShowSessionsModal(false)}
-        />
-      )}
       {showChangePasswordModal && (
         <ChangePasswordModal
           open={showChangePasswordModal}

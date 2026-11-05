@@ -19,6 +19,10 @@ html.privacy .sensitive { filter: blur(5px); user-select: none; }
   --ring: #a1a1aa;
   --accent-brand: #38bdf8;
   --ok: #6be0a0;
+  --accent: #6be0a0;
+  --accent-ink: #0b0b0b;
+  --line: #232323;
+  --line-strong: #333333;
   --sidebar-bg: #0d0d0f;
   --sidebar-hover: #17171a;
   --sidebar-active: #1e1e22;
@@ -30,6 +34,7 @@ html.privacy .sensitive { filter: blur(5px); user-select: none; }
   --face-top: #17171a; --face-bot: #121214;
   --silver-top: #f1f1f3; --silver-mid: #c9c9ce; --silver-bot: #a3a3aa; --silver-ink: #0c0c0e;
   --weave: rgba(255, 255, 255, .018);
+  --core-violet: rgba(139, 92, 246, .22); --core-cyan: rgba(56, 189, 248, .14);
 }
 
 html.light {
@@ -39,7 +44,10 @@ html.light {
   --card-border: #e2e2de;
   --muted: #efefec;
   --muted-foreground: #6b6b70;
-  --accent: #efefec;
+  --accent: #1f8a55;
+  --accent-ink: #ffffff;
+  --line: #e2e2de;
+  --line-strong: #cfcfca;
   --primary: #18181a;
   --primary-foreground: #ffffff;
   --border: #e2e2de;
@@ -55,6 +63,7 @@ html.light {
   --face-top: #ffffff; --face-bot: #f6f6f4;
   --silver-top: #3a3a40; --silver-mid: #232327; --silver-bot: #111113; --silver-ink: #f6f6f7;
   --weave: rgba(0, 0, 0, .02);
+  --core-violet: rgba(139, 92, 246, .12); --core-cyan: rgba(56, 189, 248, .08);
 
   /* Components hardcode zinc-* for dark mode; invert the scale so they follow light mode too. */
   --color-zinc-50: #09090b;
@@ -142,6 +151,51 @@ html.light .btn-metal { text-shadow: 0 -1px 0 rgba(0, 0, 0, .5); box-shadow: ins
 }
 /* Status LED with a small bloom (like the icon's drive lights). */
 .led-glow { box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 18%, transparent), 0 0 7px currentColor; }
+.led { background: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent), 0 0 8px var(--accent); }
+@keyframes breathe { 0%, 100% { opacity: .45 } 50% { opacity: 1 } }
+.breathe { animation: breathe 2.8s ease-in-out infinite; }
+
+/* Inset well (recessed inputs/containers): carbon-dark recess under a thin bevel. */
+.well {
+  border: 1px solid transparent !important;
+  background:
+    linear-gradient(180deg, #0a0a0b, #0e0e10) padding-box,
+    linear-gradient(180deg, #202024, #34343a) border-box !important;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, .45);
+}
+html.light .well {
+  background:
+    linear-gradient(180deg, #ececea, #f6f6f4) padding-box,
+    linear-gradient(180deg, var(--rim-mid), var(--rim-hi)) border-box !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, .08);
+}
+
+/* Headline in brushed silver. */
+.silver-text {
+  background: linear-gradient(180deg, var(--foreground) 30%, color-mix(in srgb, var(--foreground) 58%, var(--background)));
+  -webkit-background-clip: text; background-clip: text; color: transparent !important;
+}
+
+/* Carbon-fibre ground behind hero & login, faded out at the edges. */
+.carbon {
+  position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    linear-gradient(45deg, var(--weave) 25%, transparent 25% 50%, var(--weave) 50% 75%, transparent 75%) 0 0 / 6px 6px,
+    linear-gradient(-45deg, var(--weave) 25%, transparent 25% 50%, var(--weave) 50% 75%, transparent 75%) 3px 3px / 6px 6px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 30%, transparent 75%);
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 30%, transparent 75%);
+}
+
+/* The icon's optical core: a soft violet/cyan glow behind the card, slowly breathing. */
+.core-glow { position: relative; isolation: isolate; }
+.core-glow::before {
+  content: ''; position: absolute; z-index: -1; pointer-events: none;
+  width: 50%; aspect-ratio: 1; left: 25%; top: 10%;
+  background: radial-gradient(circle, var(--core-violet), var(--core-cyan) 42%, transparent 70%);
+  filter: blur(28px);
+  animation: core 9s ease-in-out infinite;
+}
+@keyframes core { 0%, 100% { opacity: .75; transform: scale(1) } 50% { opacity: 1; transform: scale(1.06) } }
 
 /* Custom scrollbars */
 ::-webkit-scrollbar {

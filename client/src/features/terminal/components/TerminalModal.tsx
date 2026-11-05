@@ -5,6 +5,7 @@ import TerminalView from './TerminalView';
 import { Modal } from '@/shared/ui/modal';
 import { Button } from '@/shared/ui/button';
 import { useCan } from '@/features/auth/AuthContext';
+import { useT } from '@/shared/i18n';
 
 interface TerminalModalProps {
   server: ServerItem;
@@ -13,6 +14,7 @@ interface TerminalModalProps {
 }
 
 export default function TerminalModal({ server, onClose, initialCommand }: TerminalModalProps) {
+  const t = useT();
   const canOpen = useCan('terminal.open');
 
   if (!canOpen) {
@@ -20,12 +22,12 @@ export default function TerminalModal({ server, onClose, initialCommand }: Termi
       <Modal onClose={onClose} className="max-w-md">
         <div className="p-6 text-center space-y-3 bg-[var(--card)] rounded-xl border border-[var(--border)] shadow-2xl">
           <ShieldAlert className="w-8 h-8 text-red-500 mx-auto" />
-          <h3 className="text-sm font-semibold">Akses Terminal Dibatasi</h3>
+          <h3 className="text-sm font-semibold">{t('terminal.deniedTitle')}</h3>
           <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
-            Peran akun Anda tidak memiliki izin <code>terminal.open</code> untuk membuka sesi terminal SSH interaktif. Hubungi Administrator untuk meningkatkan akses.
+            {t('terminal.deniedDesc')}
           </p>
           <Button onClick={onClose} size="sm" className="mt-2">
-            Tutup
+            {t('common.close')}
           </Button>
         </div>
       </Modal>

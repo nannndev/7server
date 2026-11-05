@@ -180,3 +180,4 @@ export default function ActiveSessionsModal({ open, onClose }: ActiveSessionsMod
     </div>
   );
 }
+

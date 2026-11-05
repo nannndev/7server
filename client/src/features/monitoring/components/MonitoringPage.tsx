@@ -295,7 +295,7 @@ export default function MonitoringPage({ tab, onTabChange, onThresholdsSaved, on
                                     <RefreshCw className="w-3.5 h-3.5" /> {t('common.refresh')}
                                 </Button>
                                 <Button variant="outline" size="sm" className="gap-1" onClick={() => exportAuditCsv()}>
-                                    <Download className="w-3.5 h-3.5" /> Ekspor CSV
+                                    <Download className="w-3.5 h-3.5" /> {t('audit.exportCsv')}
                                 </Button>
                                 <span className="text-[11px] text-[var(--muted-foreground)] ml-auto">{t('mon.auditDesc')}</span>
                             </div>
@@ -309,7 +309,7 @@ export default function MonitoringPage({ tab, onTabChange, onThresholdsSaved, on
                                         <thead className="bg-[var(--muted)] text-[var(--muted-foreground)] text-left">
                                             <tr>
                                                 <th className="py-2 px-3">{t('monitoring.thTimestamp')}</th>
-                                                <th className="py-2 px-3">User</th>
+                                                <th className="py-2 px-3">{t('audit.user')}</th>
                                                 <th className="py-2 px-3">IP</th>
                                                 <th className="py-2 px-3">{t('monitoring.thAction')}</th>
                                                 <th className="py-2 px-3">{t('monitoring.thDetail')}</th>

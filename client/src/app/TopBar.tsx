@@ -106,9 +106,23 @@ export default function TopBar({
                 route.page === 'fleet' ? 'font-semibold' : 'text-[var(--muted-foreground)]'
               }`}
             >
-              {route.page === 'monitoring' ? t('nav.monitoring') : t('nav.fleet')}
+              {route.page === 'monitoring'
+                ? t('nav.monitoring')
+                : route.page === 'ai-gateway'
+                ? t('nav.aiGateway')
+                : route.page === 'users'
+                ? t('nav.users')
+                : t('nav.fleet')}
             </button>
           </li>
+          {route.page === 'users' && (
+            <>
+              <li aria-hidden><ChevronRight className="w-3.5 h-3.5 text-[var(--muted-foreground)]" /></li>
+              <li className="fade-in text-[var(--foreground)] font-semibold truncate capitalize">
+                {route.tab === 'roles' ? t('users.tabRoles') : route.tab === 'sessions' ? t('users.tabSessions') : t('users.tabUsers')}
+              </li>
+            </>
+          )}
           {route.page === 'server' && managedServer && (
             <>
               <li aria-hidden><ChevronRight className="w-3.5 h-3.5 text-[var(--muted-foreground)]" /></li>
@@ -328,7 +342,7 @@ export default function TopBar({
                       </span>
                     </div>
                     <p className="text-[10px] text-[var(--muted-foreground)] mt-0.5 truncate">
-                      {!user.servers || user.servers === '*' ? 'Akses semua server (*)' : `${Array.isArray(user.servers) ? user.servers.length : 0} server dibatasi`}
+                      {!user.servers || user.servers === '*' ? t('top.allServersAccess') : `${Array.isArray(user.servers) ? user.servers.length : 0} ${t('top.restrictedServersAccess')}`}
                     </p>
                   </div>
 
@@ -341,7 +355,7 @@ export default function TopBar({
                       className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left hover:bg-[var(--muted)] transition"
                     >
                       <Users className="w-3.5 h-3.5 text-purple-500" />
-                      <span>Kelola Pengguna (RBAC)</span>
+                      <span>{t('top.userManagement')}</span>
                     </button>
                   )}
 
@@ -354,7 +368,7 @@ export default function TopBar({
                       className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left hover:bg-[var(--muted)] transition"
                     >
                       <ShieldAlert className="w-3.5 h-3.5 text-blue-500" />
-                      <span>Sesi Aktif</span>
+                      <span>{t('top.activeSessions')}</span>
                     </button>
                   )}
 
@@ -367,7 +381,7 @@ export default function TopBar({
                       className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left hover:bg-[var(--muted)] transition"
                     >
                       <KeyRound className="w-3.5 h-3.5 text-amber-500" />
-                      <span>Ganti Password</span>
+                      <span>{t('top.changePassword')}</span>
                     </button>
                   )}
 

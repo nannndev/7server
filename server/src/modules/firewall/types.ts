@@ -24,3 +24,4 @@ export interface RulePreview {
   activeSshPort: number;
   willBlockSsh: boolean;
 }
+

@@ -103,3 +103,4 @@ export function useCan(permission: Permission): boolean {
   const { can } = useAuth();
   return can(permission);
 }
+

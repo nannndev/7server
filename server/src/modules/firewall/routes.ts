@@ -43,3 +43,4 @@ firewallRoutes.post('/servers/:id/firewall/toggle', need('firewall.manage'), wit
   const { enable } = req.body || {};
   return await toggleFirewallState(target, !!enable);
 }));
+

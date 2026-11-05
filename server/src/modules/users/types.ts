@@ -81,3 +81,4 @@ export interface AuthContextUser {
   servers: string[] | '*';
   sessionId: string;
 }
+

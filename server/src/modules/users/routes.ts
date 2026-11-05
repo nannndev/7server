@@ -144,3 +144,4 @@ usersRoutes.get('/audit/export.csv', need('server.read'), (req: Request, res: Re
   res.setHeader('Content-Disposition', `attachment; filename="7server-audit-${new Date().toISOString().slice(0, 10)}.csv"`);
   res.send(csv);
 });
+

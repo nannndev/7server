@@ -14,6 +14,7 @@ import { Badge } from '@/shared/ui/badge';
 import { Input } from '@/shared/ui/input';
 import { toast } from '@/shared/ui/toast';
 import { confirmModal } from '@/shared/ui/confirm-dialog';
+import { useT } from '@/shared/i18n';
 
 interface FirewallPanelProps {
   serverId: string;
@@ -30,6 +31,7 @@ const COMMON_PRESETS = [
 ];
 
 export default function FirewallPanel({ serverId, serverName }: FirewallPanelProps) {
+  const t = useT();
   const canManageFirewall = useCan('firewall.manage');
   const [data, setData] = useState<FirewallStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -52,7 +54,7 @@ export default function FirewallPanel({ serverId, serverName }: FirewallPanelPro
       const res = await fetchFirewall(serverId);
       setData(res);
     } catch (err: any) {
-      setError(err.message || 'Gagal memuat status firewall');
+      setError(err.message || t('firewall.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -67,17 +69,17 @@ export default function FirewallPanel({ serverId, serverName }: FirewallPanelPro
     const willEnable = !data.enabled;
 
     if (willEnable && !data.sshSafe) {
-      toast.error(`Tidak dapat mengaktifkan UFW: Port SSH (${data.sshPort}) belum memiliki aturan ALLOW. Tambahkan aturan ALLOW untuk port SSH terlebih dahulu agar koneksi server tidak terputus.`);
+      toast.error(t('firewall.sshLockedError').replace('{port}', String(data.sshPort)));
       return;
     }
 
     const confirmed = await confirmModal({
-      title: willEnable ? 'Aktifkan Firewall UFW' : 'Nonaktifkan Firewall UFW',
+      title: willEnable ? t('firewall.enableTitle') : t('firewall.disableTitle'),
       message: willEnable
-        ? `Apakah Anda yakin ingin mengaktifkan firewall UFW di "${serverName}"? Pastikan port layanan penting sudah dibuka.`
-        : `Apakah Anda yakin ingin mematikan firewall UFW di "${serverName}"? Seluruh traffic masuk tidak akan lagi disaring oleh UFW.`,
-      variant: willEnable ? 'warning' : 'danger', // enabling can still cut access: warn, never 'default'
-      confirmText: willEnable ? 'Aktifkan Firewall' : 'Matikan Firewall'
+        ? t('firewall.enableConfirm').replace('{name}', serverName)
+        : t('firewall.disableConfirm').replace('{name}', serverName),
+      variant: willEnable ? 'warning' : 'danger',
+      confirmText: willEnable ? t('firewall.btnEnable') : t('firewall.btnDisable')
     });
 
     if (!confirmed) return;
@@ -86,9 +88,9 @@ export default function FirewallPanel({ serverId, serverName }: FirewallPanelPro
     try {
       const res = await toggleFirewall(serverId, willEnable);
       setData(res);
-      toast.success(willEnable ? 'Firewall UFW berhasil diaktifkan' : 'Firewall UFW telah dimatikan');
+      toast.success(willEnable ? t('firewall.toggleEnabled') : t('firewall.toggleDisabled'));
     } catch (err: any) {
-      toast.error(err.message || 'Gagal mengubah status firewall');
+      toast.error(err.message || t('firewall.toggleFailed'));
     } finally {
       setToggling(false);
     }
@@ -108,13 +110,13 @@ export default function FirewallPanel({ serverId, serverName }: FirewallPanelPro
         comment: comment.trim() || undefined
       });
       setData(res);
-      toast.success(`Aturan firewall untuk port ${port} berhasil ditambahkan`);
+      toast.success(t('firewall.ruleAdded').replace('{port}', port));
       setShowAddForm(false);
       setPort('');
       setFromIp('');
       setComment('');
     } catch (err: any) {
-      toast.error(err.message || 'Gagal menambahkan aturan firewall');
+      toast.error(err.message || t('firewall.addFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -125,18 +127,22 @@ export default function FirewallPanel({ serverId, serverName }: FirewallPanelPro
 
     if (rule.isSsh && data?.enabled) {
       const confirmed = await confirmModal({
-        title: 'PERINGATAN: Aturan Port SSH',
-        message: `Aturan #${rule.number} melindungi port SSH (${data.sshPort}) yang sedang dipakai oleh 7Server. Menghapus aturan ini berpotensi memutus koneksi server jika tidak ada aturan SSH lain! Lanjutkan?`,
+        title: t('firewall.deleteSshWarnTitle'),
+        message: t('firewall.deleteSshWarnMsg').replace('{number}', String(rule.number)).replace('{port}', String(data.sshPort)),
         variant: 'danger',
-        confirmText: 'Tetap Hapus'
+        confirmText: t('firewall.btnForceDelete')
       });
       if (!confirmed) return;
     } else {
       const confirmed = await confirmModal({
-        title: 'Hapus Aturan Firewall',
-        message: `Hapus aturan #${rule.number} (${rule.to} ${rule.action} dari ${rule.from})?`,
+        title: t('firewall.deleteTitle'),
+        message: t('firewall.deleteConfirmMsg')
+          .replace('{number}', String(rule.number))
+          .replace('{to}', rule.to)
+          .replace('{action}', rule.action)
+          .replace('{from}', rule.from),
         variant: 'danger',
-        confirmText: 'Hapus Aturan'
+        confirmText: t('firewall.btnDelete')
       });
       if (!confirmed) return;
     }
@@ -144,9 +150,9 @@ export default function FirewallPanel({ serverId, serverName }: FirewallPanelPro
     try {
       const res = await deleteFirewallRule(serverId, rule.number);
       setData(res);
-      toast.success(`Aturan #${rule.number} berhasil dihapus`);
+      toast.success(t('firewall.ruleDeleted').replace('{number}', String(rule.number)));
     } catch (err: any) {
-      toast.error(err.message || 'Gagal menghapus aturan firewall');
+      toast.error(err.message || t('firewall.deleteFailed'));
     }
   };
 
@@ -160,7 +166,7 @@ export default function FirewallPanel({ serverId, serverName }: FirewallPanelPro
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold">Firewall Terpusat (UFW)</h3>
+              <h3 className="text-sm font-semibold">{t('firewall.title')}</h3>
               {data && (
                 <span
                   className={`px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase border ${
@@ -169,12 +175,12 @@ export default function FirewallPanel({ serverId, serverName }: FirewallPanelPro
                       : 'bg-zinc-500/10 text-zinc-500 border-zinc-500/20'
                   }`}
                 >
-                  {data.enabled ? 'AKTIF (ENFORCED)' : 'NONAKTIF'}
+                  {data.enabled ? t('firewall.statusEnforced') : t('firewall.statusDisabled')}
                 </span>
               )}
             </div>
             <p className="text-[11px] text-[var(--muted-foreground)]">
-              Manajemen paket incoming/outgoing dengan pencegahan lockout otomatis
+              {t('firewall.subtitle')}
             </p>
           </div>
         </div>
@@ -188,7 +194,7 @@ export default function FirewallPanel({ serverId, serverName }: FirewallPanelPro
             className="h-8 gap-1.5 text-xs"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            <span>Segarkan</span>
+            <span>{t('common.refresh')}</span>
           </Button>
 
           {canManageFirewall && data && (
@@ -202,7 +208,7 @@ export default function FirewallPanel({ serverId, serverName }: FirewallPanelPro
                   data.enabled ? 'text-amber-500 hover:text-amber-600 border-amber-500/30' : ''
                 }`}
               >
-                {toggling ? 'Memproses...' : data.enabled ? 'Matikan Firewall' : 'Aktifkan Firewall'}
+                {toggling ? t('common.loading') : data.enabled ? t('firewall.btnDisable') : t('firewall.btnEnable')}
               </Button>
 
               <Button
@@ -211,7 +217,7 @@ export default function FirewallPanel({ serverId, serverName }: FirewallPanelPro
                 className="h-8 gap-1.5 text-xs font-semibold"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Tambah Aturan</span>
+                <span>{t('firewall.addRuleTitle')}</span>
               </Button>
             </>
           )}
@@ -225,17 +231,17 @@ export default function FirewallPanel({ serverId, serverName }: FirewallPanelPro
           <div className="space-y-0.5">
             <div className="flex items-center gap-2">
               <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                SSH Lockout Safeguard Aktif
+                {t('firewall.sshSafeguardActive')}
               </span>
               <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-mono text-[10px]">
                 Port {data.sshPort}/tcp
               </span>
             </div>
             <p className="text-[11px] text-[var(--muted-foreground)] leading-relaxed">
-              7Server mendeteksi port SSH aktif ({data.sshPort}) dan menjaganya agar tidak terblokir saat firewall dioperasikan.
+              {t('firewall.sshSafeguardDesc').replace('{port}', String(data.sshPort))}
               {!data.sshSafe && (
                 <span className="text-amber-500 font-semibold block mt-0.5">
-                  ⚠️ Perhatian: Belum ditemukan aturan eksplisit ALLOW untuk port {data.sshPort}. UFW dicegah untuk aktif hingga aturan ini dibuat.
+                  ⚠️ {t('firewall.sshSafeguardWarning').replace('{port}', String(data.sshPort))}
                 </span>
               )}
             </p>
@@ -248,10 +254,10 @@ export default function FirewallPanel({ serverId, serverName }: FirewallPanelPro
         <form onSubmit={handleAddRule} className="p-4 rounded-xl border border-[var(--border)] bg-[var(--muted)]/20 space-y-4">
           <div className="flex items-center justify-between">
             <h4 className="text-xs font-semibold flex items-center gap-1.5">
-              <Plus className="w-3.5 h-3.5 text-primary" /> Tambah Aturan Firewall Baru
+              <Plus className="w-3.5 h-3.5 text-primary" /> {t('firewall.addRuleTitle')}
             </h4>
             <div className="flex items-center gap-1">
-              <span className="text-[10px] text-[var(--muted-foreground)] mr-1">Preset Cepat:</span>
+              <span className="text-[10px] text-[var(--muted-foreground)] mr-1">{t('firewall.quickPresets')}</span>
               {COMMON_PRESETS.map((p) => (
                 <button
                   key={p.label}
@@ -271,7 +277,7 @@ export default function FirewallPanel({ serverId, serverName }: FirewallPanelPro
 
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <label className="block space-y-1">
-              <span className="text-xs font-medium text-[var(--muted-foreground)]">Port / Servis</span>
+              <span className="text-xs font-medium text-[var(--muted-foreground)]">{t('firewall.portService')}</span>
               <Input
                 type="text"
                 required
@@ -282,7 +288,7 @@ export default function FirewallPanel({ serverId, serverName }: FirewallPanelPro
             </label>
 
             <label className="block space-y-1">
-              <span className="text-xs font-medium text-[var(--muted-foreground)]">Protokol</span>
+              <span className="text-xs font-medium text-[var(--muted-foreground)]">{t('firewall.protocol')}</span>
               <select
                 value={protocol}
                 onChange={(e) => setProtocol(e.target.value as any)}
@@ -295,7 +301,7 @@ export default function FirewallPanel({ serverId, serverName }: FirewallPanelPro
             </label>
 
             <label className="block space-y-1">
-              <span className="text-xs font-medium text-[var(--muted-foreground)]">Aksi</span>
+              <span className="text-xs font-medium text-[var(--muted-foreground)]">{t('firewall.action')}</span>
               <select
                 value={action}
                 onChange={(e) => setAction(e.target.value as any)}
@@ -307,10 +313,10 @@ export default function FirewallPanel({ serverId, serverName }: FirewallPanelPro
             </label>
 
             <label className="block space-y-1">
-              <span className="text-xs font-medium text-[var(--muted-foreground)]">Dari IP (Opsional)</span>
+              <span className="text-xs font-medium text-[var(--muted-foreground)]">{t('firewall.fromIp')}</span>
               <Input
                 type="text"
-                placeholder="Kosongkan untuk Semua (Anywhere)"
+                placeholder={t('firewall.fromIpPlaceholder')}
                 value={fromIp}
                 onChange={(e) => setFromIp(e.target.value)}
               />
@@ -319,10 +325,10 @@ export default function FirewallPanel({ serverId, serverName }: FirewallPanelPro
 
           <div className="flex items-center justify-end gap-2 pt-1">
             <Button type="button" variant="ghost" size="sm" onClick={() => setShowAddForm(false)}>
-              Batal
+              {t('common.cancel')}
             </Button>
             <Button type="submit" size="sm" disabled={submitting || !port}>
-              {submitting ? 'Menyimpan...' : 'Terapkan Aturan'}
+              {submitting ? t('common.loading') : t('firewall.applyRule')}
             </Button>
           </div>
         </form>
@@ -334,24 +340,24 @@ export default function FirewallPanel({ serverId, serverName }: FirewallPanelPro
           <thead className="bg-[var(--muted)]/50 border-b border-[var(--border)] font-medium text-[var(--muted-foreground)]">
             <tr>
               <th className="px-4 py-2.5 w-12">#</th>
-              <th className="px-4 py-2.5">Port / Tujuan</th>
-              <th className="px-4 py-2.5">Aksi</th>
-              <th className="px-4 py-2.5">Dari (Sumber)</th>
-              <th className="px-4 py-2.5">Tipe</th>
-              <th className="px-4 py-2.5 text-right">Aksi</th>
+              <th className="px-4 py-2.5">{t('firewall.colPort')}</th>
+              <th className="px-4 py-2.5">{t('firewall.colAction')}</th>
+              <th className="px-4 py-2.5">{t('firewall.colFrom')}</th>
+              <th className="px-4 py-2.5">{t('firewall.colType')}</th>
+              <th className="px-4 py-2.5 text-right">{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--border)]">
             {loading && (!data || data.rules.length === 0) ? (
               <tr>
                 <td colSpan={6} className="py-8 text-center text-[var(--muted-foreground)]">
-                  Memuat aturan firewall UFW...
+                  {t('firewall.loadingRules')}
                 </td>
               </tr>
             ) : !data || data.rules.length === 0 ? (
               <tr>
                 <td colSpan={6} className="py-8 text-center text-[var(--muted-foreground)]">
-                  Belum ada aturan UFW yang terdaftar.
+                  {t('firewall.emptyRules')}
                 </td>
               </tr>
             ) : (
@@ -394,7 +400,7 @@ export default function FirewallPanel({ serverId, serverName }: FirewallPanelPro
                           size="icon"
                           onClick={() => handleDeleteRule(r)}
                           className="h-7 w-7 text-[var(--muted-foreground)] hover:text-red-500"
-                          title="Hapus Aturan"
+                          title={t('firewall.deleteTitle')}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </Button>

@@ -1,6 +1,6 @@
 // Run (from client/): npx --prefix ../server tsx src/app/router.test.ts
 import assert from 'node:assert/strict';
-import { parseRoute, routeToHash, Route } from '@/app/router';
+import { parseRoute, routeToHash, Route } from './router';
 
 const cases: [string, Route][] = [
   ['', { page: 'fleet' }],
@@ -19,7 +19,10 @@ const cases: [string, Route][] = [
   ['#/ai-gateway/providers', { page: 'ai-gateway', tab: 'providers' }],
   ['#/ai-gateway/keys', { page: 'ai-gateway', tab: 'keys' }],
   ['#/ai-gateway/quickstart', { page: 'ai-gateway', tab: 'quickstart' }],
-  ['#/ai-gateway/usage', { page: 'ai-gateway', tab: 'usage' }]
+  ['#/ai-gateway/usage', { page: 'ai-gateway', tab: 'usage' }],
+  ['#/users', { page: 'users', tab: 'users' }],
+  ['#/users/roles', { page: 'users', tab: 'roles' }],
+  ['#/users/sessions', { page: 'users', tab: 'sessions' }]
 ];
 for (const [hash, route] of cases) {
   assert.deepEqual(parseRoute(hash), route, hash);

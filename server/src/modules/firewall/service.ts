@@ -171,3 +171,4 @@ export async function toggleFirewallState(
     return { success: true, output: res.stdout || res.stderr };
   }
 }
+
