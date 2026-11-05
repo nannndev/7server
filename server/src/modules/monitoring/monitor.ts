@@ -80,7 +80,7 @@ export function updateSettings(input: any) {
 export function validateWebhook(raw: unknown): string {
   const url = String(raw || '').trim();
   if (!/^https:\/\/(?:ptb\.|canary\.)?(?:discord|discordapp)\.com\/api\/webhooks\/\d+\/[\w-]+$/.test(url)) {
-    throw badRequest('URL webhook Discord tidak valid (harus https://discord.com/api/webhooks/...)');
+    throw badRequest('Invalid Discord webhook URL (must start with https://discord.com/api/webhooks/...)');
   }
   return url;
 }
@@ -153,7 +153,7 @@ export function evaluateMetrics(name: string, id: string, m: any, t: Thresholds)
     ['disk', 'Disk', m.disk?.usedPercent || 0, t.disk]
   ];
   for (const [k, label, v, limit] of checks) {
-    setAlert(`srv:${id}:${k}`, v >= limit, `**${esc(name)}**: ${label} ${v}% (batas ${limit}%)`, `**${esc(name)}**: ${label} normal lagi (${v}%)`);
+    setAlert(`srv:${id}:${k}`, v >= limit, `**${esc(name)}**: ${label} at ${v}% (limit ${limit}%)`, `**${esc(name)}**: ${label} back to normal (${v}%)`);
   }
 }
 
@@ -172,11 +172,11 @@ async function pollServers() {
         const m = await fetchServerMetrics(s);
         recordHistory(s.id, m);
         updateServer(s.id, { status: 'online', lastChecked: new Date().toISOString(), metrics: m });
-        setAlert(`srv:${s.id}:down`, false, '', `**${esc(s.name)}** (${s.host}) online lagi`);
+        setAlert(`srv:${s.id}:down`, false, '', `**${esc(s.name)}** (${s.host}) is back online`);
         evaluateMetrics(s.name, s.id, m, settings.thresholds);
       } catch (e: any) {
         updateServer(s.id, { status: 'offline', lastChecked: new Date().toISOString() });
-        setAlert(`srv:${s.id}:down`, true, `**${esc(s.name)}** (${s.host}) tidak bisa dihubungi: ${esc(e.message)}`, '');
+        setAlert(`srv:${s.id}:down`, true, `**${esc(s.name)}** (${s.host}) is unreachable: ${esc(e.message)}`, '');
       }
     }));
     lastMetricsRun = Date.now();
@@ -271,9 +271,9 @@ async function doUptimeChecks() {
     for (const r of results) {
       // ENOTFOUND = no DNS record: a stale nginx config, not an outage. Shown in the UI, never alerted.
       const down = r.error !== 'ENOTFOUND' && (r.status === null || r.status >= 500);
-      setAlert(`url:${r.domain}:down`, down, `${esc(r.domain)} DOWN (${r.status ?? esc(r.error || 'no response')}) di ${esc(r.serverName)}`, `${esc(r.domain)} kembali normal (${r.status})`);
+      setAlert(`url:${r.domain}:down`, down, `${esc(r.domain)} DOWN (${r.status ?? esc(r.error || 'no response')}) on ${esc(r.serverName)}`, `${esc(r.domain)} is back up (${r.status})`);
       const sslBad = r.sslDaysLeft !== null && r.sslDaysLeft !== undefined && r.sslDaysLeft < settings.sslWarnDays;
-      setAlert(`url:${r.domain}:ssl`, sslBad, `SSL ${esc(r.domain)} habis dalam ${r.sslDaysLeft} hari`, `SSL ${esc(r.domain)} sudah diperpanjang (${r.sslDaysLeft} hari)`);
+      setAlert(`url:${r.domain}:ssl`, sslBad, `SSL ${esc(r.domain)} expires in ${r.sslDaysLeft} days`, `SSL ${esc(r.domain)} renewed (${r.sslDaysLeft} days left)`);
     }
     uptime = results;
     lastUptimeRun = Date.now();

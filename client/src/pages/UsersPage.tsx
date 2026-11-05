@@ -60,23 +60,22 @@ const ROLES: RoleConfig[] = [
 
 const PERMISSIONS_MATRIX: {
   id: Permission;
-  label: string;
   category: string;
   admin: boolean;
   operator: boolean;
   viewer: boolean;
 }[] = [
-  { id: 'server.read', label: 'Melihat armada server, metrik real-time, status, dan riwayat audit', category: 'Server', admin: true, operator: true, viewer: true },
-  { id: 'server.manage', label: 'Menambah, mengubah kredensial, dan menghapus server dari armada', category: 'Server', admin: true, operator: false, viewer: false },
-  { id: 'service.control', label: 'Mengontrol service (systemd, Docker containers, PM2, cron, & backups)', category: 'Operasi', admin: true, operator: true, viewer: false },
-  { id: 'terminal.open', label: 'Membuka Web SSH terminal interaktif, batch command, & SFTP write', category: 'Operasi', admin: true, operator: true, viewer: false },
-  { id: 'db.read', label: 'Melihat skema database, tabel, relasi ER, dan menjalankan query SELECT', category: 'Database', admin: true, operator: true, viewer: true },
-  { id: 'db.write', label: 'Menjalankan query mutasi (INSERT, UPDATE, DELETE, DDL) & manipulasi data', category: 'Database', admin: true, operator: true, viewer: false },
-  { id: 'copilot.chat', label: 'Konsultasi tanya-jawab troubleshooting dengan AI Copilot', category: 'AI Copilot', admin: true, operator: true, viewer: true },
-  { id: 'copilot.execute', label: 'Izin bagi AI Copilot untuk mengeksekusi instruksi perbaikan otomatis', category: 'AI Copilot', admin: true, operator: true, viewer: false },
-  { id: 'gateway.manage', label: 'Mengelola provider AI Gateway, Virtual API Key, dan routing failover', category: 'Admin', admin: true, operator: false, viewer: false },
-  { id: 'firewall.manage', label: 'Mengelola aturan firewall terpusat (UFW) dan SSH lockout guard', category: 'Keamanan', admin: true, operator: false, viewer: false },
-  { id: 'users.manage', label: 'Mengelola akun pengguna, hak akses RBAC, dan mereset password', category: 'Keamanan', admin: true, operator: false, viewer: false },
+  { id: 'server.read', category: 'server', admin: true, operator: true, viewer: true },
+  { id: 'server.manage', category: 'server', admin: true, operator: false, viewer: false },
+  { id: 'service.control', category: 'operations', admin: true, operator: true, viewer: false },
+  { id: 'terminal.open', category: 'operations', admin: true, operator: true, viewer: false },
+  { id: 'db.read', category: 'database', admin: true, operator: true, viewer: true },
+  { id: 'db.write', category: 'database', admin: true, operator: true, viewer: false },
+  { id: 'copilot.chat', category: 'ai-copilot', admin: true, operator: true, viewer: true },
+  { id: 'copilot.execute', category: 'ai-copilot', admin: true, operator: true, viewer: false },
+  { id: 'gateway.manage', category: 'admin', admin: true, operator: false, viewer: false },
+  { id: 'firewall.manage', category: 'security', admin: true, operator: false, viewer: false },
+  { id: 'users.manage', category: 'security', admin: true, operator: false, viewer: false },
 ];
 
 export default function UsersPage({ tab, onTabChange, servers }: UsersPageProps) {
@@ -651,10 +650,10 @@ export default function UsersPage({ tab, onTabChange, servers }: UsersPageProps)
                   {PERMISSIONS_MATRIX.map((p) => (
                     <tr key={p.id} className="hover:bg-[var(--muted)]/20 transition">
                       <td className="px-5 py-3 font-medium text-[var(--muted-foreground)]">
-                        {p.category}
+                        {t(`users.permCat.${p.category}` as MessageKey)}
                       </td>
                       <td className="px-5 py-3">
-                        <div className="font-medium text-[var(--foreground)]">{p.label}</div>
+                        <div className="font-medium text-[var(--foreground)]">{t(`users.perm.${p.id}` as MessageKey)}</div>
                         <code className="text-[10px] text-[var(--muted-foreground)] font-mono">{p.id}</code>
                       </td>
                       <td className="px-5 py-3 text-center">
