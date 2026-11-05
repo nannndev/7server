@@ -321,3 +321,29 @@ html.light .shimmer-effect::after {
 .er-edge-active .react-flow__edge-textwrapper { opacity: 1; }
 .er-edge .react-flow__edge-text { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; }
 .er-edge marker path, .react-flow__arrowhead polyline { stroke: currentColor; }
+
+/* ---------------- Anatomy figures inside the dashboard ----------------
+   The kit themes off .iso[data-theme="light"]; the dashboard themes off html.light. Map one to the other
+   and use the dashboard's card colour for the plate so figures sit on the same metal surface. */
+.iso[data-theme="auto"] { --anatomy-card: var(--card); --anatomy-page: var(--background); }
+html.light .iso[data-theme="auto"] {
+  --anatomy-page:#f2f2ef;--anatomy-card:var(--card);--anatomy-text:#57575a;--anatomy-strong:#18181a;--anatomy-muted:#8c8c90;
+  --anatomy-paper:var(--card);--anatomy-face:#ffffff;--anatomy-top:#ffffff;
+  --anatomy-shade-0:#dcdcd9;--anatomy-shade-1:#e5e5e2;--anatomy-shade-2:#ededea;--anatomy-shade-3:#f4f4f1;
+  --anatomy-lit-top:#ffffff;--anatomy-lit-shade:#eeeeeb;
+  --anatomy-hi:#26262a;--anatomy-mid:#8a8a8f;--anatomy-lo:#b4b4b8;--anatomy-faint:#d4d4d6;--anatomy-lit:#000000;
+  --anatomy-halo:#8a8a80;--anatomy-halo-opacity:.32;--anatomy-dot:#3a3a3e;
+}
+.iso[data-theme="auto"] .iso-plate { padding: 44px 16px; background: var(--card); box-shadow: 0 0 0 1px var(--border); --anatomy-paper: var(--card); }
+.iso[data-theme="auto"] .iso-legend { color: var(--muted-foreground); }
+/* Rack status LEDs: the only colour in the figure, because colour is the reading. */
+.rack-led-ok { fill: #34d399; filter: drop-shadow(0 0 1.6px #34d399); }
+.rack-led-warn { fill: #fbbf24; filter: drop-shadow(0 0 1.6px #fbbf24); }
+.rack-led-hot { fill: #f87171; filter: drop-shadow(0 0 2px #f87171); animation: rack-blink 1.2s ease-in-out infinite; }
+.rack-led-off { fill: var(--anatomy-faint); }
+@keyframes rack-blink { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .rack-led-hot { animation: none; } }
+.rack-stage:focus-visible { outline: 1px dashed var(--muted-foreground); outline-offset: 4px; }
+/* Selected rack blade: the one lit part of the figure (outline in the lit tone, kit rule). */
+.rack-blade[data-selected] .iso-edge { stroke: var(--anatomy-lit); }
+.rack-blade:hover .iso-edge { stroke: var(--anatomy-hi); }

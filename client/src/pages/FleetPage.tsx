@@ -5,7 +5,7 @@ import type { ServerItem, ServerMetrics } from '@/features/servers/types';
 import type { HistoryPoint } from '@/features/servers/api';
 import type { FleetView, ServerTab } from '@/app/router';
 import ServerCard from '@/features/servers/components/ServerCard';
-import RackView from '@/features/servers/components/views/RackView';
+import ServerRack from '@/features/servers/components/views/rack/ServerRack';
 import TopologyVisualizer from '@/features/servers/components/views/TopologyVisualizer';
 import CyberMatrixVisualizer from '@/features/servers/components/views/CyberMatrixVisualizer';
 import { Button } from '@/shared/ui/button';
@@ -213,10 +213,10 @@ export default function FleetPage(p: FleetPageProps) {
             )}
           </div>
         ) : view === 'rack' ? (
-          <RackView
+          <ServerRack
             servers={filteredServers}
             alertsFor={(s) => alertsFor(s)}
-            onManage={(s, tab) => openManageServer(s, tab || 'overview')}
+            onManage={(s) => openManageServer(s, 'overview')}
             onOpenTerminal={(s) => openManageServer(s, 'terminal')}
             onOpenFiles={(s) => setFilesServer(s)}
           />

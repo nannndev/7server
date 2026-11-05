@@ -1013,5 +1013,17 @@ export const en = {
   'combo.delete': "Delete combo",
   'combo.saved': "Combo saved",
   'combo.pick': "Pick a model…",
-  'combo.namePh': "e.g. coding"
+  'combo.namePh': "e.g. coding",
+  // rack figure
+  'rack.title': "Server rack",
+  'rack.hint': "Click a blade · ↑ ↓ keys · Enter opens",
+  'rack.aria': "Server rack: arrow keys pick a server, Enter opens it",
+  'rack.caption': "Each server is a 1U blade. Its three lights are CPU, RAM and disk (green under 70%, amber under 90%, red above); the dial is CPU. The selected blade is outlined and eases forward.",
+  'rack.disk': "Disk",
+  'rack.containers': "{n} containers running",
+  'rack.alerts': "{n} alerts",
+  'rack.manage': "Manage",
+  'rack.files': "Files",
+  'rack.empty': "No servers in this view.",
+  'rack.more': "{n} more servers not shown in the rack"
 };

@@ -1006,5 +1006,17 @@ export const id: Record<keyof typeof en, string> = {
   'combo.delete': "Hapus combo",
   'combo.saved': "Combo disimpan",
   'combo.pick': "Pilih model…",
-  'combo.namePh': "mis. coding"
+  'combo.namePh': "mis. coding",
+  // rack figure
+  'rack.title': "Rak server",
+  'rack.hint': "Klik blade · tombol ↑ ↓ · Enter membuka",
+  'rack.aria': "Rak server: tombol panah memilih server, Enter membukanya",
+  'rack.caption': "Tiap server adalah blade 1U. Tiga lampunya: CPU, RAM, dan disk (hijau di bawah 70%, kuning di bawah 90%, merah di atasnya); dial menunjukkan CPU. Blade yang dipilih diberi garis terang dan sedikit maju.",
+  'rack.disk': "Disk",
+  'rack.containers': "{n} container berjalan",
+  'rack.alerts': "{n} peringatan",
+  'rack.manage': "Kelola",
+  'rack.files': "File",
+  'rack.empty': "Tidak ada server di tampilan ini.",
+  'rack.more': "{n} server lain tidak ditampilkan di rak"
 };
