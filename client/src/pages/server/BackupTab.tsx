@@ -567,7 +567,7 @@ export default function BackupTab() {
                         {p.type === 'database' ? (
                           <Database className="w-4 h-4 text-sky-400" />
                         ) : (
-                          <FolderArchive className="w-4 h-4 text-purple-400" />
+                          <FolderArchive className="w-4 h-4 text-[var(--foreground)]" />
                         )}
                         <h4 className="text-sm font-semibold text-[var(--foreground)] truncate">{p.name}</h4>
                       </div>
@@ -683,7 +683,7 @@ export default function BackupTab() {
                         : 'border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
                     }`}
                   >
-                    <FolderArchive className="w-4 h-4 text-purple-400" />
+                    <FolderArchive className="w-4 h-4 text-[var(--foreground)]" />
                     <span>{t('backup.typeFiles')}</span>
                   </button>
                 </div>

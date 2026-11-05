@@ -18,7 +18,7 @@ export default function MediaViewer({ meta, blobUrl, blobSize, serverId, path }:
   if (meta.category === 'audio') {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[#09090b] text-center space-y-4">
-        <div className="w-20 h-20 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shadow-xl">
+        <div className="w-20 h-20 rounded-2xl metal border flex items-center justify-center text-[var(--foreground)] shadow-xl">
           <Music className="w-10 h-10" />
         </div>
         <div>

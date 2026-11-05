@@ -180,7 +180,7 @@ export default function CyberMatrixVisualizer({
       <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[var(--border)]">
         <div>
           <h3 className="text-xs font-semibold text-[var(--foreground)] flex items-center gap-1.5">
-            <Activity className="w-4 h-4 text-purple-400" /> 3D Isometric Resource Matrix & Telemetry Radar
+            <Activity className="w-4 h-4 text-[var(--foreground)]" /> 3D Isometric Resource Matrix & Telemetry Radar
           </h3>
           <p className="text-[11px] text-[var(--muted-foreground)]">
             Perbandingan tinggi pilar beban 3D (CPU, RAM, Swap, Storage) dan profil radar antar-VPS secara real-time
@@ -216,7 +216,7 @@ export default function CyberMatrixVisualizer({
               step={0.05}
               value={zoom}
               onChange={(e) => setZoom(Number(e.target.value))}
-              className="w-20 accent-purple-400 cursor-pointer"
+              className="w-20 accent-[var(--foreground)] cursor-pointer"
               aria-label="Zoom Matrix 3D"
             />
             <button

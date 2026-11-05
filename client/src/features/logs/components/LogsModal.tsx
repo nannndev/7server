@@ -100,10 +100,10 @@ export default function LogsModal({ serverId, type, name, onClose }: LogsModalPr
             size="sm"
             onClick={analyzeWithAi}
             disabled={!logs || loading}
-            className="h-7 text-[11px] gap-1 border-purple-500/30 text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 transition-colors"
+            className="h-7 text-[11px] gap-1 btn-metal"
             title="Analyze Logs with AI Copilot"
           >
-            <Sparkles className="w-3 h-3 text-purple-400 animate-pulse" />
+            <Sparkles className="w-3 h-3" />
             <span className="hidden sm:inline">Analyze with AI</span>
           </Button>
           <Button variant="ghost" size="icon" onClick={copyLogs} title="Copy Logs" className="h-7 w-7">

@@ -540,7 +540,7 @@ export default function TopologyVisualizer({
               onClick={() => setViewMode('isometric')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition ${
                 viewMode === 'isometric'
-                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm'
+                  ? 'btn-metal border shadow-sm'
                   : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
               }`}
             >
