@@ -125,7 +125,7 @@ export default function LogsModal({ serverId, type, name, onClose }: LogsModalPr
         )}
         <pre
           ref={preRef}
-          className="flex-1 overflow-auto p-4 text-[11px] leading-relaxed font-mono bg-[#09090b] text-zinc-200 whitespace-pre-wrap"
+          className="flex-1 overflow-auto p-4 text-[11px] leading-relaxed font-mono bg-[var(--background)] text-[var(--foreground)] whitespace-pre-wrap"
         >
           {logs || (loading ? t('logs.loading') : t('logs.empty'))}
         </pre>

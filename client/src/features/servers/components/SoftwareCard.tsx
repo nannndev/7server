@@ -24,7 +24,9 @@ import {
   ShieldCheck,
   Package,
   KeyRound,
-  ListChecks
+  ListChecks,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 import { BrandIcon } from '@/shared/ui/brand-icon';
 import {
@@ -41,6 +43,7 @@ import {
   MARKETPLACE_CATALOG,
   generateSingleToolScript,
   generateBatchToolsScript,
+  generateUninstallScript,
   formatTerminalCommand,
   type MarketplaceTool
 } from '../lib/templates';
@@ -92,10 +95,11 @@ export default function SoftwareCard({
   // Service control busy state: `${toolId}:${action}`
   const [serviceBusy, setServiceBusy] = useState<string | null>(null);
 
-  // Quick Tool Installer / Inspector Modal State
+  // Quick Tool Installer / Inspector / Uninstaller Modal State
   const [activeToolModal, setActiveToolModal] = useState<{
     tool: MarketplaceTool;
     installedInfo?: SoftwareItem;
+    mode?: 'install' | 'uninstall';
   } | null>(null);
   const [modalVersion, setModalVersion] = useState<string>('');
   const [modalCustomScript, setModalCustomScript] = useState<string | null>(null);
@@ -143,12 +147,12 @@ export default function SoftwareCard({
   // Current active task for open modal (strictly scoped to currently inspected tool)
   const currentModalTask = activeToolModal
     ? tasks.find(
-      (t) =>
-        t.serverId === serverId &&
-        (t.id.includes(activeToolModal.tool.id) ||
-          t.title.toLowerCase().includes(activeToolModal.tool.name.toLowerCase())) &&
-        t.status === 'running'
-    )
+        (t) =>
+          t.serverId === serverId &&
+          (t.id.includes(activeToolModal.tool.id) ||
+            t.title.toLowerCase().includes(activeToolModal.tool.name.toLowerCase())) &&
+          t.status === 'running'
+      )
     : null;
 
   useEffect(() => {
@@ -162,7 +166,7 @@ export default function SoftwareCard({
     try {
       await Promise.all([
         swr(`software:${serverId}`, () => fetchSoftware(serverId), setItems, setLoading, force),
-        swr(`software-upgrades:${serverId}`, () => fetchSoftwareUpgrades(serverId), setUpgrades, () => { }, force).catch(() => { })
+        swr(`software-upgrades:${serverId}`, () => fetchSoftwareUpgrades(serverId), setUpgrades, () => {}, force).catch(() => {})
       ]);
     } catch (e: any) {
       setError(e.message);
@@ -259,15 +263,18 @@ export default function SoftwareCard({
     }
   };
 
-  // Open Quick Tool Setup / Reinstall Modal
-  const openToolSetup = (item: SoftwareItem) => {
-    const marketTool = MARKETPLACE_CATALOG.find((m) => m.id === item.id);
-    if (!marketTool) {
-      if (onOpenTemplates) onOpenTemplates();
-      return;
-    }
+  // Open Quick Tool Setup / Reinstall / Uninstall Modal
+  const openToolSetup = (item: SoftwareItem, mode: 'install' | 'uninstall' = 'install') => {
+    const marketTool =
+      MARKETPLACE_CATALOG.find((m) => m.id === item.id) || {
+        id: item.id,
+        name: item.name,
+        category: item.category,
+        description: `System package ${item.name}`,
+        getInstallScript: () => `apt-get install -y ${item.id}`
+      };
     const defVer = marketTool.defaultVersion || marketTool.versions?.[0]?.value || '';
-    setActiveToolModal({ tool: marketTool, installedInfo: item });
+    setActiveToolModal({ tool: marketTool, installedInfo: item, mode });
     setModalVersion(defVer);
     setModalCustomScript(null);
     setModalResult(null);
@@ -275,6 +282,10 @@ export default function SoftwareCard({
     setSudoPasswordInput('');
     setModalRunning(false);
     setActiveTaskId(null);
+  };
+
+  const openToolUninstall = (item: SoftwareItem) => {
+    openToolSetup(item, 'uninstall');
   };
 
   const toggleBatchSelect = (toolId: string) => {
@@ -299,7 +310,7 @@ export default function SoftwareCard({
       templateId: 'batch-install',
       installed: selectedBatchToolIds.join(','),
       skipped: ''
-    }).catch(() => { });
+    }).catch(() => {});
 
     toast.info(`Starting batch installation of ${tools.length} tools in background...`);
     setBatchMode(false);
@@ -315,7 +326,7 @@ export default function SoftwareCard({
       body: { script: batchScript, sudoPassword: pass },
       onDone: async () => {
         if (pass && rememberSudo) {
-          await updateServer(serverId, { sudoPassword: pass }).catch(() => { });
+          await updateServer(serverId, { sudoPassword: pass }).catch(() => {});
         }
         toast.success(`Batch installation of ${tools.length} tools completed successfully!`);
         setBatchRunning(false);
@@ -345,26 +356,33 @@ export default function SoftwareCard({
   const activeModalScript = useMemo(() => {
     if (!activeToolModal) return '';
     if (modalCustomScript !== null) return modalCustomScript;
+    if (activeToolModal.mode === 'uninstall') {
+      return generateUninstallScript(activeToolModal.tool);
+    }
     return generateSingleToolScript(activeToolModal.tool, modalVersion || undefined);
   }, [activeToolModal, modalVersion, modalCustomScript]);
 
-  // Execute live installation directly via SSH with background streaming
+  // Execute live installation or uninstallation directly via SSH with background streaming
   const handleRunLiveInstall = async (overridePassword?: string) => {
     if (!activeToolModal) return;
     setModalRunning(true);
     setModalResult(null);
 
+    const isUninstall = activeToolModal.mode === 'uninstall';
+    const actionLabel = isUninstall ? 'Uninstall' : 'Install';
     const toolName = activeToolModal.tool.name;
     const toolId = activeToolModal.tool.id;
-    const taskId = `install_${toolId}_${Date.now()}`;
+    const taskId = `${isUninstall ? 'uninstall' : 'install'}_${toolId}_${Date.now()}`;
     setActiveTaskId(taskId);
 
-    await recordTemplateRun(serverId, {
-      templateName: toolName,
-      templateId: toolId,
-      installed: toolId,
-      skipped: ''
-    }).catch(() => { });
+    if (!isUninstall) {
+      await recordTemplateRun(serverId, {
+        templateName: toolName,
+        templateId: toolId,
+        installed: toolId,
+        skipped: ''
+      }).catch(() => {});
+    }
 
     const pass = overridePassword !== undefined ? overridePassword : (sudoPasswordInput || undefined);
 
@@ -372,23 +390,28 @@ export default function SoftwareCard({
       id: taskId,
       serverId,
       serverName,
-      title: `Install ${toolName}`,
+      title: `${actionLabel} ${toolName}`,
       category: 'software',
       url: `/api/servers/${serverId}/software/execute?stream=1`,
       body: { script: activeModalScript, sudoPassword: pass },
       onDone: async (res) => {
         if (pass && rememberSudo) {
-          await updateServer(serverId, { sudoPassword: pass }).catch(() => { });
+          await updateServer(serverId, { sudoPassword: pass }).catch(() => {});
         }
         setModalResult({
           ok: true,
           exitCode: 0,
-          output: res.output || 'Installation succeeded',
+          output: res.output || `${actionLabel} succeeded`,
           durationMs: 0
         });
         setModalRunning(false);
         setPromptSudo(false);
         setSudoModalOpen(false);
+        toast.success(
+          isUninstall
+            ? `${toolName} has been successfully uninstalled!`
+            : `${toolName} has been installed successfully!`
+        );
         load(true);
       },
       onError: async (err: any) => {
@@ -405,12 +428,12 @@ export default function SoftwareCard({
           setPromptSudo(true);
           setPendingSudoAction(() => (pw: string) => handleRunLiveInstall(pw));
           setSudoModalOpen(true);
-          toast.warning(`Sudo authentication required to install ${toolName}`);
+          toast.warning(`Sudo authentication required to ${actionLabel.toLowerCase()} ${toolName}`);
         } else {
           setModalResult({
             ok: false,
             exitCode: err.exitCode || 1,
-            output: err.output || errMsg || 'Installation failed',
+            output: err.output || errMsg || `${actionLabel} failed`,
             durationMs: 0
           });
         }
@@ -421,7 +444,7 @@ export default function SoftwareCard({
 
   const handleSudoConfirm = async (password: string, remember: boolean) => {
     if (remember) {
-      await updateServer(serverId, { sudoPassword: password }).catch(() => { });
+      await updateServer(serverId, { sudoPassword: password }).catch(() => {});
     }
     setSudoPasswordInput(password);
     setSudoModalOpen(false);
@@ -523,10 +546,11 @@ export default function SoftwareCard({
               <button
                 type="button"
                 onClick={() => setStatusFilter('installed')}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${statusFilter === 'installed'
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                  statusFilter === 'installed'
                     ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm border border-[var(--border)]'
                     : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-                  }`}
+                }`}
               >
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
                 <span>Installed ({installed.length})</span>
@@ -535,10 +559,11 @@ export default function SoftwareCard({
               <button
                 type="button"
                 onClick={() => setStatusFilter('services')}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${statusFilter === 'services'
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                  statusFilter === 'services'
                     ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm border border-[var(--border)]'
                     : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-                  }`}
+                }`}
               >
                 <Activity className="w-3.5 h-3.5 text-sky-400" />
                 <span>Daemons & Services ({serviceItems.length})</span>
@@ -547,10 +572,11 @@ export default function SoftwareCard({
               <button
                 type="button"
                 onClick={() => setStatusFilter('missing')}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${statusFilter === 'missing'
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                  statusFilter === 'missing'
                     ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm border border-[var(--border)]'
                     : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-                  }`}
+                }`}
               >
                 <Plus className="w-3.5 h-3.5 text-amber-500" />
                 <span>Available to Install ({missing.length})</span>
@@ -559,10 +585,11 @@ export default function SoftwareCard({
               <button
                 type="button"
                 onClick={() => setStatusFilter('all')}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${statusFilter === 'all'
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                  statusFilter === 'all'
                     ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm border border-[var(--border)]'
                     : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-                  }`}
+                }`}
               >
                 <span>All ({items.length})</span>
               </button>
@@ -579,10 +606,11 @@ export default function SoftwareCard({
                     return next;
                   });
                 }}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${batchMode
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  batchMode
                     ? 'bg-sky-500 text-white shadow-md ring-1 ring-sky-400 font-bold'
                     : 'text-sky-400 hover:text-sky-300 border border-dashed border-sky-500/40 bg-sky-500/5 hover:bg-sky-500/10'
-                  }`}
+                }`}
                 title="Select multiple tools to install together in a single pipeline background task"
               >
                 <ListChecks className="w-3.5 h-3.5" />
@@ -615,10 +643,11 @@ export default function SoftwareCard({
           <div className="flex items-center gap-1.5 flex-wrap">
             <button
               onClick={() => setSelectedCategory('all')}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition border ${selectedCategory === 'all'
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition border ${
+                selectedCategory === 'all'
                   ? 'bg-[var(--primary)] text-[var(--primary-foreground)] border-transparent shadow-sm'
                   : 'bg-[var(--background)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] border-[var(--border)]'
-                }`}
+              }`}
             >
               All Categories
             </button>
@@ -627,20 +656,21 @@ export default function SoftwareCard({
                 statusFilter === 'installed'
                   ? installed
                   : statusFilter === 'services'
-                    ? serviceItems
-                    : statusFilter === 'missing'
-                      ? missing
-                      : items;
+                  ? serviceItems
+                  : statusFilter === 'missing'
+                  ? missing
+                  : items;
               const count = sourceList.filter((i) => i.category === c.id).length;
               if (count === 0) return null;
               return (
                 <button
                   key={c.id}
                   onClick={() => setSelectedCategory(c.id)}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition border ${selectedCategory === c.id
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition border ${
+                    selectedCategory === c.id
                       ? 'bg-[var(--primary)] text-[var(--primary-foreground)] border-transparent shadow-sm'
                       : 'bg-[var(--background)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] border-[var(--border)]'
-                    }`}
+                  }`}
                 >
                   {t(c.label)} ({count})
                 </button>
@@ -740,23 +770,25 @@ export default function SoftwareCard({
                                 toggleBatchSelect(tool.id);
                               }
                             }}
-                            className={`p-3.5 rounded-xl border transition-all flex flex-col justify-between space-y-3 shadow-sm ${isSelectedForBatch
+                            className={`p-3.5 rounded-xl border transition-all flex flex-col justify-between space-y-3 shadow-sm ${
+                              isSelectedForBatch
                                 ? 'border-sky-500 bg-sky-500/10 ring-2 ring-sky-500/30 cursor-pointer shadow-md'
                                 : tool.installed
-                                  ? 'border-[var(--border)] bg-[var(--background)] hover:border-[var(--muted-foreground)]/40'
-                                  : batchMode
-                                    ? 'border-dashed border-sky-500/40 bg-[var(--muted)]/15 hover:border-sky-500 hover:bg-sky-500/5 cursor-pointer'
-                                    : 'border-dashed border-[var(--border)] bg-[var(--muted)]/10 hover:bg-[var(--muted)]/25 hover:border-[var(--primary)]/40'
-                              }`}
+                                ? 'border-[var(--border)] bg-[var(--background)] hover:border-[var(--muted-foreground)]/40'
+                                : batchMode
+                                ? 'border-dashed border-sky-500/40 bg-[var(--muted)]/15 hover:border-sky-500 hover:bg-sky-500/5 cursor-pointer'
+                                : 'border-dashed border-[var(--border)] bg-[var(--muted)]/10 hover:bg-[var(--muted)]/25 hover:border-[var(--primary)]/40'
+                            }`}
                           >
                             <div className="space-y-2">
                               <div className="flex items-start justify-between gap-2">
                                 <div className="flex items-center gap-2 min-w-0">
                                   <span
-                                    className={`p-1.5 rounded-lg border shrink-0 ${tool.installed
+                                    className={`p-1.5 rounded-lg border shrink-0 ${
+                                      tool.installed
                                         ? 'bg-[var(--muted)]/40 border-[var(--border)]'
                                         : 'bg-[var(--muted)]/20 border-transparent opacity-60'
-                                      }`}
+                                    }`}
                                   >
                                     <BrandIcon
                                       name={tool.id}
@@ -798,10 +830,11 @@ export default function SoftwareCard({
                                     )
                                   ) : batchMode ? (
                                     <div
-                                      className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${isSelectedForBatch
+                                      className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${
+                                        isSelectedForBatch
                                           ? 'bg-sky-500 border-sky-400 text-white shadow-sm'
                                           : 'border-[var(--border)] bg-[var(--background)]/60 text-transparent hover:border-sky-400'
-                                        }`}
+                                      }`}
                                     >
                                       <Check className="w-3.5 h-3.5 stroke-[3]" />
                                     </div>
@@ -880,26 +913,28 @@ export default function SoftwareCard({
                                     <>
                                       {hasService ? (
                                         <span
-                                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${isServiceActive
+                                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${
+                                            isServiceActive
                                               ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30'
                                               : isServiceFailed
-                                                ? 'bg-red-500/10 text-red-500 border-red-500/30'
-                                                : 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20'
-                                            }`}
+                                              ? 'bg-red-500/10 text-red-500 border-red-500/30'
+                                              : 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20'
+                                          }`}
                                         >
                                           <span
-                                            className={`w-1.5 h-1.5 rounded-full ${isServiceActive
+                                            className={`w-1.5 h-1.5 rounded-full ${
+                                              isServiceActive
                                                 ? 'bg-emerald-500 animate-pulse'
                                                 : isServiceFailed
-                                                  ? 'bg-red-500'
-                                                  : 'bg-zinc-400'
-                                              }`}
+                                                ? 'bg-red-500'
+                                                : 'bg-zinc-400'
+                                            }`}
                                           />
                                           {isServiceActive
                                             ? t('software.serviceRunning')
                                             : isServiceFailed
-                                              ? t('software.serviceFailed')
-                                              : t('software.serviceStopped')}
+                                            ? t('software.serviceFailed')
+                                            : t('software.serviceStopped')}
                                         </span>
                                       ) : (
                                         <span className="text-[10px] text-emerald-500/80 font-mono flex items-center gap-1">
@@ -921,8 +956,9 @@ export default function SoftwareCard({
                                                   className="p-1 rounded-md border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition disabled:opacity-50"
                                                 >
                                                   <RotateCw
-                                                    className={`w-3 h-3 ${serviceBusy === `${tool.id}:restart` ? 'animate-spin text-[var(--primary)]' : ''
-                                                      }`}
+                                                    className={`w-3 h-3 ${
+                                                      serviceBusy === `${tool.id}:restart` ? 'animate-spin text-[var(--primary)]' : ''
+                                                    }`}
                                                   />
                                                 </button>
                                                 <button
@@ -953,13 +989,21 @@ export default function SoftwareCard({
                                         {marketMeta && (
                                           <button
                                             type="button"
-                                            onClick={() => openToolSetup(tool)}
+                                            onClick={() => openToolSetup(tool, 'install')}
                                             title={`Configure / Reinstall ${tool.name}`}
-                                            className="p-1 rounded-md border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition"
+                                            className="p-1 rounded-md border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition cursor-pointer"
                                           >
                                             <Wrench className="w-3 h-3" />
                                           </button>
                                         )}
+                                        <button
+                                          type="button"
+                                          onClick={() => openToolUninstall(tool)}
+                                          title={`Uninstall / Remove ${tool.name}`}
+                                          className="p-1 rounded-md border border-[var(--border)] hover:border-red-500/40 hover:bg-red-500/10 text-[var(--muted-foreground)] hover:text-red-400 transition cursor-pointer"
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </button>
                                       </div>
                                     </>
                                   );
@@ -969,10 +1013,11 @@ export default function SoftwareCard({
                                   return (
                                     <div className="w-full flex items-center justify-between">
                                       <span
-                                        className={`text-[10px] font-mono ${isSelectedForBatch
+                                        className={`text-[10px] font-mono ${
+                                          isSelectedForBatch
                                             ? 'text-sky-400 font-semibold'
                                             : 'text-[var(--muted-foreground)]'
-                                          }`}
+                                        }`}
                                       >
                                         {isSelectedForBatch ? 'Selected for batch' : 'Click to select'}
                                       </span>
@@ -982,10 +1027,11 @@ export default function SoftwareCard({
                                           e.stopPropagation();
                                           toggleBatchSelect(tool.id);
                                         }}
-                                        className={`h-6 px-2.5 text-[10px] gap-1 rounded-md font-semibold inline-flex items-center transition cursor-pointer border ${isSelectedForBatch
+                                        className={`h-6 px-2.5 text-[10px] gap-1 rounded-md font-semibold inline-flex items-center transition cursor-pointer border ${
+                                          isSelectedForBatch
                                             ? 'bg-sky-500 border-sky-400 text-white shadow-sm'
                                             : 'border-sky-500/40 bg-sky-500/10 text-sky-400 hover:bg-sky-500/20'
-                                          }`}
+                                        }`}
                                       >
                                         {isSelectedForBatch ? (
                                           <Check className="w-3 h-3 stroke-[2.5]" />
@@ -1054,16 +1100,16 @@ export default function SoftwareCard({
 
       {/* Floating Batch Action Bar */}
       {batchMode && selectedBatchToolIds.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-5 py-3 rounded-2xl bg-zinc-950/95 border border-sky-500/50 shadow-2xl backdrop-blur-md animate-in slide-in-from-bottom duration-200">
-          <div className="flex items-center gap-2 pr-3 border-r border-zinc-800">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-5 py-3 rounded-2xl bg-[var(--card)] border border-sky-500/50 shadow-2xl backdrop-blur-md animate-in slide-in-from-bottom duration-200">
+          <div className="flex items-center gap-2 pr-3 border-r border-[var(--border)]">
             <span className="w-6 h-6 rounded-full bg-sky-500 text-white text-xs font-bold flex items-center justify-center">
               {selectedBatchToolIds.length}
             </span>
             <div className="flex flex-col">
-              <span className="text-xs font-semibold text-zinc-100">
+              <span className="text-xs font-semibold text-[var(--foreground)]">
                 {selectedBatchToolIds.length} {selectedBatchToolIds.length === 1 ? 'Tool' : 'Tools'} Selected
               </span>
-              <span className="text-[10px] text-zinc-400">Sequential background pipeline</span>
+              <span className="text-[10px] text-[var(--muted-foreground)]">Sequential background pipeline</span>
             </div>
           </div>
 
@@ -1071,7 +1117,7 @@ export default function SoftwareCard({
             <button
               type="button"
               onClick={() => setSelectedBatchToolIds([])}
-              className="px-2.5 py-1 text-xs text-zinc-400 hover:text-zinc-200 transition cursor-pointer"
+              className="px-2.5 py-1 text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition cursor-pointer"
             >
               Clear
             </button>
@@ -1094,7 +1140,7 @@ export default function SoftwareCard({
 
       {/* Quick 1-Click Tool Setup & Live Runner Modal */}
       {activeToolModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/75 backdrop-blur-xs p-4 animate-in fade-in duration-150">
           <div className="w-full max-w-2xl rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             {/* Modal Header */}
             <div className="p-5 border-b border-[var(--border)] flex items-start justify-between gap-3 bg-[var(--muted)]/20">
@@ -1108,15 +1154,34 @@ export default function SoftwareCard({
                 </span>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-bold text-[var(--foreground)]">
-                      {activeToolModal.installedInfo?.installed ? 'Manage / Reinstall' : 'Install'}{' '}
-                      {activeToolModal.tool.name}
+                    <h3 className={`text-sm font-bold flex items-center gap-1.5 ${
+                      activeToolModal.mode === 'uninstall' ? 'text-red-500 dark:text-red-400' : 'text-[var(--foreground)]'
+                    }`}>
+                      {activeToolModal.mode === 'uninstall' ? (
+                        <>
+                          <Trash2 className="w-4 h-4 text-red-500" />
+                          Uninstall {activeToolModal.tool.name}
+                        </>
+                      ) : (
+                        <>
+                          {activeToolModal.installedInfo?.installed ? 'Manage / Reinstall' : 'Install'}{' '}
+                          {activeToolModal.tool.name}
+                        </>
+                      )}
                     </h3>
                     <Badge
-                      variant={activeToolModal.installedInfo?.installed ? 'success' : 'secondary'}
+                      variant={
+                        activeToolModal.mode === 'uninstall'
+                          ? 'destructive'
+                          : activeToolModal.installedInfo?.installed
+                          ? 'success'
+                          : 'secondary'
+                      }
                       className="text-[10px] font-mono"
                     >
-                      {activeToolModal.installedInfo?.installed
+                      {activeToolModal.mode === 'uninstall'
+                        ? 'Uninstalling'
+                        : activeToolModal.installedInfo?.installed
                         ? `Installed ${activeToolModal.installedInfo.version ? `(v${activeToolModal.installedInfo.version})` : ''}`
                         : 'Not Installed'}
                     </Badge>
@@ -1129,7 +1194,7 @@ export default function SoftwareCard({
               <button
                 type="button"
                 onClick={() => setActiveToolModal(null)}
-                className="p-1.5 rounded-lg text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] transition"
+                className="p-1.5 rounded-lg text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] transition cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1137,8 +1202,60 @@ export default function SoftwareCard({
 
             {/* Modal Body */}
             <div className="p-5 overflow-y-auto space-y-4 flex-1">
-              {/* Version Picker if available */}
-              {activeToolModal.tool.versions && activeToolModal.tool.versions.length > 0 && (
+              {/* Tab Switcher if Tool is Installed */}
+              {activeToolModal.installedInfo?.installed && (
+                <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[var(--muted)]/40 border border-[var(--border)] w-fit">
+                  <button
+                    type="button"
+                    disabled={modalRunning}
+                    onClick={() => {
+                      setActiveToolModal((prev) => (prev ? { ...prev, mode: 'install' } : null));
+                      setModalCustomScript(null);
+                    }}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                      activeToolModal.mode !== 'uninstall'
+                        ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm'
+                        : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                    }`}
+                  >
+                    Reinstall / Configure
+                  </button>
+                  <button
+                    type="button"
+                    disabled={modalRunning}
+                    onClick={() => {
+                      setActiveToolModal((prev) => (prev ? { ...prev, mode: 'uninstall' } : null));
+                      setModalCustomScript(null);
+                    }}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer ${
+                      activeToolModal.mode === 'uninstall'
+                        ? 'bg-red-500/10 dark:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/30 shadow-sm'
+                        : 'text-[var(--muted-foreground)] hover:text-red-500 dark:hover:text-red-400'
+                    }`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Uninstall / Remove</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Uninstall Mode Warning Banner */}
+              {activeToolModal.mode === 'uninstall' && (
+                <div className="p-3.5 rounded-xl border border-red-500/30 bg-red-500/10 dark:bg-red-500/15 flex items-start gap-3 animate-in fade-in">
+                  <AlertTriangle className="w-4 h-4 text-red-500 dark:text-red-400 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <span className="text-xs font-semibold text-red-700 dark:text-red-300 block">
+                      Clean Uninstallation Pipeline
+                    </span>
+                    <p className="text-[11px] text-zinc-700 dark:text-zinc-300 leading-relaxed">
+                      This will stop active systemd daemons, purge packages, remove binary symlinks, and run autoremove on your server. You can review and adjust the uninstallation commands below.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Version Picker if available (only in install mode) */}
+              {activeToolModal.mode !== 'uninstall' && activeToolModal.tool.versions && activeToolModal.tool.versions.length > 0 && (
                 <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--background)] flex items-center justify-between gap-4">
                   <div>
                     <span className="text-xs font-semibold text-[var(--foreground)] block">
@@ -1166,8 +1283,8 @@ export default function SoftwareCard({
                 </div>
               )}
 
-              {/* Step Breakdown */}
-              {activeToolModal.tool.steps && activeToolModal.tool.steps.length > 0 && (
+              {/* Step Breakdown (only in install mode) */}
+              {activeToolModal.mode !== 'uninstall' && activeToolModal.tool.steps && activeToolModal.tool.steps.length > 0 && (
                 <div className="space-y-2">
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)] block">
                     Automated Pipeline Steps
@@ -1192,7 +1309,9 @@ export default function SoftwareCard({
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
-                    Bash Setup Script (Editable)
+                    {activeToolModal.mode === 'uninstall'
+                      ? 'Bash Uninstall Script (Editable)'
+                      : 'Bash Setup Script (Editable)'}
                   </span>
                   <button
                     type="button"
@@ -1201,7 +1320,7 @@ export default function SoftwareCard({
                       setCopiedScript(true);
                       setTimeout(() => setCopiedScript(false), 2000);
                     }}
-                    className="text-[11px] text-[var(--muted-foreground)] hover:text-[var(--foreground)] inline-flex items-center gap-1"
+                    className="text-[11px] text-[var(--muted-foreground)] hover:text-[var(--foreground)] inline-flex items-center gap-1 cursor-pointer"
                   >
                     {copiedScript ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                     <span>{copiedScript ? 'Copied' : 'Copy Script'}</span>
@@ -1212,8 +1331,8 @@ export default function SoftwareCard({
                   onChange={(e) => setModalCustomScript(e.target.value)}
                   disabled={modalRunning}
                   spellCheck={false}
-                  rows={8}
-                  className="w-full p-3 rounded-xl border border-zinc-800 bg-[#09090b] text-zinc-200 font-mono text-xs leading-relaxed outline-none focus:ring-1 focus:ring-[var(--primary)] resize-y"
+                  rows={activeToolModal.mode === 'uninstall' ? 9 : 8}
+                  className="w-full p-3.5 rounded-xl border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] font-mono text-xs leading-relaxed outline-none focus:ring-1 focus:ring-[var(--primary)] resize-y"
                 />
               </div>
 
@@ -1223,10 +1342,10 @@ export default function SoftwareCard({
                   <div className="flex items-start gap-2.5">
                     <KeyRound className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
                     <div className="space-y-1">
-                      <h4 className="text-xs font-semibold text-amber-300">
+                      <h4 className="text-xs font-semibold text-amber-500 dark:text-amber-300">
                         Sudo Password Required
                       </h4>
-                      <p className="text-[11px] text-zinc-300 leading-relaxed">
+                      <p className="text-[11px] text-[var(--muted-foreground)] leading-relaxed">
                         The remote user requires root/sudo privileges to install packages on this server.
                       </p>
                     </div>
@@ -1238,7 +1357,7 @@ export default function SoftwareCard({
                       placeholder="Enter sudo password..."
                       value={sudoPasswordInput}
                       onChange={(e) => setSudoPasswordInput(e.target.value)}
-                      className="h-8 text-xs bg-black/50 border-amber-500/40 text-zinc-100 flex-1"
+                      className="h-8 text-xs bg-[var(--background)] border-amber-500/40 text-[var(--foreground)] flex-1"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && sudoPasswordInput.trim()) {
                           handleRunLiveInstall(sudoPasswordInput);
@@ -1249,19 +1368,19 @@ export default function SoftwareCard({
                       size="sm"
                       disabled={!sudoPasswordInput.trim() || modalRunning}
                       onClick={() => handleRunLiveInstall(sudoPasswordInput)}
-                      className="h-8 text-xs gap-1.5 font-semibold bg-amber-500 hover:bg-amber-600 text-zinc-950 shrink-0"
+                      className="h-8 text-xs gap-1.5 font-semibold bg-amber-500 hover:bg-amber-600 text-black dark:text-zinc-950 shrink-0 cursor-pointer"
                     >
                       <Play className="w-3 h-3" />
                       <span>Authenticate & Install</span>
                     </Button>
                   </div>
 
-                  <label className="flex items-center gap-2 cursor-pointer text-[11px] text-zinc-400">
+                  <label className="flex items-center gap-2 cursor-pointer text-[11px] text-[var(--muted-foreground)]">
                     <input
                       type="checkbox"
                       checked={rememberSudo}
                       onChange={(e) => setRememberSudo(e.target.checked)}
-                      className="rounded border-zinc-700 bg-zinc-900 text-amber-500 focus:ring-0"
+                      className="rounded border-[var(--border)] bg-[var(--card)] text-amber-500 focus:ring-0"
                     />
                     <span>Remember sudo password for this server (encrypted with AES-256-GCM)</span>
                   </label>
@@ -1270,43 +1389,47 @@ export default function SoftwareCard({
 
               {/* Live Execution Output */}
               {(modalRunning || currentModalTask || modalResult) && (
-                <div className="rounded-xl border border-zinc-800 bg-[#09090b] overflow-hidden">
-                  <div className="px-3.5 py-2 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between text-xs font-mono">
-                    <span className="text-[11px] text-zinc-300 flex items-center gap-2">
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--background)] overflow-hidden">
+                  <div className="px-3.5 py-2 border-b border-[var(--border)] bg-[var(--muted)]/40 flex items-center justify-between text-xs font-mono">
+                    <span className="text-[11px] text-[var(--foreground)] flex items-center gap-2">
                       {modalRunning || currentModalTask?.status === 'running' ? (
                         <>
-                          <RotateCw className="w-3.5 h-3.5 text-sky-400 animate-spin" />
-                          <span>Installing on server via SSH ({currentModalTask?.durationSec || 0}s)...</span>
+                          <RotateCw className="w-3.5 h-3.5 text-sky-500 dark:text-sky-400 animate-spin" />
+                          <span>
+                            {activeToolModal.mode === 'uninstall' ? 'Uninstalling' : 'Installing'} on server via SSH ({currentModalTask?.durationSec || 0}s)...
+                          </span>
                         </>
                       ) : (currentModalTask?.status === 'success' || modalResult?.ok) ? (
                         <>
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                          <span className="text-emerald-400 font-semibold">
-                            Installation Complete
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
+                          <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                            {activeToolModal.mode === 'uninstall'
+                              ? 'Uninstallation Complete'
+                              : 'Installation Complete'}
                           </span>
                         </>
                       ) : (
                         <>
-                          <AlertCircle className="w-3.5 h-3.5 text-red-400" />
-                          <span className="text-red-400 font-semibold">
+                          <AlertCircle className="w-3.5 h-3.5 text-red-500 dark:text-red-400" />
+                          <span className="text-red-600 dark:text-red-400 font-semibold">
                             Failed {modalResult?.exitCode ? `(Exit Code: ${modalResult.exitCode})` : ''}
                           </span>
                         </>
                       )}
                     </span>
                     {(modalRunning || currentModalTask?.status === 'running') && (
-                      <span className="text-[10px] text-zinc-400 font-sans">
+                      <span className="text-[10px] text-[var(--muted-foreground)] font-sans">
                         Runs in background · Safe to close
                       </span>
                     )}
                   </div>
                   <pre
                     ref={logPreRef}
-                    className="p-3.5 text-[11px] font-mono text-zinc-300 max-h-52 overflow-auto whitespace-pre-wrap leading-relaxed select-text"
+                    className="p-3.5 text-[11px] font-mono text-[var(--foreground)] max-h-52 overflow-auto whitespace-pre-wrap leading-relaxed select-text bg-[var(--background)]"
                   >
                     {currentModalTask && currentModalTask.logs.length > 0
                       ? currentModalTask.logs.join('\n')
-                      : modalResult?.output || '(Executing setup script on remote server...)'}
+                      : modalResult?.output || '(Executing script on remote server...)'}
                   </pre>
                 </div>
               )}
@@ -1346,19 +1469,29 @@ export default function SoftwareCard({
                   size="sm"
                   disabled={modalRunning || currentModalTask?.status === 'running'}
                   onClick={() => handleRunLiveInstall()}
-                  className="h-8 text-xs gap-1.5 font-semibold bg-[var(--primary)] text-[var(--primary-foreground)] shadow-md"
+                  className={`h-8 text-xs gap-1.5 font-semibold shadow-md cursor-pointer ${
+                    activeToolModal.mode === 'uninstall'
+                      ? 'bg-red-600 hover:bg-red-700 text-white'
+                      : 'bg-[var(--primary)] text-[var(--primary-foreground)]'
+                  }`}
                 >
                   {modalRunning || currentModalTask?.status === 'running' ? (
                     <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : activeToolModal.mode === 'uninstall' ? (
+                    <Trash2 className="w-3.5 h-3.5" />
                   ) : (
                     <Play className="w-3.5 h-3.5" />
                   )}
                   <span>
                     {modalRunning || currentModalTask?.status === 'running'
-                      ? 'Installing...'
+                      ? activeToolModal.mode === 'uninstall'
+                        ? 'Uninstalling...'
+                        : 'Installing...'
+                      : activeToolModal.mode === 'uninstall'
+                      ? 'Uninstall Now (Live)'
                       : activeToolModal.installedInfo?.installed
-                        ? 'Reinstall Now'
-                        : 'Install Now (Live)'}
+                      ? 'Reinstall Now'
+                      : 'Install Now (Live)'}
                   </span>
                 </Button>
               </div>
@@ -1376,7 +1509,7 @@ export default function SoftwareCard({
         username={serverUsername || 'user'}
         reason={
           activeToolModal
-            ? `Installing ${activeToolModal.tool.name} requires root/sudo privileges on this server.`
+            ? `${activeToolModal.mode === 'uninstall' ? 'Uninstalling' : 'Installing'} ${activeToolModal.tool.name} requires root/sudo privileges on this server.`
             : 'Executing this system command requires sudo privileges.'
         }
       />

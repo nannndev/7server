@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { TEMPLATE_PRESETS, MARKETPLACE_CATALOG, analyzeTemplate, formatTerminalCommand } from './templates.js';
+import { TEMPLATE_PRESETS, MARKETPLACE_CATALOG, analyzeTemplate, formatTerminalCommand, generateUninstallScript } from './templates.js';
 import type { SoftwareItem } from '../api.js';
 
 console.log('Testing template presets and analysis...');
@@ -64,5 +64,14 @@ assert.equal(forceAnalysis.itemsSkipped.length, 0);
 const terminalCmd = formatTerminalCommand(analysis.generatedScript, '/tmp/test.sh');
 assert.ok(terminalCmd.startsWith("cat << 'EOF' > /tmp/test.sh"));
 assert.ok(terminalCmd.endsWith('bash /tmp/test.sh'));
+
+// 6. Test generateUninstallScript
+const bunUninstall = generateUninstallScript({ id: 'bun', name: 'Bun' });
+assert.ok(bunUninstall.includes('rm -rf /usr/local/bin/bun'));
+assert.ok(bunUninstall.includes('Bun has been successfully uninstalled'));
+
+const nginxUninstall = generateUninstallScript({ id: 'nginx', name: 'Nginx' });
+assert.ok(nginxUninstall.includes('systemctl stop nginx'));
+assert.ok(nginxUninstall.includes('apt-get purge $APT_FLAGS nginx'));
 
 console.log('All template unit tests passed successfully!');

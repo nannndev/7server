@@ -436,6 +436,314 @@ systemctl enable --now unattended-upgrades || true
 echo "==> [2/2] Automatic security updates enabled."`
 };
 
+export const UNINSTALL_SCRIPTS: Record<string, () => string> = {
+  node: () => `# Uninstall Node.js, npm & Corepack
+echo "==> [1/3] Removing nodejs package..."
+apt-get purge $APT_FLAGS nodejs || true
+echo "==> [2/3] Cleaning up NodeSource repositories..."
+rm -f /etc/apt/sources.list.d/nodesource.list /etc/apt/keyrings/nodesource.gpg
+echo "==> [3/3] Removing global npm/corepack leftovers..."
+rm -rf /usr/local/lib/node_modules /usr/local/bin/corepack /usr/local/bin/node /usr/local/bin/npm /usr/local/bin/npx "$HOME/.npm" "$HOME/.node-gyp"
+apt-get autoremove $APT_FLAGS || true
+echo "==> Node.js successfully removed."`,
+
+  pnpm: () => `# Uninstall pnpm Package Manager
+echo "==> [1/2] Removing pnpm binary and cache..."
+rm -rf /usr/local/bin/pnpm "$HOME/.local/share/pnpm" "$HOME/.pnpm-state"
+if command -v npm >/dev/null 2>&1; then
+  npm uninstall -g pnpm 2>/dev/null || true
+fi
+echo "==> [2/2] pnpm successfully removed."`,
+
+  yarn: () => `# Uninstall Yarn Package Manager
+echo "==> [1/2] Removing yarn binary and cache..."
+rm -rf /usr/local/bin/yarn /usr/local/bin/yarnpkg "$HOME/.yarn" "$HOME/.cache/yarn"
+if command -v npm >/dev/null 2>&1; then
+  npm uninstall -g yarn 2>/dev/null || true
+fi
+echo "==> [2/2] Yarn successfully removed."`,
+
+  bun: () => `# Uninstall Bun Runtime
+echo "==> [1/2] Removing Bun binaries and cache..."
+rm -rf /usr/local/bin/bun /usr/local/bin/bunx "$HOME/.bun"
+echo "==> [2/2] Bun successfully removed."`,
+
+  deno: () => `# Uninstall Deno Runtime
+echo "==> [1/2] Removing Deno binary and cache..."
+rm -rf /usr/local/bin/deno "$HOME/.deno"
+echo "==> [2/2] Deno successfully removed."`,
+
+  php: () => `# Uninstall PHP, PHP-FPM & Extensions
+echo "==> [1/3] Stopping and disabling php-fpm services..."
+systemctl stop php*-fpm 2>/dev/null || true
+systemctl disable php*-fpm 2>/dev/null || true
+echo "==> [2/3] Purging PHP packages..."
+apt-get purge $APT_FLAGS 'php*' || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> [3/3] PHP and PHP-FPM successfully removed."`,
+
+  composer: () => `# Uninstall Composer
+echo "==> [1/2] Removing Composer executable and cache..."
+rm -rf /usr/local/bin/composer "$HOME/.composer"
+echo "==> [2/2] Composer successfully removed."`,
+
+  python: () => `# Clean Python Dev Headers & Virtualenv tools
+echo "==> Note: Core system python3 is preserved to ensure OS stability."
+echo "==> [1/2] Removing developer packages (pip, venv, dev headers)..."
+apt-get remove $APT_FLAGS python3-pip python3-venv python3-dev build-essential 2>/dev/null || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> [2/2] Python dev environment cleaned up."`,
+
+  go: () => `# Uninstall Go (Golang)
+echo "==> [1/2] Removing Go installation and symlinks..."
+rm -rf /usr/local/go /usr/local/bin/go /usr/local/bin/gofmt "$HOME/go"
+apt-get purge $APT_FLAGS golang-go 2>/dev/null || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> [2/2] Go successfully removed."`,
+
+  rust: () => `# Uninstall Rust & Cargo
+echo "==> [1/2] Running rustup self uninstall..."
+if command -v rustup >/dev/null 2>&1; then
+  rustup self uninstall -y 2>/dev/null || true
+fi
+rm -rf "$HOME/.cargo" "$HOME/.rustup" /usr/local/bin/rustc /usr/local/bin/cargo
+echo "==> [2/2] Rust toolchain successfully removed."`,
+
+  java: () => `# Uninstall Java (OpenJDK)
+echo "==> [1/2] Purging OpenJDK packages..."
+apt-get purge $APT_FLAGS 'openjdk*' 'default-jdk*' 'default-jre*' || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> [2/2] Java successfully removed."`,
+
+  nginx: () => `# Uninstall Nginx Web Server
+echo "==> [1/3] Stopping and disabling Nginx service..."
+systemctl stop nginx 2>/dev/null || true
+systemctl disable nginx 2>/dev/null || true
+echo "==> [2/3] Purging Nginx packages..."
+apt-get purge $APT_FLAGS nginx nginx-common nginx-core || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> [3/3] Nginx successfully removed."`,
+
+  apache: () => `# Uninstall Apache HTTP Server
+echo "==> [1/3] Stopping and disabling Apache2 service..."
+systemctl stop apache2 2>/dev/null || true
+systemctl disable apache2 2>/dev/null || true
+echo "==> [2/3] Purging Apache2 packages..."
+apt-get purge $APT_FLAGS apache2 apache2-utils apache2-bin apache2-data || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> [3/3] Apache2 successfully removed."`,
+
+  caddy: () => `# Uninstall Caddy Web Server
+echo "==> [1/3] Stopping and disabling Caddy service..."
+systemctl stop caddy 2>/dev/null || true
+systemctl disable caddy 2>/dev/null || true
+echo "==> [2/3] Purging Caddy package & repo..."
+apt-get purge $APT_FLAGS caddy || true
+rm -f /etc/apt/sources.list.d/caddy-stable.list /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+apt-get autoremove $APT_FLAGS || true
+echo "==> [3/3] Caddy successfully removed."`,
+
+  certbot: () => `# Uninstall Certbot
+echo "==> [1/2] Purging Certbot packages..."
+apt-get purge $APT_FLAGS certbot python3-certbot-nginx 2>/dev/null || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> [2/2] Certbot successfully removed."`,
+
+  cloudflared: () => `# Uninstall Cloudflare Tunnel (cloudflared)
+echo "==> [1/2] Stopping cloudflared service..."
+systemctl stop cloudflared 2>/dev/null || true
+systemctl disable cloudflared 2>/dev/null || true
+apt-get purge $APT_FLAGS cloudflared 2>/dev/null || true
+rm -f /usr/local/bin/cloudflared /usr/bin/cloudflared
+echo "==> [2/2] Cloudflared successfully removed."`,
+
+  haproxy: () => `# Uninstall HAProxy
+echo "==> [1/2] Stopping and disabling HAProxy service..."
+systemctl stop haproxy 2>/dev/null || true
+systemctl disable haproxy 2>/dev/null || true
+apt-get purge $APT_FLAGS haproxy || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> [2/2] HAProxy successfully removed."`,
+
+  mysql: () => `# Uninstall MySQL Server
+echo "==> [1/3] Stopping and disabling MySQL service..."
+systemctl stop mysql 2>/dev/null || true
+systemctl disable mysql 2>/dev/null || true
+echo "==> [2/3] Purging MySQL server & client packages..."
+apt-get purge $APT_FLAGS mysql-server mysql-client mysql-common || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> [3/3] MySQL successfully removed."`,
+
+  mariadb: () => `# Uninstall MariaDB Server
+echo "==> [1/3] Stopping and disabling MariaDB service..."
+systemctl stop mariadb 2>/dev/null || true
+systemctl disable mariadb 2>/dev/null || true
+echo "==> [2/3] Purging MariaDB packages..."
+apt-get purge $APT_FLAGS mariadb-server mariadb-client mariadb-common || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> [3/3] MariaDB successfully removed."`,
+
+  postgres: () => `# Uninstall PostgreSQL Server
+echo "==> [1/3] Stopping and disabling PostgreSQL service..."
+systemctl stop postgresql 2>/dev/null || true
+systemctl disable postgresql 2>/dev/null || true
+echo "==> [2/3] Purging PostgreSQL packages..."
+apt-get purge $APT_FLAGS 'postgresql*' libpq-dev || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> [3/3] PostgreSQL successfully removed."`,
+
+  redis: () => `# Uninstall Redis Server
+echo "==> [1/3] Stopping and disabling Redis service..."
+systemctl stop redis-server 2>/dev/null || true
+systemctl disable redis-server 2>/dev/null || true
+echo "==> [2/3] Purging Redis packages..."
+apt-get purge $APT_FLAGS redis-server redis-tools || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> [3/3] Redis successfully removed."`,
+
+  mongodb: () => `# Uninstall MongoDB Server
+echo "==> [1/3] Stopping and disabling MongoDB service..."
+systemctl stop mongod 2>/dev/null || true
+systemctl disable mongod 2>/dev/null || true
+echo "==> [2/3] Purging MongoDB packages..."
+apt-get purge $APT_FLAGS 'mongodb-org*' || true
+rm -f /etc/apt/sources.list.d/mongodb-org-*.list /usr/share/keyrings/mongodb-server-*.gpg
+apt-get autoremove $APT_FLAGS || true
+echo "==> [3/3] MongoDB successfully removed."`,
+
+  sqlite: () => `# Uninstall SQLite3
+echo "==> Purging SQLite packages..."
+apt-get purge $APT_FLAGS sqlite3 libsqlite3-dev || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> SQLite successfully removed."`,
+
+  meilisearch: () => `# Uninstall Meilisearch
+echo "==> [1/2] Stopping meilisearch service..."
+systemctl stop meilisearch 2>/dev/null || true
+systemctl disable meilisearch 2>/dev/null || true
+rm -f /usr/local/bin/meilisearch
+echo "==> [2/2] Meilisearch binary removed."`,
+
+  docker: () => `# Uninstall Docker Engine & Containerd
+echo "==> [1/3] Stopping Docker and containerd services..."
+systemctl stop docker containerd 2>/dev/null || true
+systemctl disable docker containerd 2>/dev/null || true
+echo "==> [2/3] Purging Docker CE and CLI packages..."
+apt-get purge $APT_FLAGS docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin docker.io docker-compose 2>/dev/null || true
+rm -f /etc/apt/sources.list.d/docker.list /etc/apt/keyrings/docker.asc
+apt-get autoremove $APT_FLAGS || true
+echo "==> [3/3] Docker successfully removed."`,
+
+  compose: () => `# Uninstall Docker Compose Plugin
+echo "==> Purging Docker Compose package..."
+apt-get purge $APT_FLAGS docker-compose-plugin docker-compose-v2 docker-compose 2>/dev/null || true
+echo "==> Docker Compose removed."`,
+
+  podman: () => `# Uninstall Podman
+echo "==> Purging Podman packages..."
+apt-get purge $APT_FLAGS podman || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> Podman successfully removed."`,
+
+  lazydocker: () => `# Uninstall Lazydocker
+echo "==> Removing Lazydocker binary..."
+rm -f /usr/local/bin/lazydocker
+echo "==> Lazydocker removed."`,
+
+  pm2: () => `# Uninstall PM2
+echo "==> [1/2] Stopping PM2 processes and unregistering systemd..."
+pm2 kill 2>/dev/null || true
+pm2 unstartup systemd 2>/dev/null || true
+echo "==> [2/2] Uninstalling PM2 from global npm..."
+if command -v npm >/dev/null 2>&1; then
+  npm uninstall -g pm2 2>/dev/null || true
+fi
+rm -rf "$HOME/.pm2"
+echo "==> PM2 successfully removed."`,
+
+  supervisor: () => `# Uninstall Supervisor
+echo "==> [1/2] Stopping supervisor service..."
+systemctl stop supervisor 2>/dev/null || true
+systemctl disable supervisor 2>/dev/null || true
+apt-get purge $APT_FLAGS supervisor || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> [2/2] Supervisor successfully removed."`,
+
+  git: () => `# Uninstall Git
+echo "==> Purging Git package..."
+apt-get purge $APT_FLAGS git || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> Git removed."`,
+
+  gh: () => `# Uninstall GitHub CLI (gh)
+echo "==> [1/2] Purging GitHub CLI package..."
+apt-get purge $APT_FLAGS gh || true
+rm -f /etc/apt/sources.list.d/github-cli.list /etc/apt/keyrings/githubcli-archive-keyring.gpg
+apt-get autoremove $APT_FLAGS || true
+echo "==> [2/2] GitHub CLI successfully removed."`,
+
+  ffmpeg: () => `# Uninstall FFmpeg
+echo "==> Purging FFmpeg packages..."
+apt-get purge $APT_FLAGS ffmpeg || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> FFmpeg successfully removed."`,
+
+  rclone: () => `# Uninstall Rclone
+echo "==> Removing Rclone binary..."
+rm -f /usr/local/bin/rclone /usr/bin/rclone /usr/local/share/man/man1/rclone.1
+apt-get purge $APT_FLAGS rclone 2>/dev/null || true
+echo "==> Rclone removed."`,
+
+  ufw: () => `# Disable and Uninstall UFW Firewall
+echo "==> [1/2] Disabling UFW..."
+ufw disable 2>/dev/null || true
+systemctl stop ufw 2>/dev/null || true
+systemctl disable ufw 2>/dev/null || true
+echo "==> [2/2] Purging UFW package..."
+apt-get purge $APT_FLAGS ufw || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> UFW removed."`,
+
+  fail2ban: () => `# Uninstall Fail2ban
+echo "==> [1/2] Stopping fail2ban service..."
+systemctl stop fail2ban 2>/dev/null || true
+systemctl disable fail2ban 2>/dev/null || true
+echo "==> [2/2] Purging fail2ban package..."
+apt-get purge $APT_FLAGS fail2ban || true
+rm -f /etc/fail2ban/jail.d/sshd-7server.local
+apt-get autoremove $APT_FLAGS || true
+echo "==> Fail2ban removed."`,
+
+  swap: () => `# Remove Swap Memory
+echo "==> [1/3] Disabling swap file..."
+swapoff /swapfile 2>/dev/null || true
+echo "==> [2/3] Removing swapfile entry from /etc/fstab..."
+sed -i '/\\/swapfile/d' /etc/fstab 2>/dev/null || true
+echo "==> [3/3] Deleting /swapfile on disk..."
+rm -f /swapfile
+echo "==> Swap memory removed. Current memory:"
+free -h`,
+
+  tailscale: () => `# Uninstall Tailscale VPN
+echo "==> [1/2] Stopping Tailscale service..."
+tailscale down 2>/dev/null || true
+systemctl stop tailscaled 2>/dev/null || true
+systemctl disable tailscaled 2>/dev/null || true
+echo "==> [2/2] Purging Tailscale package..."
+apt-get purge $APT_FLAGS tailscale || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> Tailscale removed."`,
+
+  autoupdates: () => `# Uninstall Unattended Upgrades
+echo "==> [1/2] Stopping unattended-upgrades..."
+systemctl stop unattended-upgrades 2>/dev/null || true
+systemctl disable unattended-upgrades 2>/dev/null || true
+echo "==> [2/2] Purging packages & configs..."
+apt-get purge $APT_FLAGS unattended-upgrades || true
+rm -f /etc/apt/apt.conf.d/20auto-upgrades
+echo "==> Unattended upgrades removed."`
+};
+
 // ---------------------------------------------------------------------------
 // 10 Comprehensive Preset Stacks
 // ---------------------------------------------------------------------------
@@ -1593,6 +1901,37 @@ export function generateBatchToolsScript(tools: MarketplaceTool[], versions?: Re
   );
 
   return lines.join('\n');
+}
+
+/** Generate a clean, safe uninstallation script for a single tool */
+export function generateUninstallScript(tool: MarketplaceTool | { id: string; name: string }): string {
+  const getScript = UNINSTALL_SCRIPTS[tool.id];
+  const scriptBody = getScript
+    ? getScript()
+    : `# Generic uninstall fallback for ${tool.name}
+echo "==> Stopping service ${tool.id} if active..."
+systemctl stop ${tool.id} 2>/dev/null || true
+systemctl disable ${tool.id} 2>/dev/null || true
+echo "==> Purging package ${tool.id} via APT..."
+apt-get purge $APT_FLAGS ${tool.id} 2>/dev/null || true
+apt-get autoremove $APT_FLAGS 2>/dev/null || true
+echo "==> ${tool.name} removal completed."`;
+
+  return [
+    '#!/usr/bin/env bash',
+    '# ============================================================',
+    `#  7Server 1-Click Uninstall: ${tool.name}`,
+    `#  Generated on: ${new Date().toISOString()}`,
+    '# ============================================================',
+    'set -e',
+    PREFLIGHT_HEADER,
+    '',
+    scriptBody,
+    '',
+    'echo "============================================================"',
+    `echo "  ✔ ${tool.name} has been successfully uninstalled!"`,
+    'echo "============================================================"'
+  ].join('\n');
 }
 
 /** Formats the script for interactive terminal execution via temp file */

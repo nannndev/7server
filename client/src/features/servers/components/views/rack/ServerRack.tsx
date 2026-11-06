@@ -361,13 +361,12 @@ export default function ServerRack({ servers, alertsFor, onManage, onOpenTermina
                 </div>
                 <div className="h-2 rounded-full bg-[var(--muted)] overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all duration-700 ${
-                      levelOf(sel.cpu) === 'hot'
-                        ? 'bg-red-500 shadow-[0_0_8px_#ef4444]'
-                        : levelOf(sel.cpu) === 'warn'
+                    className={`h-full rounded-full transition-all duration-700 ${levelOf(sel.cpu) === 'hot'
+                      ? 'bg-red-500 shadow-[0_0_8px_#ef4444]'
+                      : levelOf(sel.cpu) === 'warn'
                         ? 'bg-amber-400'
                         : 'bg-emerald-400'
-                    }`}
+                      }`}
                     style={{ width: `${sel.cpu ?? 0}%` }}
                   />
                 </div>
@@ -386,9 +385,8 @@ export default function ServerRack({ servers, alertsFor, onManage, onOpenTermina
                 </div>
                 <div className="h-2 rounded-full bg-[var(--muted)] overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all duration-700 ${
-                      levelOf(sel.ram) === 'hot' ? 'bg-red-500' : levelOf(sel.ram) === 'warn' ? 'bg-amber-400' : 'bg-purple-400'
-                    }`}
+                    className={`h-full rounded-full transition-all duration-700 ${levelOf(sel.ram) === 'hot' ? 'bg-red-500' : levelOf(sel.ram) === 'warn' ? 'bg-amber-400' : 'bg-purple-400'
+                      }`}
                     style={{ width: `${sel.ram ?? 0}%` }}
                   />
                 </div>
@@ -407,9 +405,8 @@ export default function ServerRack({ servers, alertsFor, onManage, onOpenTermina
                 </div>
                 <div className="h-2 rounded-full bg-[var(--muted)] overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all duration-700 ${
-                      levelOf(sel.disk) === 'hot' ? 'bg-red-500' : levelOf(sel.disk) === 'warn' ? 'bg-amber-400' : 'bg-amber-400'
-                    }`}
+                    className={`h-full rounded-full transition-all duration-700 ${levelOf(sel.disk) === 'hot' ? 'bg-red-500' : levelOf(sel.disk) === 'warn' ? 'bg-amber-400' : 'bg-amber-400'
+                      }`}
                     style={{ width: `${sel.disk ?? 0}%` }}
                   />
                 </div>
@@ -437,17 +434,15 @@ export default function ServerRack({ servers, alertsFor, onManage, onOpenTermina
                       key={s.id}
                       type="button"
                       onClick={() => pick(idx)}
-                      className={`w-full px-2.5 py-1.5 rounded-lg text-left flex items-center justify-between border transition text-xs cursor-pointer ${
-                        isCurrent
-                          ? 'bg-sky-500/10 border-sky-500/40 text-zinc-100 shadow-sm'
-                          : 'bg-[var(--background)] hover:bg-[var(--muted)]/50 border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-                      }`}
+                      className={`w-full px-2.5 py-1.5 rounded-lg text-left flex items-center justify-between border transition text-xs cursor-pointer ${isCurrent
+                        ? 'bg-sky-500/10 border-sky-500/40 text-zinc-100 shadow-sm'
+                        : 'bg-[var(--background)] hover:bg-[var(--muted)]/50 border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                        }`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <span
-                          className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                            b.online ? 'bg-emerald-400 shadow-[0_0_6px_#34d399]' : 'bg-red-500'
-                          }`}
+                          className={`w-1.5 h-1.5 rounded-full shrink-0 ${b.online ? 'bg-emerald-400 shadow-[0_0_6px_#34d399]' : 'bg-red-500'
+                            }`}
                         />
                         <span className="font-mono text-[10px] font-semibold text-sky-400 shrink-0">{idx + 1}U</span>
                         <span className="font-medium truncate">{s.name}</span>

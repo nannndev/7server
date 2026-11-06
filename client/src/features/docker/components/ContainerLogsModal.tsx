@@ -80,9 +80,9 @@ export function ContainerLogsModal({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/70 p-4 backdrop-blur-xs" onClick={onClose}>
       <div
-        className="metal relative flex h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[#0d0d0f] shadow-2xl"
+        className="metal relative flex h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -93,12 +93,12 @@ export function ContainerLogsModal({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-mono text-sm font-semibold text-white">{containerName}</h3>
-                <span className="rounded bg-white/10 px-1.5 py-0.2 font-mono text-[10px] text-zinc-400">
+                <h3 className="font-mono text-sm font-semibold text-[var(--foreground)]">{containerName}</h3>
+                <span className="rounded bg-[var(--muted)] px-1.5 py-0.2 font-mono text-[10px] text-[var(--muted-foreground)]">
                   {containerId.slice(0, 12)}
                 </span>
               </div>
-              <p className="text-[11px] text-zinc-400">{t('docker.liveLogs')}</p>
+              <p className="text-[11px] text-[var(--muted-foreground)]">{t('docker.liveLogs')}</p>
             </div>
           </div>
 
@@ -174,7 +174,7 @@ export function ContainerLogsModal({
         </div>
 
         {/* Console Log Area */}
-        <div className="flex-1 overflow-auto bg-[#08080a] p-4 font-mono text-[12px] leading-relaxed text-zinc-300">
+        <div className="flex-1 overflow-auto bg-[var(--background)] p-4 font-mono text-[12px] leading-relaxed text-[var(--foreground)]">
           {loading && !logs ? (
             <div className="flex h-full items-center justify-center text-zinc-500">
               <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Loading container logs...

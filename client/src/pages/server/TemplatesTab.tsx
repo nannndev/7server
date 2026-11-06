@@ -1321,7 +1321,7 @@ export default function TemplatesTab() {
 
                               {/* Collapsible Live Step Output Log */}
                               {isExpanded && liveState?.output && (
-                                <pre className="p-3 bg-[#09090b] border-t border-zinc-800 text-[11px] font-mono text-zinc-300 max-h-48 overflow-auto whitespace-pre-wrap leading-relaxed">
+                                <pre className="p-3 bg-[var(--background)] border-t border-[var(--border)] text-[11px] font-mono text-[var(--foreground)] max-h-48 overflow-auto whitespace-pre-wrap leading-relaxed">
                                   {liveState.output}
                                 </pre>
                               )}
@@ -1333,13 +1333,13 @@ export default function TemplatesTab() {
                   </div>
                 ) : (
                   /* MODE B: EDITABLE BASH SCRIPT EDITOR */
-                  <div className="flex-1 flex flex-col rounded-xl border border-zinc-800 bg-[#09090b] overflow-hidden focus-within:ring-1 focus-within:ring-[var(--primary)] min-h-[380px]">
-                    <div className="px-3 py-1.5 border-b border-zinc-800/80 bg-zinc-950 flex items-center justify-between text-[11px] text-zinc-400 font-mono">
+                  <div className="flex-1 flex flex-col rounded-xl border border-[var(--border)] bg-[var(--background)] overflow-hidden focus-within:ring-1 focus-within:ring-[var(--primary)] min-h-[380px]">
+                    <div className="px-3 py-1.5 border-b border-[var(--border)] bg-[var(--muted)]/40 flex items-center justify-between text-[11px] text-[var(--muted-foreground)] font-mono">
                       <span className="flex items-center gap-1.5">
                         <span className="w-2.5 h-2.5 rounded-full bg-red-500/40 inline-block" />
                         <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/40 inline-block" />
                         <span className="w-2.5 h-2.5 rounded-full bg-green-500/40 inline-block" />
-                        <span className="ml-2 text-zinc-500">bash setup script ({selectedPreset.id}.sh)</span>
+                        <span className="ml-2 text-[var(--muted-foreground)]">bash setup script ({selectedPreset.id}.sh)</span>
                       </span>
                       <span>
                         {activeScript.split('\n').length} lines · {activeScript.length} characters
@@ -1350,7 +1350,7 @@ export default function TemplatesTab() {
                       value={activeScript}
                       onChange={(e) => setCustomScript(e.target.value)}
                       spellCheck={false}
-                      className="w-full flex-1 p-4 bg-transparent text-zinc-200 font-mono text-xs leading-relaxed outline-none resize-none overflow-auto whitespace-pre selection:bg-[var(--primary)]/30 min-h-[350px]"
+                      className="w-full flex-1 p-4 bg-transparent text-[var(--foreground)] font-mono text-xs leading-relaxed outline-none resize-none overflow-auto whitespace-pre selection:bg-[var(--primary)]/30 min-h-[350px]"
                     />
                   </div>
                 )}
@@ -1718,7 +1718,7 @@ export default function TemplatesTab() {
 
       {/* Inspect / Custom Tool Runner Modal */}
       {inspectTool && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/75 backdrop-blur-xs p-4 animate-in fade-in duration-150">
           <div className="w-full max-w-2xl rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="p-5 border-b border-[var(--border)] flex items-start justify-between gap-3 bg-[var(--muted)]/20">
               <div className="flex items-center gap-3">
@@ -1753,19 +1753,19 @@ export default function TemplatesTab() {
                 onChange={(e) => setInspectScript(e.target.value)}
                 rows={10}
                 spellCheck={false}
-                className="w-full p-3.5 rounded-xl border border-zinc-800 bg-[#09090b] text-zinc-200 font-mono text-xs leading-relaxed outline-none focus:ring-1 focus:ring-[var(--primary)]"
+                className="w-full p-3.5 rounded-xl border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] font-mono text-xs leading-relaxed outline-none focus:ring-1 focus:ring-[var(--primary)]"
               />
 
               {/* Sudo Password Required Prompt */}
               {promptSudo && (
                 <div className="p-4 rounded-xl border border-amber-500/40 bg-amber-500/10 space-y-3 animate-in fade-in">
                   <div className="flex items-start gap-2.5">
-                    <KeyRound className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                    <KeyRound className="w-5 h-5 text-amber-500 dark:text-amber-400 shrink-0 mt-0.5" />
                     <div className="space-y-1">
-                      <h4 className="text-xs font-semibold text-amber-300">
+                      <h4 className="text-xs font-semibold text-amber-500 dark:text-amber-300">
                         Sudo Password Required
                       </h4>
-                      <p className="text-[11px] text-zinc-300 leading-relaxed">
+                      <p className="text-[11px] text-[var(--muted-foreground)] leading-relaxed">
                         The remote user requires root/sudo privileges to install packages on this server.
                       </p>
                     </div>
@@ -1777,7 +1777,7 @@ export default function TemplatesTab() {
                       placeholder="Enter sudo password..."
                       value={sudoPasswordInput}
                       onChange={(e) => setSudoPasswordInput(e.target.value)}
-                      className="h-8 text-xs bg-black/50 border-amber-500/40 text-zinc-100 flex-1"
+                      className="h-8 text-xs bg-[var(--background)] border-amber-500/40 text-[var(--foreground)] flex-1"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && sudoPasswordInput.trim() && inspectTool) {
                           handleInstallMarketplaceToolLive(inspectTool, inspectScript || undefined, sudoPasswordInput);
@@ -1788,19 +1788,19 @@ export default function TemplatesTab() {
                       size="sm"
                       disabled={!sudoPasswordInput.trim() || !!installingToolId}
                       onClick={() => inspectTool && handleInstallMarketplaceToolLive(inspectTool, inspectScript || undefined, sudoPasswordInput)}
-                      className="h-8 text-xs gap-1.5 font-semibold bg-amber-500 hover:bg-amber-600 text-zinc-950 shrink-0"
+                      className="h-8 text-xs gap-1.5 font-semibold bg-amber-500 hover:bg-amber-600 text-black dark:text-zinc-950 shrink-0"
                     >
                       <Play className="w-3 h-3" />
                       <span>Authenticate & Install</span>
                     </Button>
                   </div>
 
-                  <label className="flex items-center gap-2 cursor-pointer text-[11px] text-zinc-400">
+                  <label className="flex items-center gap-2 cursor-pointer text-[11px] text-[var(--muted-foreground)]">
                     <input
                       type="checkbox"
                       checked={rememberSudo}
                       onChange={(e) => setRememberSudo(e.target.checked)}
-                      className="rounded border-zinc-700 bg-zinc-900 text-amber-500 focus:ring-0"
+                      className="rounded border-[var(--border)] bg-[var(--card)] text-amber-500 focus:ring-0"
                     />
                     <span>Remember sudo password for this server (encrypted with AES-256-GCM)</span>
                   </label>
@@ -1808,14 +1808,14 @@ export default function TemplatesTab() {
               )}
 
               {inspectResult && (
-                <div className="rounded-xl border border-zinc-800 bg-[#09090b] overflow-hidden">
-                  <div className="px-3.5 py-2 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between text-xs font-mono">
-                    <span className={inspectResult.ok ? 'text-emerald-400' : 'text-red-400'}>
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--background)] overflow-hidden">
+                  <div className="px-3.5 py-2 border-b border-[var(--border)] bg-[var(--muted)]/40 flex items-center justify-between text-xs font-mono">
+                    <span className={inspectResult.ok ? 'text-emerald-500 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}>
                       {inspectResult.ok ? '✔ Execution Succeeded' : `✖ Failed (Exit ${inspectResult.exitCode})`} ·{' '}
                       {(inspectResult.durationMs / 1000).toFixed(1)}s
                     </span>
                   </div>
-                  <pre className="p-3.5 text-[11px] font-mono text-zinc-300 max-h-52 overflow-auto whitespace-pre-wrap">
+                  <pre className="p-3.5 text-[11px] font-mono text-[var(--foreground)] max-h-52 overflow-auto whitespace-pre-wrap bg-[var(--background)]">
                     {inspectResult.output}
                   </pre>
                 </div>

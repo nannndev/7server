@@ -73,38 +73,38 @@ export function BackgroundTasksWidget() {
             onClick={() => setIsDrawerOpen(true)}
             className={`group flex items-center gap-2.5 px-3.5 py-2 rounded-full border shadow-2xl backdrop-blur-md transition-all hover:scale-105 active:scale-95 cursor-pointer ${
               hasRunning
-                ? 'bg-zinc-900/90 border-sky-500/50 text-zinc-100 shadow-sky-500/10'
+                ? 'bg-[var(--card)] border-sky-500/50 text-[var(--foreground)] shadow-sky-500/10'
                 : latestTask.status === 'success'
-                ? 'bg-zinc-900/90 border-emerald-500/40 text-emerald-300 shadow-emerald-500/10'
-                : 'bg-zinc-900/90 border-red-500/40 text-red-300 shadow-red-500/10'
+                ? 'bg-[var(--card)] border-emerald-500/40 text-emerald-600 dark:text-emerald-300 shadow-emerald-500/10'
+                : 'bg-[var(--card)] border-red-500/40 text-red-600 dark:text-red-300 shadow-red-500/10'
             }`}
           >
             {hasRunning ? (
-              <RotateCw className="w-4 h-4 text-sky-400 animate-spin shrink-0" />
+              <RotateCw className="w-4 h-4 text-sky-500 dark:text-sky-400 animate-spin shrink-0" />
             ) : latestTask.status === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
             ) : (
-              <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+              <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
             )}
 
             <div className="flex items-center gap-2 text-xs font-medium">
-              <span className="font-semibold text-white">
+              <span className="font-semibold text-[var(--foreground)]">
                 {hasRunning
                   ? `${activeTasks.length} ${activeTasks.length === 1 ? 'Task' : 'Tasks'} Active`
                   : 'Tasks Completed'}
               </span>
-              <span className="text-zinc-500">•</span>
-              <span className="truncate max-w-[200px] text-zinc-300 font-mono text-[11px]">
+              <span className="text-[var(--muted-foreground)]">•</span>
+              <span className="truncate max-w-[200px] text-[var(--muted-foreground)] font-mono text-[11px]">
                 {latestTask.title}
               </span>
               {hasRunning && (
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300">
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-600 dark:text-sky-300 font-semibold">
                   {latestTask.durationSec}s
                 </span>
               )}
             </div>
 
-            <ChevronRight className="w-3.5 h-3.5 text-zinc-400 group-hover:translate-x-0.5 transition-transform ml-1" />
+            <ChevronRight className="w-3.5 h-3.5 text-[var(--muted-foreground)] group-hover:translate-x-0.5 transition-transform ml-1" />
           </button>
           {!hasRunning && (
             <button
@@ -114,7 +114,7 @@ export function BackgroundTasksWidget() {
                 clearFinishedTasks();
               }}
               title="Dismiss task pill"
-              className="absolute -top-1.5 -right-1.5 p-1 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700 shadow transition"
+              className="absolute -top-1.5 -right-1.5 p-1 rounded-full bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] border border-[var(--border)] shadow transition"
             >
               <X className="w-3 h-3" />
             </button>
@@ -124,24 +124,24 @@ export function BackgroundTasksWidget() {
 
       {/* Slide-out Task & Live Log Drawer */}
       {isDrawerOpen && (
-        <div className="fixed inset-0 z-[120] flex justify-end bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="w-full sm:w-[560px] h-full bg-[#0d0d0f] border-l border-zinc-800 shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
+        <div className="fixed inset-0 z-[120] flex justify-end bg-black/40 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="w-full sm:w-[560px] h-full bg-[var(--card)] border-l border-[var(--border)] shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
             {/* Drawer Header */}
-            <div className="p-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-950/60">
+            <div className="p-4 border-b border-[var(--border)] flex items-center justify-between bg-[var(--muted)]/40">
               <div className="flex items-center gap-2.5">
-                <span className="p-2 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400">
+                <span className="p-2 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-500 dark:text-sky-400">
                   <Activity className="w-4 h-4" />
                 </span>
                 <div>
-                  <h3 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
                     <span>Operations & Background Tasks</span>
                     {hasRunning && (
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/30 animate-pulse">
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-500/30 animate-pulse font-semibold">
                         {activeTasks.length} running
                       </span>
                     )}
                   </h3>
-                  <p className="text-[11px] text-zinc-400">
+                  <p className="text-[11px] text-[var(--muted-foreground)]">
                     Tasks persist across tabs and execute independently in the background
                   </p>
                 </div>
@@ -152,7 +152,7 @@ export function BackgroundTasksWidget() {
                   type="button"
                   onClick={clearFinishedTasks}
                   disabled={tasks.filter((t) => t.status !== 'running').length === 0}
-                  className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition disabled:opacity-30 disabled:pointer-events-none"
+                  className="p-1.5 rounded-lg text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] transition disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
                   title="Clear finished tasks"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -160,7 +160,7 @@ export function BackgroundTasksWidget() {
                 <button
                   type="button"
                   onClick={() => setIsDrawerOpen(false)}
-                  className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition"
+                  className="p-1.5 rounded-lg text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] transition cursor-pointer"
                   title="Close drawer"
                 >
                   <X className="w-4 h-4" />
@@ -169,7 +169,7 @@ export function BackgroundTasksWidget() {
             </div>
 
             {/* Task Item Selector List */}
-            <div className="border-b border-zinc-800 bg-[#09090b] max-h-48 overflow-y-auto divide-y divide-zinc-800/60">
+            <div className="border-b border-[var(--border)] bg-[var(--background)] max-h-48 overflow-y-auto divide-y divide-[var(--border)]/60">
               {tasks.map((t) => {
                 const isSelected = selectedTask?.id === t.id;
                 return (
@@ -177,28 +177,28 @@ export function BackgroundTasksWidget() {
                     key={t.id}
                     type="button"
                     onClick={() => setSelectedTaskId(t.id)}
-                    className={`w-full p-3 text-left flex items-center justify-between gap-3 transition ${
+                    className={`w-full p-3 text-left flex items-center justify-between gap-3 transition cursor-pointer ${
                       isSelected
-                        ? 'bg-zinc-800/60 text-zinc-100 border-l-2 border-sky-400'
-                        : 'hover:bg-zinc-900/50 text-zinc-300'
+                        ? 'bg-sky-500/10 text-[var(--foreground)] border-l-2 border-sky-500 font-medium'
+                        : 'hover:bg-[var(--muted)]/50 text-[var(--muted-foreground)]'
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       {t.status === 'running' ? (
-                        <RotateCw className="w-4 h-4 text-sky-400 animate-spin shrink-0" />
+                        <RotateCw className="w-4 h-4 text-sky-500 dark:text-sky-400 animate-spin shrink-0" />
                       ) : t.status === 'success' ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
                       ) : (
-                        <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                        <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
                       )}
                       <div className="min-w-0">
-                        <span className="text-xs font-semibold block truncate">
+                        <span className="text-xs font-semibold block truncate text-[var(--foreground)]">
                           {t.title}
                         </span>
-                        <div className="flex items-center gap-2 text-[10px] text-zinc-400 font-mono mt-0.5">
+                        <div className="flex items-center gap-2 text-[10px] text-[var(--muted-foreground)] font-mono mt-0.5">
                           {t.serverName && <span>{t.serverName}</span>}
                           <span>•</span>
-                          <span>{t.durationSec}s elapsed</span>
+                           <span>{t.durationSec}s elapsed</span>
                           <span>•</span>
                           <span className="capitalize">{t.status}</span>
                         </div>
@@ -218,23 +218,23 @@ export function BackgroundTasksWidget() {
 
             {/* Selected Task Details & Live Terminal Output */}
             {selectedTask ? (
-              <div className="flex-1 flex flex-col min-h-0 bg-[#09090b]">
+              <div className="flex-1 flex flex-col min-h-0 bg-[var(--background)]">
                 {/* Terminal Toolbar */}
-                <div className="px-4 py-2.5 border-b border-zinc-800 flex items-center justify-between text-xs bg-zinc-950">
+                <div className="px-4 py-2.5 border-b border-[var(--border)] flex items-center justify-between text-xs bg-[var(--muted)]/30">
                   <div className="flex items-center gap-2">
-                    <Terminal className="w-3.5 h-3.5 text-zinc-400" />
-                    <span className="font-mono text-[11px] text-zinc-300 font-medium truncate max-w-[280px]">
+                    <Terminal className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
+                    <span className="font-mono text-[11px] text-[var(--foreground)] font-medium truncate max-w-[280px]">
                       Live Output: {selectedTask.title}
                     </span>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <label className="flex items-center gap-1.5 cursor-pointer text-[10px] text-zinc-400 select-none">
+                    <label className="flex items-center gap-1.5 cursor-pointer text-[10px] text-[var(--muted-foreground)] select-none">
                       <input
                         type="checkbox"
                         checked={autoScroll}
                         onChange={(e) => setAutoScroll(e.target.checked)}
-                        className="rounded border-zinc-700 bg-zinc-900 text-sky-500 focus:ring-0"
+                        className="rounded border-[var(--border)] bg-[var(--card)] text-sky-500 focus:ring-0"
                       />
                       <span>Auto-scroll</span>
                     </label>
@@ -242,10 +242,10 @@ export function BackgroundTasksWidget() {
                     <button
                       type="button"
                       onClick={handleCopyLogs}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] text-zinc-300 hover:text-white hover:bg-zinc-800 transition"
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] transition cursor-pointer"
                       title="Copy logs"
                     >
-                      {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                      {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
                       <span>{copied ? 'Copied' : 'Copy'}</span>
                     </button>
                   </div>
@@ -254,7 +254,7 @@ export function BackgroundTasksWidget() {
                 {/* Terminal Pre Console */}
                 <pre
                   ref={logTerminalRef}
-                  className="flex-1 p-4 font-mono text-[11px] leading-relaxed text-zinc-300 overflow-auto whitespace-pre-wrap select-text bg-[#09090b]"
+                  className="flex-1 p-4 font-mono text-[11px] leading-relaxed text-[var(--foreground)] overflow-auto whitespace-pre-wrap select-text bg-[var(--background)]"
                 >
                   {selectedTask.logs.length > 0
                     ? selectedTask.logs.join('\n')
@@ -262,17 +262,17 @@ export function BackgroundTasksWidget() {
                 </pre>
 
                 {/* Footer Status Bar */}
-                <div className="p-3 border-t border-zinc-800 bg-zinc-950 flex items-center justify-between text-xs font-mono">
-                  <span className="text-[11px] text-zinc-400">
+                <div className="p-3 border-t border-[var(--border)] bg-[var(--muted)]/30 flex items-center justify-between text-xs font-mono">
+                  <span className="text-[11px] text-[var(--muted-foreground)]">
                     Lines: {selectedTask.logs.length} · Duration: {selectedTask.durationSec}s
                   </span>
                   <span
                     className={`text-[11px] font-semibold ${
                       selectedTask.status === 'running'
-                        ? 'text-sky-400'
+                        ? 'text-sky-500 dark:text-sky-400'
                         : selectedTask.status === 'success'
-                        ? 'text-emerald-400'
-                        : 'text-red-400'
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : 'text-red-600 dark:text-red-400'
                     }`}
                   >
                     {selectedTask.status === 'running'
@@ -284,7 +284,7 @@ export function BackgroundTasksWidget() {
                 </div>
               </div>
             ) : (
-              <div className="flex-1 flex items-center justify-center text-zinc-500 text-xs">
+              <div className="flex-1 flex items-center justify-center text-[var(--muted-foreground)] text-xs">
                 No task selected
               </div>
             )}

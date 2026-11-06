@@ -470,7 +470,7 @@ export default function DockerPanel({
                   placeholder="Enter sudo password..."
                   value={dockerSudoPassword}
                   onChange={(e) => setDockerSudoPassword(e.target.value)}
-                  className="h-8 text-xs bg-black/50 border-amber-500/40 text-zinc-100 flex-1"
+                  className="h-8 text-xs bg-[var(--background)] border-amber-500/40 text-[var(--foreground)] flex-1"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && dockerSudoPassword.trim()) {
                       handleInstallDocker(dockerSudoPassword);
@@ -481,7 +481,7 @@ export default function DockerPanel({
                   size="sm"
                   disabled={!dockerSudoPassword.trim() || installingDocker}
                   onClick={() => handleInstallDocker(dockerSudoPassword)}
-                  className="h-8 text-xs gap-1.5 font-semibold bg-amber-500 hover:bg-amber-600 text-zinc-950 shrink-0"
+                  className="h-8 text-xs gap-1.5 font-semibold bg-amber-500 hover:bg-amber-600 text-black dark:text-zinc-950 shrink-0"
                 >
                   <Play className="w-3 h-3" />
                   <span>Authenticate & Install</span>
@@ -579,39 +579,39 @@ export default function DockerPanel({
             if (!isBusy && !dockerInstallResult) return null;
 
             return (
-              <div className="mt-5 rounded-xl border border-zinc-800 bg-[#09090b] overflow-hidden">
-                <div className="px-3.5 py-2 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between text-xs">
-                  <span className="font-mono text-[11px] text-zinc-300 flex items-center gap-2">
+              <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--background)] overflow-hidden">
+                <div className="px-3.5 py-2 border-b border-[var(--border)] bg-[var(--muted)]/40 flex items-center justify-between text-xs">
+                  <span className="font-mono text-[11px] text-[var(--foreground)] flex items-center gap-2">
                     {isBusy ? (
                       <>
-                        <RotateCw className="w-3.5 h-3.5 text-sky-400 animate-spin" />
+                        <RotateCw className="w-3.5 h-3.5 text-sky-500 dark:text-sky-400 animate-spin" />
                         <span>
                           Setting up Docker GPG key, repository, and installing packages ({activeDockerTask?.durationSec || 0}s)...
                         </span>
                       </>
                     ) : dockerInstallResult?.ok ? (
                       <>
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                        <span className="text-emerald-400 font-semibold">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
+                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
                           Docker Installation Complete
                         </span>
                       </>
                     ) : (
                       <>
-                        <AlertCircle className="w-3.5 h-3.5 text-red-400" />
-                        <span className="text-red-400 font-semibold">
+                        <AlertCircle className="w-3.5 h-3.5 text-red-500 dark:text-red-400" />
+                        <span className="text-red-600 dark:text-red-400 font-semibold">
                           Failed {dockerInstallResult?.exitCode ? `(Exit Code: ${dockerInstallResult.exitCode})` : ''}
                         </span>
                       </>
                     )}
                   </span>
                   {isBusy && (
-                    <span className="text-[10px] text-zinc-400 font-sans">
+                    <span className="text-[10px] text-[var(--muted-foreground)] font-sans">
                       Runs in background · Safe to navigate
                     </span>
                   )}
                 </div>
-                <pre className="p-3.5 text-[11px] font-mono text-zinc-300 max-h-60 overflow-auto whitespace-pre-wrap leading-relaxed">
+                <pre className="p-3.5 text-[11px] font-mono text-[var(--foreground)] max-h-60 overflow-auto whitespace-pre-wrap leading-relaxed bg-[var(--background)]">
                   {activeDockerTask && activeDockerTask.logs.length > 0
                     ? activeDockerTask.logs.join('\n')
                     : dockerInstallResult?.output || '(Executing Docker installation on remote server...)'}
@@ -623,7 +623,7 @@ export default function DockerPanel({
 
         {/* Script Inspector Modal */}
         {showDockerScriptModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/75 backdrop-blur-xs p-4 animate-in fade-in duration-150">
             <div className="w-full max-w-2xl rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
               <div className="p-4 border-b border-[var(--border)] flex items-center justify-between bg-[var(--muted)]/20">
                 <div className="flex items-center gap-2">
@@ -666,7 +666,7 @@ export default function DockerPanel({
                   disabled={installingDocker}
                   rows={10}
                   spellCheck={false}
-                  className="w-full p-3.5 rounded-xl border border-zinc-800 bg-[#09090b] text-zinc-200 font-mono text-xs leading-relaxed outline-none focus:ring-1 focus:ring-sky-500 resize-y"
+                  className="w-full p-3.5 rounded-xl border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] font-mono text-xs leading-relaxed outline-none focus:ring-1 focus:ring-sky-500 resize-y"
                 />
               </div>
 

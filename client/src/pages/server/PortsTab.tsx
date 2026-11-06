@@ -115,7 +115,7 @@ export default function PortsTab() {
           )}
 
           {showRawPorts ? (
-            <div className="bg-[#09090b] border border-[var(--border)] rounded-lg p-3 font-mono text-xs text-zinc-200 overflow-x-auto max-h-[60vh] overflow-y-auto">
+            <div className="bg-[var(--background)] border border-[var(--border)] rounded-lg p-3 font-mono text-xs text-[var(--foreground)] overflow-x-auto max-h-[60vh] overflow-y-auto">
               <pre className="whitespace-pre-wrap">{portsRaw || t('ports.scanning')}</pre>
             </div>
           ) : loadingPorts && portsList.length === 0 ? (

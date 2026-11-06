@@ -78,7 +78,7 @@ export function PullImageModal({ serverId, isOpen, onClose, onSuccess }: PullIma
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/60 p-4 backdrop-blur-xs" onClick={onClose}>
       <div
         className="metal relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
@@ -159,35 +159,35 @@ export function PullImageModal({ serverId, isOpen, onClose, onSuccess }: PullIma
 
           {/* Real-time Streaming Output Terminal */}
           {(currentTask || output) && (
-            <div className="rounded-xl border border-zinc-800 bg-[#09090b] overflow-hidden">
-              <div className="px-3 py-2 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between text-xs font-mono">
-                <span className="text-[11px] text-zinc-300 flex items-center gap-2">
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--background)] overflow-hidden">
+              <div className="px-3 py-2 border-b border-[var(--border)] bg-[var(--muted)]/40 flex items-center justify-between text-xs font-mono">
+                <span className="text-[11px] text-[var(--foreground)] flex items-center gap-2">
                   {isBusy ? (
                     <>
-                      <RotateCw className="w-3.5 h-3.5 text-sky-400 animate-spin" />
+                      <RotateCw className="w-3.5 h-3.5 text-sky-500 dark:text-sky-400 animate-spin" />
                       <span>Downloading & extracting layers ({currentTask?.durationSec || 0}s)...</span>
                     </>
                   ) : output?.ok ? (
                     <>
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
-                      <span className="text-emerald-400 font-semibold">Pull Complete</span>
+                      <Check className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
+                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Pull Complete</span>
                     </>
                   ) : (
                     <>
-                      <X className="w-3.5 h-3.5 text-red-400" />
-                      <span className="text-red-400 font-semibold">Pull Failed</span>
+                      <X className="w-3.5 h-3.5 text-red-500 dark:text-red-400" />
+                      <span className="text-red-600 dark:text-red-400 font-semibold">Pull Failed</span>
                     </>
                   )}
                 </span>
                 {isBusy && (
-                  <span className="text-[10px] text-zinc-400 font-sans">
+                  <span className="text-[10px] text-[var(--muted-foreground)] font-sans">
                     Runs in background · Safe to close
                   </span>
                 )}
               </div>
               <pre
                 ref={logPreRef}
-                className="p-3 font-mono text-[11px] leading-relaxed text-zinc-300 max-h-48 overflow-auto whitespace-pre-wrap select-text"
+                className="p-3 font-mono text-[11px] leading-relaxed text-[var(--foreground)] max-h-48 overflow-auto whitespace-pre-wrap select-text bg-[var(--background)]"
               >
                 {currentTask && currentTask.logs.length > 0
                   ? currentTask.logs.join('\n')
