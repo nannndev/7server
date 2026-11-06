@@ -1,6 +1,6 @@
 // One server: header + output banner + the active tab. Each tab is its own component in pages/server/.
 import React, { useEffect, useState } from 'react';
-import { Terminal as TermIcon, Settings, RefreshCw, Check, Copy, FolderOpen, Pencil, X } from 'lucide-react';
+import { Terminal as TermIcon, Settings, RefreshCw, Check, Copy, FolderOpen, Pencil, X, KeyRound } from 'lucide-react';
 import type { ServerItem, ServerMetrics } from '@/features/servers/types';
 import { fetchServerMetrics, updateServer, type HistoryPoint } from '@/features/servers/api';
 import { apiFetch } from '@/shared/api/client';
@@ -9,6 +9,7 @@ import { Button } from '@/shared/ui/button';
 import { toast } from '@/shared/ui/toast';
 import FileManagerModal from '@/features/files/components/FileManagerModal';
 import LogsModal from '@/features/logs/components/LogsModal';
+import { SudoPasswordModal } from '@/features/servers/components/SudoPasswordModal';
 import { SERVER_SECTIONS, sectionLabel } from '@/app/serverNav';
 import type { ServerTab } from '@/app/router';
 import { ServerPageProvider, type LogsTarget, type ServerPageCtx } from './server/context';
@@ -75,6 +76,18 @@ export default function ServerPage({ server, tab, onTabChange, history = [], thr
   const [isEditingName, setIsEditingName] = useState(false);
   const [serverNameInput, setServerNameInput] = useState(server.name);
   const [savingName, setSavingName] = useState(false);
+  const [sudoModalOpen, setSudoModalOpen] = useState(false);
+
+  const handleSudoConfirm = async (password: string) => {
+    try {
+      await updateServer(server.id, { sudoPassword: password });
+      toast.success(`Sudo password saved & encrypted for ${server.name}`);
+      setSudoModalOpen(false);
+      onServerUpdated?.();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save sudo password');
+    }
+  };
 
   useEffect(() => {
     setServerNameInput(server.name);
@@ -241,6 +254,28 @@ export default function ServerPage({ server, tab, onTabChange, history = [], thr
               </button>
               <span className="text-[var(--border)]">•</span>
               <span className="capitalize">{server.status}</span>
+              {server.username !== 'root' && (
+                <>
+                  <span className="text-[var(--border)]">•</span>
+                  <button
+                    type="button"
+                    onClick={() => setSudoModalOpen(true)}
+                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-sans font-medium transition cursor-pointer border ${
+                      server.hasSudoPassword
+                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
+                        : 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20 animate-pulse'
+                    }`}
+                    title={
+                      server.hasSudoPassword
+                        ? 'Sudo password is encrypted & saved. Click to update.'
+                        : 'Sudo password not configured. Click to save.'
+                    }
+                  >
+                    <KeyRound className="w-2.5 h-2.5" />
+                    <span>{server.hasSudoPassword ? 'Sudo: Saved' : 'Sudo: Not Set'}</span>
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -301,6 +336,16 @@ export default function ServerPage({ server, tab, onTabChange, history = [], thr
         {logsModal && (
           <LogsModal serverId={server.id} type={logsModal.type} name={logsModal.name} onClose={() => setLogsModal(null)} />
         )}
+
+        <SudoPasswordModal
+          isOpen={sudoModalOpen}
+          onClose={() => setSudoModalOpen(false)}
+          onConfirm={handleSudoConfirm}
+          serverName={server.name}
+          username={server.username}
+          hasExistingPassword={server.hasSudoPassword}
+          reason={`Provide sudo password for '${server.username}' on ${server.name} so 7Server can run 1-click packages, service controls, and Docker automated pipelines without prompt.`}
+        />
       </div>
     </ServerPageProvider>
   );

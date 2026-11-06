@@ -17,17 +17,20 @@ export function getAllServers(includeCredentials = false): (SafeServer | ServerC
         ...server,
         hasPassword: !!server.encryptedPassword,
         hasPrivateKey: !!server.encryptedPrivateKey,
+        hasSudoPassword: !!server.encryptedSudoPassword,
         password: server.encryptedPassword ? decrypt(server.encryptedPassword) : '',
         privateKey: server.encryptedPrivateKey ? decrypt(server.encryptedPrivateKey) : '',
-        passphrase: server.encryptedPassphrase ? decrypt(server.encryptedPassphrase) : ''
+        passphrase: server.encryptedPassphrase ? decrypt(server.encryptedPassphrase) : '',
+        sudoPassword: server.encryptedSudoPassword ? decrypt(server.encryptedSudoPassword) : ''
       };
       return creds;
     }
-    const { encryptedPassword, encryptedPrivateKey, encryptedPassphrase, ...safe } = server;
+    const { encryptedPassword, encryptedPrivateKey, encryptedPassphrase, encryptedSudoPassword, ...safe } = server;
     const safeServer: SafeServer = {
       ...safe,
       hasPassword: !!encryptedPassword,
-      hasPrivateKey: !!encryptedPrivateKey
+      hasPrivateKey: !!encryptedPrivateKey,
+      hasSudoPassword: !!encryptedSudoPassword
     };
     return safeServer;
   });
@@ -45,7 +48,7 @@ export function getServerById(id: string, includeCredentials = false): SafeServe
   }
 }
 
-export function createServer(data: Partial<RawServer> & { password?: string; privateKey?: string; passphrase?: string }): SafeServer {
+export function createServer(data: Partial<RawServer> & { password?: string; privateKey?: string; passphrase?: string; sudoPassword?: string }): SafeServer {
   const servers = readData();
   const id = uuidv4();
 
@@ -59,6 +62,7 @@ export function createServer(data: Partial<RawServer> & { password?: string; pri
     encryptedPassword: data.password ? encrypt(data.password) : null,
     encryptedPrivateKey: data.privateKey ? encrypt(data.privateKey) : null,
     encryptedPassphrase: data.passphrase ? encrypt(data.passphrase) : null,
+    encryptedSudoPassword: data.sudoPassword ? encrypt(data.sudoPassword) : null,
     tags: Array.isArray(data.tags) ? data.tags : [],
     description: data.description || '',
     status: 'unknown',
@@ -72,7 +76,7 @@ export function createServer(data: Partial<RawServer> & { password?: string; pri
   return getServerById(id, false)!;
 }
 
-export function updateServer(id: string, data: Partial<RawServer> & { password?: string; privateKey?: string; passphrase?: string }): SafeServer | null {
+export function updateServer(id: string, data: Partial<RawServer> & { password?: string; privateKey?: string; passphrase?: string; sudoPassword?: string }): SafeServer | null {
   const servers = readData();
   const index = servers.findIndex((s) => s.id === id);
   if (index === -1) return null;
@@ -100,6 +104,9 @@ export function updateServer(id: string, data: Partial<RawServer> & { password?:
   }
   if (data.passphrase !== undefined && data.passphrase !== '') {
     updated.encryptedPassphrase = encrypt(data.passphrase);
+  }
+  if (data.sudoPassword !== undefined && data.sudoPassword !== '') {
+    updated.encryptedSudoPassword = encrypt(data.sudoPassword);
   }
 
   servers[index] = updated;

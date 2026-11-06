@@ -19,7 +19,6 @@ import { Card } from '@/shared/ui/card';
 import { Progress } from '@/shared/ui/progress';
 import { Input } from '@/shared/ui/input';
 import TelemetryChart from '@/features/servers/components/TelemetryChart';
-import SoftwareCard from '@/features/servers/components/SoftwareCard';
 import { VpsTuningModal } from '@/features/servers/components/VpsTuningModal';
 import { useServerPage, formatMB } from './context';
 import { useT } from '@/shared/i18n';
@@ -318,12 +317,6 @@ export default function OverviewTab() {
           </div>
           <TelemetryChart points={ctx.history} thresholds={ctx.thresholds} height={220} />
         </Card>
-
-        <SoftwareCard
-          serverId={server.id}
-          onOpenTemplates={() => ctx.setActiveTab('templates')}
-          onOpenTerminal={(cmd) => ctx.openTerminal(cmd)}
-        />
       </div>
 
       {/* VPS System & Swap Tuning Modal */}

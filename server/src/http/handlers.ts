@@ -22,9 +22,14 @@ export const withServer = (fn: (target: ServerCredentials, req: Request) => Prom
 
     const target = getServerById(serverId, true);
     if (!target) return res.status(404).json({ success: false, error: 'Server not found' });
-    res.json({ success: true, data: await fn(target, req) });
+    const result = await fn(target, req);
+    if (!res.headersSent) {
+      res.json({ success: true, data: result });
+    }
   } catch (err: any) {
-    res.status(statusOf(err)).json({ success: false, error: err.message });
+    if (!res.headersSent) {
+      res.status(statusOf(err)).json({ success: false, error: err.message });
+    }
   }
 };
 

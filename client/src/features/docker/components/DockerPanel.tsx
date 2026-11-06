@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import { cacheGet, cacheSet } from '@/shared/lib/cache';
 import {
   RefreshCw, Play, Square, RotateCw, Pause, Trash2, ScrollText, Terminal as TermIcon, Info, ChevronDown, ChevronRight,
-  Box, HardDrive, Layers, Download, X, FolderOpen, AlertTriangle, Plus, Network as NetIcon, Database, ExternalLink
+  Box, HardDrive, Layers, Download, X, FolderOpen, AlertTriangle, Plus, Network as NetIcon, Database, ExternalLink,
+  CheckCircle2, AlertCircle, KeyRound, Code2, ShieldCheck, Sparkles, Copy, Check
 } from 'lucide-react';
 import { BrandIcon } from '@/shared/ui/brand-icon';
 import {
@@ -25,9 +26,22 @@ import {
 } from '@/features/docker/api';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
+import { Badge } from '@/shared/ui/badge';
 import { Skeleton, RowsSkeleton } from '@/shared/ui/skeleton';
+import { toast } from '@/shared/ui/toast';
 import { useT } from '@/shared/i18n';
 import { confirmModal } from '@/shared/ui/confirm-dialog';
+import {
+  executeSoftwareScript,
+  recordTemplateRun,
+  updateServer
+} from '@/features/servers/api';
+import {
+  MARKETPLACE_CATALOG,
+  generateSingleToolScript,
+  formatTerminalCommand
+} from '@/features/servers/lib/templates';
+import { SudoPasswordModal } from '@/features/servers/components/SudoPasswordModal';
 
 import { PullImageModal } from './PullImageModal';
 import { VolumeModal } from './VolumeModal';
@@ -39,9 +53,13 @@ import { ContainerLogsModal } from './ContainerLogsModal';
 interface DockerPanelProps {
   serverId: string;
   serverHost: string;
+  serverName?: string;
+  serverUsername?: string;
   onLogs: (containerName: string) => void;
   onShell: (command: string) => void;
   onOpenFolder: (path: string) => void;
+  onOpenTerminal?: (command?: string) => void;
+  onOpenTemplates?: () => void;
 }
 
 type View = 'containers' | 'compose' | 'images' | 'volumes' | 'networks' | 'disk';
@@ -55,7 +73,17 @@ const barColor = (v: number) => (v >= 90 ? 'bg-red-500' : v >= 70 ? 'bg-amber-40
 const hostPorts = (ports: string) =>
   [...new Set([...ports.matchAll(/(?:0\.0\.0\.0|\[::\]):(\d+)->/g)].map((m) => m[1]))];
 
-export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onOpenFolder }: DockerPanelProps) {
+export default function DockerPanel({
+  serverId,
+  serverHost,
+  serverName,
+  serverUsername,
+  onLogs,
+  onShell,
+  onOpenFolder,
+  onOpenTerminal,
+  onOpenTemplates
+}: DockerPanelProps) {
   const t = useT();
   const cacheKey = `docker:${serverId}`;
   const [data, setData] = useState<DockerOverview | null>(() => cacheGet<DockerOverview>(cacheKey) ?? null);
@@ -87,6 +115,107 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
     id: string;
     name: string;
   }>({ open: false, id: '', name: '' });
+
+  // Docker 1-Click Installer state
+  const [installingDocker, setInstallingDocker] = useState(false);
+  const [dockerInstallResult, setDockerInstallResult] = useState<{
+    ok: boolean;
+    exitCode: number;
+    output: string;
+    durationMs: number;
+    sudoRequired?: boolean;
+  } | null>(null);
+  const [dockerPromptSudo, setDockerPromptSudo] = useState(false);
+  const [dockerSudoPassword, setDockerSudoPassword] = useState('');
+  const [dockerRememberSudo, setDockerRememberSudo] = useState(true);
+  const [sudoModalOpen, setSudoModalOpen] = useState(false);
+  const [pendingSudoAction, setPendingSudoAction] = useState<((password: string) => Promise<void>) | null>(null);
+  const [showDockerScriptModal, setShowDockerScriptModal] = useState(false);
+  const [customDockerScript, setCustomDockerScript] = useState<string | null>(null);
+  const [copiedDockerScript, setCopiedDockerScript] = useState(false);
+
+  const dockerTool = useMemo(
+    () => MARKETPLACE_CATALOG.find((m) => m.id === 'docker'),
+    []
+  );
+
+  const activeDockerScript = useMemo(() => {
+    if (customDockerScript !== null) return customDockerScript;
+    if (dockerTool) return generateSingleToolScript(dockerTool);
+    return `#!/usr/bin/env bash\nset -e\nexport DEBIAN_FRONTEND=noninteractive\ncurl -fsSL https://get.docker.com | sh\nsystemctl enable --now docker\ngroupadd -f docker 2>/dev/null || true\n[ -n "$SUDO_USER" ] && usermod -aG docker "$SUDO_USER" 2>/dev/null || true\nusermod -aG docker $(whoami) 2>/dev/null || true\nchmod 666 /var/run/docker.sock 2>/dev/null || true\n`;
+  }, [customDockerScript, dockerTool]);
+
+  const handleSudoConfirm = async (password: string, remember: boolean) => {
+    if (remember) {
+      await updateServer(serverId, { sudoPassword: password }).catch(() => {});
+    }
+    setDockerSudoPassword(password);
+    setSudoModalOpen(false);
+    if (pendingSudoAction) {
+      const act = pendingSudoAction;
+      setPendingSudoAction(null);
+      await act(password);
+    } else {
+      await handleInstallDocker(password);
+    }
+  };
+
+  const handleInstallDocker = async (overridePassword?: string) => {
+    setInstallingDocker(true);
+    setDockerInstallResult(null);
+    try {
+      await recordTemplateRun(serverId, {
+        templateName: 'Docker Engine (CE)',
+        templateId: 'docker',
+        installed: 'docker',
+        skipped: ''
+      }).catch(() => {});
+
+      const pass = overridePassword !== undefined ? overridePassword : (dockerSudoPassword || undefined);
+      const res = await executeSoftwareScript(serverId, activeDockerScript, pass);
+      setDockerInstallResult(res);
+
+      const isSudo =
+        res.sudoRequired ||
+        res.exitCode === 126 ||
+        /sudo:.*(password|terminal|askpass|incorrect)/i.test(res.output || '') ||
+        /a terminal is required/i.test(res.output || '') ||
+        /password.*required/i.test(res.output || '');
+
+      if (isSudo) {
+        setDockerPromptSudo(true);
+        setPendingSudoAction(() => (pw: string) => handleInstallDocker(pw));
+        setSudoModalOpen(true);
+        toast.warning('Sudo authentication required to install Docker packages.');
+      } else if (res.ok) {
+        if (pass && dockerRememberSudo) {
+          await updateServer(serverId, { sudoPassword: pass }).catch(() => {});
+        }
+        setDockerPromptSudo(false);
+        setSudoModalOpen(false);
+        toast.success('Docker Engine successfully installed!');
+        await load(true);
+      } else {
+        toast.error(`Docker installation completed with exit code ${res.exitCode}`);
+      }
+    } catch (e: any) {
+      setDockerInstallResult({
+        ok: false,
+        exitCode: 1,
+        output: e.message || 'Failed to execute Docker installation on server',
+        durationMs: 0
+      });
+      toast.error(e.message || 'Docker installation failed');
+    } finally {
+      setInstallingDocker(false);
+    }
+  };
+
+  const handleOpenDockerInTerminal = () => {
+    if (!onOpenTerminal) return;
+    const cmd = formatTerminalCommand(activeDockerScript, '/tmp/7server-install-docker.sh');
+    onOpenTerminal(cmd);
+  };
 
   const load = async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -219,9 +348,292 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
   if (error && !data) return <p role="alert" className="text-xs text-red-500 p-4">{error}</p>;
   if (data && !data.installed) {
     return (
-      <div className="py-16 text-center text-xs text-[var(--muted-foreground)] space-y-1">
-        <Box className="w-8 h-8 mx-auto opacity-30" />
-        <p className="font-semibold">{t('docker.notInstalled')}</p>
+      <div className="space-y-6 max-w-4xl mx-auto py-4">
+        {/* Hero Card */}
+        <div className="p-6 sm:p-8 rounded-2xl border border-[var(--border)] bg-gradient-to-b from-sky-500/10 via-[var(--card)] to-[var(--card)] relative overflow-hidden shadow-xl">
+          <div className="flex flex-col sm:flex-row sm:items-start gap-5">
+            <div className="p-3.5 rounded-2xl bg-sky-500/10 border border-sky-500/20 text-sky-400 shrink-0 flex items-center justify-center w-16 h-16 shadow-inner">
+              <BrandIcon name="docker" className="w-10 h-10" fallback={<Box className="w-10 h-10 text-sky-400" />} />
+            </div>
+
+            <div className="space-y-2 flex-1">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h3 className="text-base sm:text-lg font-bold text-[var(--foreground)] tracking-tight">
+                  Docker Engine & Docker Compose
+                </h3>
+                <Badge variant="outline" className="border-amber-500/30 text-amber-400 bg-amber-500/10 text-[10px] font-mono">
+                  Not Installed
+                </Badge>
+              </div>
+              <p className="text-xs sm:text-sm text-[var(--muted-foreground)] leading-relaxed max-w-2xl">
+                Docker is not detected on this server. Run containers, microservices, and Docker Compose application stacks by installing the official Docker Community Edition with 1 click directly via SSH.
+              </p>
+            </div>
+          </div>
+
+          {/* Feature Highlights Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 pt-6 border-t border-[var(--border)]/70">
+            <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--background)]/60 space-y-1">
+              <div className="flex items-center gap-2 text-xs font-semibold text-[var(--foreground)]">
+                <BrandIcon name="docker" className="w-4 h-4 text-sky-400" />
+                <span>Docker Engine (CE)</span>
+              </div>
+              <p className="text-[11px] text-[var(--muted-foreground)] leading-snug">
+                Production-grade container daemon, CLI (<code className="font-mono text-[10px]">docker run</code>, <code className="font-mono text-[10px]">docker ps</code>), and containerd runtime.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--background)]/60 space-y-1">
+              <div className="flex items-center gap-2 text-xs font-semibold text-[var(--foreground)]">
+                <Layers className="w-4 h-4 text-emerald-400" />
+                <span>Docker Compose v2</span>
+              </div>
+              <p className="text-[11px] text-[var(--muted-foreground)] leading-snug">
+                Native compose plugin orchestrating multi-container services with <code className="font-mono text-[10px]">docker-compose.yml</code> stacks.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--background)]/60 space-y-1">
+              <div className="flex items-center gap-2 text-xs font-semibold text-[var(--foreground)]">
+                <ShieldCheck className="w-4 h-4 text-sky-400" />
+                <span>Buildx & Auto-Start</span>
+              </div>
+              <p className="text-[11px] text-[var(--muted-foreground)] leading-snug">
+                Multi-architecture builder subsystem enabled and auto-started on system boot via systemd.
+              </p>
+            </div>
+          </div>
+
+          {/* Sudo Password Required Prompt */}
+          {dockerPromptSudo && (
+            <div className="mt-5 p-4 rounded-xl border border-amber-500/40 bg-amber-500/10 space-y-3 animate-in fade-in">
+              <div className="flex items-start gap-2.5">
+                <KeyRound className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <h4 className="text-xs font-semibold text-amber-300">
+                    Sudo Password Required
+                  </h4>
+                  <p className="text-[11px] text-zinc-300 leading-relaxed">
+                    The remote user requires root/sudo privileges to install Docker packages on this server.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Input
+                  type="password"
+                  placeholder="Enter sudo password..."
+                  value={dockerSudoPassword}
+                  onChange={(e) => setDockerSudoPassword(e.target.value)}
+                  className="h-8 text-xs bg-black/50 border-amber-500/40 text-zinc-100 flex-1"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && dockerSudoPassword.trim()) {
+                      handleInstallDocker(dockerSudoPassword);
+                    }
+                  }}
+                />
+                <Button
+                  size="sm"
+                  disabled={!dockerSudoPassword.trim() || installingDocker}
+                  onClick={() => handleInstallDocker(dockerSudoPassword)}
+                  className="h-8 text-xs gap-1.5 font-semibold bg-amber-500 hover:bg-amber-600 text-zinc-950 shrink-0"
+                >
+                  <Play className="w-3 h-3" />
+                  <span>Authenticate & Install</span>
+                </Button>
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer text-[11px] text-zinc-400">
+                <input
+                  type="checkbox"
+                  checked={dockerRememberSudo}
+                  onChange={(e) => setDockerRememberSudo(e.target.checked)}
+                  className="rounded border-zinc-700 bg-zinc-900 text-amber-500 focus:ring-0"
+                />
+                <span>Remember sudo password for this server (encrypted with AES-256-GCM)</span>
+              </label>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-5 border-t border-[var(--border)]/70">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                size="sm"
+                disabled={installingDocker}
+                onClick={() => handleInstallDocker()}
+                className="h-9 px-4 text-xs gap-2 font-semibold bg-sky-500 hover:bg-sky-600 text-white shadow-md shadow-sky-500/20"
+              >
+                {installingDocker ? (
+                  <RotateCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Play className="w-4 h-4 fill-white" />
+                )}
+                <span>
+                  {installingDocker ? 'Installing Docker on Server...' : 'Install Docker & Compose Now (Live)'}
+                </span>
+              </Button>
+
+              {onOpenTerminal && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={installingDocker}
+                  onClick={handleOpenDockerInTerminal}
+                  className="h-9 text-xs gap-1.5"
+                >
+                  <TermIcon className="w-3.5 h-3.5" />
+                  <span>Open in Terminal</span>
+                </Button>
+              )}
+
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={installingDocker}
+                onClick={() => setShowDockerScriptModal(true)}
+                className="h-9 text-xs gap-1.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+              >
+                <Code2 className="w-3.5 h-3.5" />
+                <span>View Setup Script</span>
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {onOpenTemplates && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onOpenTemplates}
+                  className="h-8 text-xs gap-1.5 text-zinc-400 hover:text-zinc-200"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Setup Templates</span>
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={loading}
+                onClick={() => load(true)}
+                className="h-8 text-xs gap-1.5"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                <span>Re-check</span>
+              </Button>
+            </div>
+          </div>
+
+          {/* Live Execution Output Box */}
+          {(installingDocker || dockerInstallResult) && (
+            <div className="mt-5 rounded-xl border border-zinc-800 bg-[#09090b] overflow-hidden">
+              <div className="px-3.5 py-2 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between text-xs">
+                <span className="font-mono text-[11px] text-zinc-300 flex items-center gap-2">
+                  {installingDocker ? (
+                    <>
+                      <RotateCw className="w-3.5 h-3.5 text-sky-400 animate-spin" />
+                      <span>Setting up Docker GPG key, repository, and installing packages...</span>
+                    </>
+                  ) : dockerInstallResult?.ok ? (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <span className="text-emerald-400 font-semibold">
+                        Docker Installation Complete ({(dockerInstallResult.durationMs / 1000).toFixed(1)}s)
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertCircle className="w-3.5 h-3.5 text-red-400" />
+                      <span className="text-red-400 font-semibold">
+                        Failed (Exit Code: {dockerInstallResult?.exitCode})
+                      </span>
+                    </>
+                  )}
+                </span>
+              </div>
+              {dockerInstallResult && (
+                <pre className="p-3.5 text-[11px] font-mono text-zinc-300 max-h-60 overflow-auto whitespace-pre-wrap leading-relaxed">
+                  {dockerInstallResult.output || '(No stdout output)'}
+                </pre>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Script Inspector Modal */}
+        {showDockerScriptModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+            <div className="w-full max-w-2xl rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+              <div className="p-4 border-b border-[var(--border)] flex items-center justify-between bg-[var(--muted)]/20">
+                <div className="flex items-center gap-2">
+                  <BrandIcon name="docker" className="w-5 h-5 text-sky-400" />
+                  <span className="text-sm font-bold text-[var(--foreground)]">
+                    Docker Engine & Compose Setup Script
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowDockerScriptModal(false)}
+                  className="p-1 rounded-lg text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-4 space-y-3 flex-1 overflow-y-auto">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
+                    Bash Setup Script (Editable)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(activeDockerScript);
+                      setCopiedDockerScript(true);
+                      setTimeout(() => setCopiedDockerScript(false), 2000);
+                    }}
+                    className="text-[11px] text-[var(--muted-foreground)] hover:text-[var(--foreground)] inline-flex items-center gap-1"
+                  >
+                    {copiedDockerScript ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    <span>{copiedDockerScript ? 'Copied' : 'Copy Script'}</span>
+                  </button>
+                </div>
+
+                <textarea
+                  value={activeDockerScript}
+                  onChange={(e) => setCustomDockerScript(e.target.value)}
+                  disabled={installingDocker}
+                  rows={10}
+                  spellCheck={false}
+                  className="w-full p-3.5 rounded-xl border border-zinc-800 bg-[#09090b] text-zinc-200 font-mono text-xs leading-relaxed outline-none focus:ring-1 focus:ring-sky-500 resize-y"
+                />
+              </div>
+
+              <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]/20 flex items-center justify-end gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowDockerScriptModal(false)}
+                  className="h-8 text-xs"
+                >
+                  Close
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={installingDocker}
+                  onClick={() => {
+                    setShowDockerScriptModal(false);
+                    handleInstallDocker();
+                  }}
+                  className="h-8 text-xs gap-1.5 font-semibold bg-sky-500 hover:bg-sky-600 text-white"
+                >
+                  <Play className="w-3.5 h-3.5" />
+                  <span>Execute This Script</span>
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -930,6 +1342,15 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
         containerName={logsModal.name}
         isOpen={logsModal.open}
         onClose={() => setLogsModal({ open: false, id: '', name: '' })}
+      />
+
+      <SudoPasswordModal
+        isOpen={sudoModalOpen}
+        onClose={() => setSudoModalOpen(false)}
+        onConfirm={handleSudoConfirm}
+        serverName={serverName || 'Server'}
+        username={serverUsername || 'user'}
+        reason="Installing Docker CE, Docker Compose and enabling system services requires root/sudo privileges."
       />
     </div>
   );

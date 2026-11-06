@@ -29,6 +29,26 @@ export const fetchSoftwareUpgrades = async (id: string) =>
     'Failed to fetch software upgrades'
   );
 
+export const controlSoftwareService = async (
+  id: string,
+  toolId: string,
+  action: 'start' | 'stop' | 'restart' | 'reload'
+) =>
+  unwrap<{ ok: boolean; unit: string; state: string; output: string }>(
+    await apiFetch(`${API_BASE}/servers/${id}/software/service`, jsonPost({ toolId, action })),
+    `Failed to ${action} service`
+  );
+
+export const executeSoftwareScript = async (
+  id: string,
+  script: string,
+  sudoPassword?: string
+) =>
+  unwrap<{ ok: boolean; exitCode: number; output: string; durationMs: number; sudoRequired?: boolean }>(
+    await apiFetch(`${API_BASE}/servers/${id}/software/execute`, jsonPost({ script, sudoPassword })),
+    'Failed to execute setup script'
+  );
+
 export const exportServers = () => downloadBlob(`${API_BASE}/export`, '7server-servers.json');
 export async function importServers(items: unknown): Promise<number> {
   const res = await apiFetch(`${API_BASE}/import`, jsonPost(items));
@@ -55,7 +75,7 @@ export async function createServer(payload: Partial<ServerItem> & { password?: s
   return data.data;
 }
 
-export async function updateServer(id: string, payload: Partial<ServerItem> & { password?: string; privateKey?: string; passphrase?: string }): Promise<ServerItem> {
+export async function updateServer(id: string, payload: Partial<ServerItem> & { password?: string; privateKey?: string; passphrase?: string; sudoPassword?: string }): Promise<ServerItem> {
   const res = await apiFetch(`${API_BASE}/servers/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },

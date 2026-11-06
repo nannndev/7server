@@ -56,6 +56,7 @@ export interface RawServer {
   encryptedPassword?: string | null;
   encryptedPrivateKey?: string | null;
   encryptedPassphrase?: string | null;
+  encryptedSudoPassword?: string | null;
   tags: string[];
   description?: string;
   status: ServerStatus;
@@ -64,15 +65,17 @@ export interface RawServer {
   createdAt: string;
 }
 
-export interface SafeServer extends Omit<RawServer, 'encryptedPassword' | 'encryptedPrivateKey' | 'encryptedPassphrase'> {
+export interface SafeServer extends Omit<RawServer, 'encryptedPassword' | 'encryptedPrivateKey' | 'encryptedPassphrase' | 'encryptedSudoPassword'> {
   hasPassword: boolean;
   hasPrivateKey: boolean;
+  hasSudoPassword?: boolean;
 }
 
 export interface ServerCredentials extends SafeServer {
   password?: string;
   privateKey?: string;
   passphrase?: string;
+  sudoPassword?: string;
 }
 
 export interface CommandResult {

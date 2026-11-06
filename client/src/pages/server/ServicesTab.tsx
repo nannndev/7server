@@ -8,11 +8,13 @@ import {
   Play,
   Square,
   FileText,
-  Box
+  Box,
+  Package
 } from 'lucide-react';
 import { BrandIcon } from '@/shared/ui/brand-icon';
 import type { ProcessInfo, SystemService, DockerContainerInfo } from '@/features/processes/types';
 import { fetchProcesses, fetchServices, killProcess, controlService } from '@/features/processes/api';
+import SoftwareCard from '@/features/servers/components/SoftwareCard';
 import { Button } from '@/shared/ui/button';
 import { Badge } from '@/shared/ui/badge';
 import { Card } from '@/shared/ui/card';
@@ -33,6 +35,7 @@ export default function ServicesTab() {
   const [dockerContainers, setDockerContainers] = useState<DockerContainerInfo[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [serviceFilter, setServiceFilter] = useState<'all' | 'running' | 'failed'>('all');
+  const [viewMode, setViewMode] = useState<'software' | 'system'>('software');
   const loadServiceData = async (manual?: unknown) => {
     try {
       await swr(`services:${server.id}`, () => Promise.all([fetchProcesses(server.id), fetchServices(server.id)]), ([procData, srvData]) => {
@@ -90,8 +93,46 @@ export default function ServicesTab() {
   useLayoutEffect(() => { loadServiceData(); }, [server.id]);
 
   return (
-    <>
-      <Card className="p-5 space-y-5">
+    <div className="space-y-4">
+      {/* Top Navigation Switcher */}
+      <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[var(--muted)]/50 border border-[var(--border)] w-fit">
+        <button
+          type="button"
+          onClick={() => setViewMode('software')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition ${
+            viewMode === 'software'
+              ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm border border-[var(--border)]'
+              : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+          }`}
+        >
+          <Package className="w-3.5 h-3.5 text-[var(--primary)]" />
+          <span>Installed Packages & Tools</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setViewMode('system')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition ${
+            viewMode === 'system'
+              ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm border border-[var(--border)]'
+              : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+          }`}
+        >
+          <Activity className="w-3.5 h-3.5 text-sky-400" />
+          <span>Raw Systemd & Processes</span>
+        </button>
+      </div>
+
+      {viewMode === 'software' ? (
+        <SoftwareCard
+          serverId={server.id}
+          serverName={server.name}
+          serverUsername={server.username}
+          onOpenTemplates={() => ctx.setActiveTab('templates')}
+          onOpenTerminal={(cmd) => ctx.openTerminal(cmd)}
+        />
+      ) : (
+        <Card className="p-5 space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2 flex-wrap">
             <Input
@@ -290,7 +331,8 @@ export default function ServicesTab() {
             </div>
           )}
         </div>
-      </Card>
-    </>
+        </Card>
+      )}
+    </div>
   );
 }

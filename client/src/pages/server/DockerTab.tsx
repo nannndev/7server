@@ -14,9 +14,13 @@ export default function DockerTab() {
         <DockerPanel
           serverId={server.id}
           serverHost={server.host}
+          serverName={server.name}
+          serverUsername={server.username}
           onLogs={(name) => ctx.openLogs({ type: 'docker', name })}
           onShell={(cmd) => { ctx.openTerminal(cmd); }}
           onOpenFolder={(path) => ctx.openFiles(path)}
+          onOpenTerminal={(cmd) => ctx.openTerminal(cmd)}
+          onOpenTemplates={() => ctx.setActiveTab('templates')}
         />
       </Card>
     </>

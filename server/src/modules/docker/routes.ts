@@ -16,7 +16,8 @@ import {
   readComposeFile,
   deployComposeStack,
   inspectContainer,
-  pruneCommand
+  pruneCommand,
+  executeDockerCommand
 } from './service.js';
 import { executeCommand } from '../../infra/ssh.js';
 import { withServer } from '../../http/handlers.js';
@@ -26,7 +27,7 @@ export const dockerRoutes = Router();
 
 // Run a prebuilt (already validated) docker command and return its output.
 const runDocker = async (target: any, cmd: string, timeoutMs = 60000) => {
-  const r = await executeCommand(target, cmd, timeoutMs);
+  const r = await executeDockerCommand(target, cmd, timeoutMs);
   if (r.code !== 0) throw new Error((r.stderr || r.stdout || `exit ${r.code}`).trim());
   return (r.stdout + r.stderr).trim();
 };

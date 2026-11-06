@@ -1,6 +1,6 @@
 // Docker inventory & actions over SSH. Every user-supplied name goes through a strict allowlist,
 // then is single-quoted, so nothing reaches the remote shell unescaped.
-import { executeCommand } from '../../infra/ssh.js';
+import { executeCommand, executeCommandStream } from '../../infra/ssh.js';
 import { ServerCredentials, CommandResult } from '../servers/types.js';
 import { badRequest } from '../../http/errors.js';
 
@@ -79,6 +79,72 @@ const SEP = '␟'; // unit separator char; never appears in docker output
 
 const pct = (s: string) => parseFloat(String(s).replace('%', '')) || 0;
 
+export async function executeDockerCommand(
+  server: ServerCredentials,
+  cmd: string,
+  timeoutMs = 60000,
+  opts?: { stdin?: string }
+): Promise<CommandResult> {
+  const sudoPass = server.sudoPassword || (server.authType === 'password' ? server.password : undefined);
+  const hasSudoPass = !!sudoPass;
+
+  // Self-healing pre-flight for non-root users: if /var/run/docker.sock is not writable,
+  // grant group membership and socket rw permissions using sudo so docker works seamlessly.
+  const wrapper = `
+if [ "$(id -u)" -ne 0 ] && [ -S /var/run/docker.sock ] && [ ! -w /var/run/docker.sock ]; then
+  if [ -n "$__7SERVER_HAS_SUDO_PASS" ]; then
+    sudo -S -p '' usermod -aG docker $(whoami) 2>/dev/null || true
+    sudo -S -p '' chmod 666 /var/run/docker.sock 2>/dev/null || true
+  elif sudo -n true 2>/dev/null; then
+    sudo -n usermod -aG docker $(whoami) 2>/dev/null || true
+    sudo -n chmod 666 /var/run/docker.sock 2>/dev/null || true
+  fi
+fi
+${cmd}
+`;
+
+  const wrappedCmd = `export __7SERVER_HAS_SUDO_PASS=${hasSudoPass ? '1' : ''}\n${wrapper}`;
+  return executeCommand(
+    server,
+    wrappedCmd,
+    timeoutMs,
+    hasSudoPass ? { stdin: `${sudoPass}\n${opts?.stdin || ''}` } : opts
+  );
+}
+
+export async function executeDockerCommandStream(
+  server: ServerCredentials,
+  cmd: string,
+  onChunk: (chunk: string, isStderr: boolean) => void,
+  timeoutMs = 180000,
+  opts?: { stdin?: string }
+): Promise<CommandResult> {
+  const sudoPass = server.sudoPassword || (server.authType === 'password' ? server.password : undefined);
+  const hasSudoPass = !!sudoPass;
+
+  const wrapper = `
+if [ "$(id -u)" -ne 0 ] && [ -S /var/run/docker.sock ] && [ ! -w /var/run/docker.sock ]; then
+  if [ -n "$__7SERVER_HAS_SUDO_PASS" ]; then
+    sudo -S -p '' usermod -aG docker $(whoami) 2>/dev/null || true
+    sudo -S -p '' chmod 666 /var/run/docker.sock 2>/dev/null || true
+  elif sudo -n true 2>/dev/null; then
+    sudo -n usermod -aG docker $(whoami) 2>/dev/null || true
+    sudo -n chmod 666 /var/run/docker.sock 2>/dev/null || true
+  fi
+fi
+${cmd}
+`;
+
+  const wrappedCmd = `export __7SERVER_HAS_SUDO_PASS=${hasSudoPass ? '1' : ''}\n${wrapper}`;
+  return executeCommandStream(
+    server,
+    wrappedCmd,
+    onChunk,
+    timeoutMs,
+    hasSudoPass ? { stdin: `${sudoPass}\n${opts?.stdin || ''}` } : opts
+  );
+}
+
 export async function fetchDockerOverview(server: ServerCredentials, withStats = true): Promise<DockerOverview> {
   const f = (fields: string[]) => `'${fields.map((x) => `{{${x}}}`).join(SEP)}'`;
   const script = [
@@ -101,7 +167,7 @@ export async function fetchDockerOverview(server: ServerCredentials, withStats =
     `echo "@@NETWORKS_USED"; if [ -n "$cids" ]; then docker inspect $cids --format '{{range $net, $val := .NetworkSettings.Networks}}{{$net}}␟{{$.Name}}{{println}}{{end}}' 2>/dev/null; fi`
   ].filter(Boolean).join('\n');
 
-  const { stdout } = await executeCommand(server, script, 45000);
+  const { stdout } = await executeDockerCommand(server, script, 45000);
   if (stdout.includes('@@NODOCKER')) {
     return { installed: false, version: '', composeVersion: '', containers: [], images: [], volumes: [], networks: [], df: [] };
   }
@@ -268,7 +334,7 @@ export function volumeRemoveCommand(name: unknown): string {
 }
 
 export async function inspectVolume(server: ServerCredentials, name: unknown) {
-  const { stdout, stderr } = await executeCommand(server, `docker volume inspect ${checkName(name)} 2>&1`, 15000);
+  const { stdout, stderr } = await executeDockerCommand(server, `docker volume inspect ${checkName(name)} 2>&1`, 15000);
   let data: any;
   try { data = JSON.parse(stdout)[0]; } catch { throw new Error(stderr || stdout || 'volume inspect gagal'); }
   return data;
@@ -290,7 +356,7 @@ export function networkRemoveCommand(name: unknown): string {
 }
 
 export async function inspectNetwork(server: ServerCredentials, name: unknown) {
-  const { stdout, stderr } = await executeCommand(server, `docker network inspect ${checkName(name)} 2>&1`, 15000);
+  const { stdout, stderr } = await executeDockerCommand(server, `docker network inspect ${checkName(name)} 2>&1`, 15000);
   let data: any;
   try { data = JSON.parse(stdout)[0]; } catch { throw new Error(stderr || stdout || 'network inspect gagal'); }
   return data;
@@ -364,7 +430,7 @@ export function runContainerCommand(options: RunContainerOptions): string {
 export async function getContainerLogs(server: ServerCredentials, id: unknown, tail = 200, timestamps = false): Promise<string> {
   const t = Math.min(Math.max(1, Number(tail) || 200), 2000);
   const ts = timestamps ? ' --timestamps' : '';
-  const { stdout, stderr } = await executeCommand(server, `docker logs --tail ${t}${ts} ${checkName(id)} 2>&1`, 30000);
+  const { stdout, stderr } = await executeDockerCommand(server, `docker logs --tail ${t}${ts} ${checkName(id)} 2>&1`, 30000);
   return (stdout + stderr).trim();
 }
 
@@ -416,13 +482,13 @@ export async function deployComposeStack(server: ServerCredentials, {
     `DC="docker compose -p ${p.slice(1, -1)} -f ${cfg}"; (docker compose version >/dev/null 2>&1 || DC="docker-compose -p ${p.slice(1, -1)} -f ${cfg}"); $DC up -d --remove-orphans 2>&1`
   ].filter(Boolean).join(' && ');
 
-  const { stdout, stderr, code } = await executeCommand(server, script, 300000);
+  const { stdout, stderr, code } = await executeDockerCommand(server, script, 300000);
   if (code !== 0) throw new Error((stderr || stdout || `exit ${code}`).trim());
   return (stdout + stderr).trim();
 }
 
 export async function inspectContainer(server: ServerCredentials, id: unknown) {
-  const { stdout, stderr } = await executeCommand(server, `docker inspect ${checkName(id)} 2>&1`, 15000);
+  const { stdout, stderr } = await executeDockerCommand(server, `docker inspect ${checkName(id)} 2>&1`, 15000);
   let data: any;
   try { data = JSON.parse(stdout)[0]; } catch { throw new Error(stderr || stdout || 'inspect gagal'); }
   // Env vars commonly hold DB passwords/API keys: mask values by default.
@@ -461,5 +527,5 @@ export async function manageDockerContainer(serverConfig: ServerCredentials, con
   }
   const cleanId = containerId.replace(/[^a-zA-Z0-9_\-]/g, '');
   const cmd = `docker ${action} ${cleanId}`;
-  return await executeCommand(serverConfig, cmd, 15000);
+  return await executeDockerCommand(serverConfig, cmd, 15000);
 }
