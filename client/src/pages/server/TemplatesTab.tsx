@@ -46,6 +46,7 @@ import {
   type SoftwareItem
 } from '@/features/servers/api';
 import { swr } from '@/shared/lib/cache';
+import { useTaskManager } from '@/shared/tasks/TaskContext';
 import { SudoPasswordModal } from '@/features/servers/components/SudoPasswordModal';
 import {
   TEMPLATE_PRESETS,
@@ -141,6 +142,24 @@ export default function TemplatesTab() {
   const [rememberSudo, setRememberSudo] = useState(true);
   const [sudoModalOpen, setSudoModalOpen] = useState(false);
   const [pendingSudoAction, setPendingSudoAction] = useState<((password: string) => Promise<void>) | null>(null);
+
+  const { runStreamTask, tasks } = useTaskManager();
+  const lastFinishedRef = React.useRef<number>(Date.now());
+
+  useEffect(() => {
+    const newlyDone = tasks.find(
+      (t) =>
+        t.serverId === server.id &&
+        (t.category === 'software' || t.category === 'docker') &&
+        t.status === 'success' &&
+        t.finishedAt &&
+        t.finishedAt > lastFinishedRef.current
+    );
+    if (newlyDone && newlyDone.finishedAt) {
+      lastFinishedRef.current = newlyDone.finishedAt;
+      loadSoftwareData(true);
+    }
+  }, [tasks, server.id]);
 
   const loadSoftwareData = async (force = false) => {
     setErrorSoftware(null);
@@ -288,29 +307,51 @@ export default function TemplatesTab() {
         }
       ]);
       setExpandedStepLog('custom-script');
+      const taskId = `template_custom_${selectedPreset.id}_${Date.now()}`;
+      let stepOk = true;
+      let stepOutput = '';
+      let stepErr: any = null;
+
       try {
-        const res = await executeSoftwareScript(server.id, activeScript, pass);
+        await runStreamTask({
+          id: taskId,
+          serverId: server.id,
+          serverName: server.name,
+          title: `${selectedPreset.name} (Custom Script)`,
+          category: 'software',
+          url: `/api/servers/${server.id}/software/execute?stream=1`,
+          body: { script: activeScript, sudoPassword: pass },
+          onDone: (res) => {
+            stepOk = true;
+            stepOutput = res.output || 'Setup completed';
+          },
+          onError: (err) => {
+            stepOk = false;
+            stepErr = err;
+          }
+        });
+
         setLiveSteps([
           {
             toolId: 'custom-script',
             toolName: `${selectedPreset.name} (Custom Script)`,
-            status: res.ok ? 'success' : 'failed',
-            durationMs: res.durationMs,
-            output: res.output
+            status: stepOk ? 'success' : 'failed',
+            output: stepOk ? stepOutput : (stepErr?.output || stepErr?.message || 'Execution failed')
           }
         ]);
-        if (isSudoFailure(res)) {
+
+        if (stepErr && isSudoFailure(stepErr)) {
           setPendingSudoAction(() => (pw: string) => handleRunLiveStepByStep(pw));
           setSudoModalOpen(true);
           return;
-        } else if (res.ok) {
+        } else if (stepOk) {
           if (pass && rememberSudo) {
             await updateServer(server.id, { sudoPassword: pass }).catch(() => {});
           }
           toast.success(`Setup for ${selectedPreset.name} completed successfully!`);
           await loadSoftwareData(true);
         } else {
-          toast.error(`Setup failed with exit code ${res.exitCode}`);
+          toast.error(`Setup failed with exit code ${stepErr?.exitCode || 1}`);
         }
       } catch (e: any) {
         setLiveSteps([
@@ -346,31 +387,53 @@ export default function TemplatesTab() {
           : prev
       );
 
+      const taskId = `template_${selectedPreset.id}_${current.tool.id}_${Date.now()}`;
+      let stepOk = true;
+      let stepOutput = '';
+      let stepErr: any = null;
+
       try {
-        const res = await executeSoftwareScript(server.id, current.script, pass);
+        await runStreamTask({
+          id: taskId,
+          serverId: server.id,
+          serverName: server.name,
+          title: `${selectedPreset.name}: ${current.tool.name}`,
+          category: 'software',
+          url: `/api/servers/${server.id}/software/execute?stream=1`,
+          body: { script: current.script, sudoPassword: pass },
+          onDone: (res) => {
+            stepOk = true;
+            stepOutput = res.output || 'Step succeeded';
+          },
+          onError: (err) => {
+            stepOk = false;
+            stepErr = err;
+          }
+        });
+
         setLiveSteps((prev) =>
           prev
             ? prev.map((s, idx) =>
                 idx === i
                   ? {
                       ...s,
-                      status: res.ok ? 'success' : 'failed',
-                      durationMs: res.durationMs,
-                      output: res.output
+                      status: stepOk ? 'success' : 'failed',
+                      output: stepOk ? stepOutput : (stepErr?.output || stepErr?.message || 'Execution error')
                     }
                   : s
               )
             : prev
         );
-        if (isSudoFailure(res)) {
+
+        if (stepErr && isSudoFailure(stepErr)) {
           setPendingSudoAction(() => (pw: string) => handleRunLiveStepByStep(pw));
           setSudoModalOpen(true);
           allOk = false;
           break;
         }
-        if (!res.ok) {
+        if (!stepOk) {
           allOk = false;
-          toast.error(`Failed at step ${current.tool.name} (Exit code: ${res.exitCode})`);
+          toast.error(`Failed at step ${current.tool.name} (Exit code: ${stepErr?.exitCode || 1})`);
           break;
         }
       } catch (err: any) {
@@ -395,6 +458,9 @@ export default function TemplatesTab() {
 
     await loadSoftwareData(true);
     if (allOk) {
+      if (pass && rememberSudo) {
+        await updateServer(server.id, { sudoPassword: pass }).catch(() => {});
+      }
       toast.success(`Setup template "${selectedPreset.name}" completed successfully!`);
     }
     setLiveRunning(false);
@@ -439,24 +505,51 @@ export default function TemplatesTab() {
       }).catch(() => {});
 
       const pass = overridePassword !== undefined ? overridePassword : (sudoPasswordInput || undefined);
-      const res = await executeSoftwareScript(server.id, script, pass);
-      if (inspectTool?.id === tool.id) {
-        setInspectResult(res);
-      }
-      if (isSudoFailure(res)) {
-        setPendingSudoAction(() => (pw: string) => handleInstallMarketplaceToolLive(tool, customBash, pw));
-        setSudoModalOpen(true);
-      } else if (res.ok) {
-        if (pass && rememberSudo) {
-          await updateServer(server.id, { sudoPassword: pass }).catch(() => {});
+      const taskId = `install_${tool.id}_${Date.now()}`;
+
+      await runStreamTask({
+        id: taskId,
+        serverId: server.id,
+        serverName: server.name,
+        title: `Install ${tool.name}`,
+        category: 'software',
+        url: `/api/servers/${server.id}/software/execute?stream=1`,
+        body: { script, sudoPassword: pass },
+        onDone: async (res) => {
+          if (inspectTool?.id === tool.id) {
+            setInspectResult({
+              ok: true,
+              exitCode: 0,
+              output: res.output || 'Installed successfully',
+              durationMs: 0
+            });
+          }
+          if (pass && rememberSudo) {
+            await updateServer(server.id, { sudoPassword: pass }).catch(() => {});
+          }
+          setPromptSudo(false);
+          setSudoModalOpen(false);
+          toast.success(`${tool.name} successfully installed on ${server.name}!`);
+          await loadSoftwareData(true);
+        },
+        onError: async (err: any) => {
+          const errMsg = `${err.message || ''}\n${err.output || ''}`;
+          if (inspectTool?.id === tool.id) {
+            setInspectResult({
+              ok: false,
+              exitCode: err.exitCode || 1,
+              output: err.output || errMsg,
+              durationMs: 0
+            });
+          }
+          if (isSudoFailure(err)) {
+            setPendingSudoAction(() => (pw: string) => handleInstallMarketplaceToolLive(tool, customBash, pw));
+            setSudoModalOpen(true);
+          } else {
+            toast.error(`Installation of ${tool.name} failed`);
+          }
         }
-        setPromptSudo(false);
-        setSudoModalOpen(false);
-        toast.success(`${tool.name} successfully installed on ${server.name}!`);
-        await loadSoftwareData(true);
-      } else {
-        toast.error(`Installation of ${tool.name} failed (Exit: ${res.exitCode})`);
-      }
+      });
     } catch (err: any) {
       toast.error(err.message || `Failed to install ${tool.name}`);
     } finally {

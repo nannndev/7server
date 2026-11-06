@@ -45,7 +45,17 @@ export interface MarketplaceTool {
 export const PREFLIGHT_HEADER = `# --- Pre-flight: Environment & APT Lock Guard ---
 export DEBIAN_FRONTEND=noninteractive
 export PATH="$PATH:/usr/local/bin:/usr/local/sbin:/usr/local/go/bin:$HOME/.bun/bin:$HOME/.cargo/bin:$HOME/.deno/bin:$HOME/.local/bin"
-APT_FLAGS="-y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold -o DPkg::Lock::Timeout=60"`;
+APT_FLAGS="-y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold -o DPkg::Lock::Timeout=300"
+
+# Wait gracefully if another concurrent task holds apt/dpkg lock
+for i in $(seq 1 60); do
+  if fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || fuser /var/lib/apt/lists/lock >/dev/null 2>&1; then
+    echo "[$i/60] Concurrent task holds apt/dpkg lock, waiting for release..."
+    sleep 2
+  else
+    break
+  fi
+done`;
 
 // ---------------------------------------------------------------------------
 // Shared Tool Script Builders (Debian & Ubuntu safe, idempotent)
@@ -1543,6 +1553,46 @@ export function generateSingleToolScript(tool: MarketplaceTool, version?: string
     `echo "  ✔ Installation of ${tool.name} Completed Successfully!"`,
     'echo "============================================================"'
   ].join('\n');
+}
+
+/** Generate a unified batch installation pipeline script for multiple selected tools */
+export function generateBatchToolsScript(tools: MarketplaceTool[], versions?: Record<string, string>): string {
+  const lines: string[] = [
+    '#!/usr/bin/env bash',
+    '# ============================================================',
+    `#  7Server — Multi-Task Batch Install (${tools.length} Tools)`,
+    `#  Generated on: ${new Date().toISOString()}`,
+    '# ============================================================',
+    'set -e',
+    PREFLIGHT_HEADER,
+    '',
+    'echo "============================================================"',
+    `echo "  Starting Multi-Task Pipeline (${tools.length} components)"`,
+    'echo "============================================================"',
+    'echo ""'
+  ];
+
+  tools.forEach((tool, idx) => {
+    const chosenVersion = versions?.[tool.id] || tool.defaultVersion;
+    const scriptBody = tool.getInstallScript(chosenVersion);
+
+    lines.push(
+      'echo "------------------------------------------------------------"',
+      `echo "  [Step ${idx + 1}/${tools.length}] Installing ${tool.name}${chosenVersion ? ` (${chosenVersion})` : ''}..."`,
+      'echo "------------------------------------------------------------"',
+      scriptBody,
+      `echo "  ✔ Step ${idx + 1}/${tools.length} (${tool.name}) Completed!"`,
+      'echo ""'
+    );
+  });
+
+  lines.push(
+    'echo "============================================================"',
+    `echo "  ✔ All ${tools.length} Tools Installed Successfully!"`,
+    'echo "============================================================"'
+  );
+
+  return lines.join('\n');
 }
 
 /** Formats the script for interactive terminal execution via temp file */

@@ -1,5 +1,5 @@
 // Inventory & management of common server software: one SSH round-trip probe + service control & setup execution.
-import { executeCommand } from '../../infra/ssh.js';
+import { executeCommand, executeCommandStream } from '../../infra/ssh.js';
 import type { ServerCredentials } from '../servers/types.js';
 
 export type SoftwareCategory = 'runtime' | 'web' | 'database' | 'container' | 'tooling' | 'security';
@@ -264,7 +264,8 @@ echo "@@RESULT|$UNIT|$STATE"
 export async function executeSoftwareScript(
   target: ServerCredentials,
   script: string,
-  sudoPasswordOverride?: string
+  sudoPasswordOverride?: string,
+  onChunk?: (chunk: string, isStderr: boolean) => void
 ): Promise<{ ok: boolean; exitCode: number; output: string; durationMs: number; sudoRequired?: boolean }> {
   if (!script || !script.trim()) {
     throw new Error('Script cannot be empty');
@@ -302,12 +303,20 @@ echo "__7SERVER_EXIT_CODE:\${EXIT_CODE}"
 `;
 
   const wrappedCmd = `export __7SERVER_HAS_SUDO_PASS=${hasSudoPass ? '1' : ''}\n${wrapper}`;
-  const r = await executeCommand(
-    target,
-    wrappedCmd,
-    300000,
-    hasSudoPass ? { stdin: `${sudoPass}\n` } : {}
-  );
+  const r = onChunk
+    ? await executeCommandStream(
+        target,
+        wrappedCmd,
+        onChunk,
+        300000,
+        hasSudoPass ? { stdin: `${sudoPass}\n` } : {}
+      )
+    : await executeCommand(
+        target,
+        wrappedCmd,
+        300000,
+        hasSudoPass ? { stdin: `${sudoPass}\n` } : {}
+      );
 
   const combined = `${r.stdout || ''}${r.stderr ? `\n${r.stderr}` : ''}`;
   const isSudoRequired = combined.includes('__7SERVER_SUDO_REQUIRED__');

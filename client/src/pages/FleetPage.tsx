@@ -243,7 +243,7 @@ export default function FleetPage(p: FleetPageProps) {
           <ServerRack
             servers={filteredServers}
             alertsFor={(s) => alertsFor(s)}
-            onManage={(s) => openManageServer(s, 'overview')}
+            onManage={(s, tab) => openManageServer(s, tab || 'overview')}
             onOpenTerminal={(s) => openManageServer(s, 'terminal')}
             onOpenFiles={(s) => setFilesServer(s)}
           />

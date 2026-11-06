@@ -17,7 +17,8 @@ import {
   deployComposeStack,
   inspectContainer,
   pruneCommand,
-  executeDockerCommand
+  executeDockerCommand,
+  executeDockerCommandStream
 } from './service.js';
 import { executeCommand } from '../../infra/ssh.js';
 import { withServer } from '../../http/handlers.js';
@@ -47,8 +48,48 @@ dockerRoutes.get('/servers/:id/docker/logs/:cid', withServer((t, req) =>
   getContainerLogs(t, req.params.cid, Number(req.query.tail) || 200, req.query.timestamps === '1')));
 
 // 3. Images: Pull & Remove
-dockerRoutes.post('/servers/:id/docker/image/pull', need('service.control'), withServer((t, req) =>
-  runDocker(t, pullImageCommand(req.body?.image), 180000)));
+dockerRoutes.post('/servers/:id/docker/image/pull', need('service.control'), withServer(async (t, req, res) => {
+  const isStream = req.query.stream === '1' || req.headers.accept?.includes('text/event-stream');
+  const image = req.body?.image;
+  const cmd = pullImageCommand(image);
+
+  if (isStream) {
+    res.status(200).set({
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no'
+    });
+
+    const send = (type: string, payload: any) => {
+      res.write(`data: ${JSON.stringify({ type, ...payload })}\n\n`);
+      if (typeof (res as any).flush === 'function') (res as any).flush();
+    };
+
+    try {
+      const r = await executeDockerCommandStream(
+        t,
+        cmd,
+        (chunk) => {
+          send('chunk', { chunk });
+        },
+        180000
+      );
+      if (r.code !== 0) {
+        send('error', { error: (r.stderr || r.stdout || `exit code ${r.code}`).trim() });
+      } else {
+        send('done', { ok: true, output: (r.stdout + r.stderr).trim() });
+      }
+      res.end();
+    } catch (err: any) {
+      send('error', { error: err.message || 'Pull failed' });
+      res.end();
+    }
+    return;
+  }
+
+  return runDocker(t, cmd, 180000);
+}));
 
 dockerRoutes.post('/servers/:id/docker/image/rm', need('service.control'), withServer((t, req) =>
   runDocker(t, imageRemoveCommand(req.body?.image), 60000)));

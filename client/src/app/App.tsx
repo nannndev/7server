@@ -1,5 +1,6 @@
 import React from 'react';
 import { AuthProvider, useAuth } from '@/features/auth/AuthContext';
+import { TaskManagerProvider } from '@/shared/tasks/TaskContext';
 import LoginScreen from '@/features/auth/components/LoginScreen';
 import AppShell from './AppShell';
 import { ToastContainer } from '@/shared/ui/toast';
@@ -26,9 +27,11 @@ function AppContent() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppContent />
-      <ToastContainer />
-      <ConfirmDialogContainer />
+      <TaskManagerProvider>
+        <AppContent />
+        <ToastContainer />
+        <ConfirmDialogContainer />
+      </TaskManagerProvider>
     </AuthProvider>
   );
 }

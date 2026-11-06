@@ -13,7 +13,7 @@ export function isServerAllowed(userServers: string[] | '*' | undefined, serverI
 }
 
 /** Resolves :id to a server (with credentials) and checks user server scope. */
-export const withServer = (fn: (target: ServerCredentials, req: Request) => Promise<unknown>) => async (req: Request, res: Response) => {
+export const withServer = (fn: (target: ServerCredentials, req: Request, res: Response) => Promise<unknown>) => async (req: Request, res: Response) => {
   try {
     const serverId = req.params.id as string;
     if (req.user && !isServerAllowed(req.user.servers, serverId)) {
@@ -22,7 +22,7 @@ export const withServer = (fn: (target: ServerCredentials, req: Request) => Prom
 
     const target = getServerById(serverId, true);
     if (!target) return res.status(404).json({ success: false, error: 'Server not found' });
-    const result = await fn(target, req);
+    const result = await fn(target, req, res);
     if (!res.headersSent) {
       res.json({ success: true, data: result });
     }

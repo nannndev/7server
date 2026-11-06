@@ -16,6 +16,7 @@ import ServerPage from '@/pages/ServerPage';
 import AiGatewayPage from '@/pages/AiGatewayPage';
 import AiCopilotDrawer from '@/features/copilot/components/AiCopilotDrawer';
 import AiCopilotTrigger from '@/features/copilot/components/AiCopilotTrigger';
+import { BackgroundTasksWidget } from '@/shared/tasks/BackgroundTasksWidget';
 import UsersPage from '@/pages/UsersPage';
 import IntegrationsPage from '@/pages/IntegrationsPage';
 import ChangePasswordModal from '@/features/users/components/ChangePasswordModal';
@@ -272,6 +273,7 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
         open={copilotOpen}
         onClick={() => setCopilotOpen(true)}
       />
+      <BackgroundTasksWidget />
     </div>
   );
 }

@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { cacheGet, cacheSet } from '@/shared/lib/cache';
+import { useTaskManager } from '@/shared/tasks/TaskContext';
 import {
   RefreshCw, Play, Square, RotateCw, Pause, Trash2, ScrollText, Terminal as TermIcon, Info, ChevronDown, ChevronRight,
   Box, HardDrive, Layers, Download, X, FolderOpen, AlertTriangle, Plus, Network as NetIcon, Database, ExternalLink,
@@ -116,6 +117,25 @@ export default function DockerPanel({
     name: string;
   }>({ open: false, id: '', name: '' });
 
+  // Auto-reload data when background tasks for this server complete (e.g. image pull finished in background)
+  const { tasks, runStreamTask } = useTaskManager();
+  const lastTaskFinishedRef = useRef<number>(Date.now());
+
+  useEffect(() => {
+    const newlyFinished = tasks.find(
+      (t) =>
+        t.serverId === serverId &&
+        t.category === 'docker' &&
+        t.status === 'success' &&
+        t.finishedAt &&
+        t.finishedAt > lastTaskFinishedRef.current
+    );
+    if (newlyFinished && newlyFinished.finishedAt) {
+      lastTaskFinishedRef.current = newlyFinished.finishedAt;
+      load(true);
+    }
+  }, [tasks, serverId]);
+
   // Docker 1-Click Installer state
   const [installingDocker, setInstallingDocker] = useState(false);
   const [dockerInstallResult, setDockerInstallResult] = useState<{
@@ -163,6 +183,9 @@ export default function DockerPanel({
   const handleInstallDocker = async (overridePassword?: string) => {
     setInstallingDocker(true);
     setDockerInstallResult(null);
+    const pass = overridePassword !== undefined ? overridePassword : (dockerSudoPassword || undefined);
+    const taskId = `install_docker_${Date.now()}`;
+
     try {
       await recordTemplateRun(serverId, {
         templateName: 'Docker Engine (CE)',
@@ -171,33 +194,55 @@ export default function DockerPanel({
         skipped: ''
       }).catch(() => {});
 
-      const pass = overridePassword !== undefined ? overridePassword : (dockerSudoPassword || undefined);
-      const res = await executeSoftwareScript(serverId, activeDockerScript, pass);
-      setDockerInstallResult(res);
+      await runStreamTask({
+        id: taskId,
+        serverId,
+        serverName: serverName,
+        title: 'Install Docker Engine (CE)',
+        category: 'docker',
+        url: `/api/servers/${serverId}/software/execute?stream=1`,
+        body: { script: activeDockerScript, sudoPassword: pass },
+        onDone: async (res) => {
+          if (pass && dockerRememberSudo) {
+            await updateServer(serverId, { sudoPassword: pass }).catch(() => {});
+          }
+          setDockerPromptSudo(false);
+          setSudoModalOpen(false);
+          setDockerInstallResult({
+            ok: true,
+            exitCode: 0,
+            output: res.output || 'Docker Engine successfully installed',
+            durationMs: 0
+          });
+          toast.success('Docker Engine successfully installed!');
+          await load(true);
+        },
+        onError: async (err: any) => {
+          const errMsg = `${err.message || ''}\n${err.output || ''}`;
+          const isSudo =
+            err.sudoRequired ||
+            err.exitCode === 126 ||
+            /sudo:.*(password|terminal|askpass|incorrect)/i.test(errMsg) ||
+            /a terminal is required/i.test(errMsg) ||
+            /a password is required/i.test(errMsg) ||
+            /password.*required/i.test(errMsg);
 
-      const isSudo =
-        res.sudoRequired ||
-        res.exitCode === 126 ||
-        /sudo:.*(password|terminal|askpass|incorrect)/i.test(res.output || '') ||
-        /a terminal is required/i.test(res.output || '') ||
-        /password.*required/i.test(res.output || '');
-
-      if (isSudo) {
-        setDockerPromptSudo(true);
-        setPendingSudoAction(() => (pw: string) => handleInstallDocker(pw));
-        setSudoModalOpen(true);
-        toast.warning('Sudo authentication required to install Docker packages.');
-      } else if (res.ok) {
-        if (pass && dockerRememberSudo) {
-          await updateServer(serverId, { sudoPassword: pass }).catch(() => {});
+          if (isSudo) {
+            setDockerPromptSudo(true);
+            setPendingSudoAction(() => (pw: string) => handleInstallDocker(pw));
+            setSudoModalOpen(true);
+            toast.warning('Sudo authentication required to install Docker packages.');
+          } else {
+            setDockerInstallResult({
+              ok: false,
+              exitCode: err.exitCode || 1,
+              output: err.output || errMsg || 'Docker installation failed',
+              durationMs: 0
+            });
+            toast.error(err.message || 'Docker installation failed');
+          }
         }
-        setDockerPromptSudo(false);
-        setSudoModalOpen(false);
-        toast.success('Docker Engine successfully installed!');
-        await load(true);
-      } else {
-        toast.error(`Docker installation completed with exit code ${res.exitCode}`);
-      }
+      });
     } catch (e: any) {
       setDockerInstallResult({
         ok: false,
@@ -525,39 +570,55 @@ export default function DockerPanel({
           </div>
 
           {/* Live Execution Output Box */}
-          {(installingDocker || dockerInstallResult) && (
-            <div className="mt-5 rounded-xl border border-zinc-800 bg-[#09090b] overflow-hidden">
-              <div className="px-3.5 py-2 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between text-xs">
-                <span className="font-mono text-[11px] text-zinc-300 flex items-center gap-2">
-                  {installingDocker ? (
-                    <>
-                      <RotateCw className="w-3.5 h-3.5 text-sky-400 animate-spin" />
-                      <span>Setting up Docker GPG key, repository, and installing packages...</span>
-                    </>
-                  ) : dockerInstallResult?.ok ? (
-                    <>
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                      <span className="text-emerald-400 font-semibold">
-                        Docker Installation Complete ({(dockerInstallResult.durationMs / 1000).toFixed(1)}s)
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <AlertCircle className="w-3.5 h-3.5 text-red-400" />
-                      <span className="text-red-400 font-semibold">
-                        Failed (Exit Code: {dockerInstallResult?.exitCode})
-                      </span>
-                    </>
+          {(() => {
+            const activeDockerTask = tasks.find(
+              (t) => t.serverId === serverId && t.title.includes('Docker Engine') && t.status === 'running'
+            );
+            const isBusy = installingDocker || !!activeDockerTask;
+
+            if (!isBusy && !dockerInstallResult) return null;
+
+            return (
+              <div className="mt-5 rounded-xl border border-zinc-800 bg-[#09090b] overflow-hidden">
+                <div className="px-3.5 py-2 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between text-xs">
+                  <span className="font-mono text-[11px] text-zinc-300 flex items-center gap-2">
+                    {isBusy ? (
+                      <>
+                        <RotateCw className="w-3.5 h-3.5 text-sky-400 animate-spin" />
+                        <span>
+                          Setting up Docker GPG key, repository, and installing packages ({activeDockerTask?.durationSec || 0}s)...
+                        </span>
+                      </>
+                    ) : dockerInstallResult?.ok ? (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="text-emerald-400 font-semibold">
+                          Docker Installation Complete
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertCircle className="w-3.5 h-3.5 text-red-400" />
+                        <span className="text-red-400 font-semibold">
+                          Failed {dockerInstallResult?.exitCode ? `(Exit Code: ${dockerInstallResult.exitCode})` : ''}
+                        </span>
+                      </>
+                    )}
+                  </span>
+                  {isBusy && (
+                    <span className="text-[10px] text-zinc-400 font-sans">
+                      Runs in background · Safe to navigate
+                    </span>
                   )}
-                </span>
-              </div>
-              {dockerInstallResult && (
+                </div>
                 <pre className="p-3.5 text-[11px] font-mono text-zinc-300 max-h-60 overflow-auto whitespace-pre-wrap leading-relaxed">
-                  {dockerInstallResult.output || '(No stdout output)'}
+                  {activeDockerTask && activeDockerTask.logs.length > 0
+                    ? activeDockerTask.logs.join('\n')
+                    : dockerInstallResult?.output || '(Executing Docker installation on remote server...)'}
                 </pre>
-              )}
-            </div>
-          )}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Script Inspector Modal */}

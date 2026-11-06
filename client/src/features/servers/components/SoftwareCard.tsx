@@ -1,5 +1,6 @@
 // Installed Software, Active Services & Quick 1-Click Tool Installer
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
+import { useTaskManager } from '@/shared/tasks/TaskContext';
 import {
   RefreshCw,
   Check,
@@ -22,7 +23,8 @@ import {
   Copy,
   ShieldCheck,
   Package,
-  KeyRound
+  KeyRound,
+  ListChecks
 } from 'lucide-react';
 import { BrandIcon } from '@/shared/ui/brand-icon';
 import {
@@ -38,6 +40,7 @@ import {
 import {
   MARKETPLACE_CATALOG,
   generateSingleToolScript,
+  generateBatchToolsScript,
   formatTerminalCommand,
   type MarketplaceTool
 } from '../lib/templates';
@@ -110,13 +113,56 @@ export default function SoftwareCard({
   const [promptSudo, setPromptSudo] = useState(false);
   const [sudoPasswordInput, setSudoPasswordInput] = useState('');
   const [rememberSudo, setRememberSudo] = useState(true);
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+
+  // Multi-Task / Batch Install State
+  const [batchMode, setBatchMode] = useState(false);
+  const [selectedBatchToolIds, setSelectedBatchToolIds] = useState<string[]>([]);
+  const [batchRunning, setBatchRunning] = useState(false);
+
+  const { runStreamTask, tasks } = useTaskManager();
+  const lastCompletedRef = useRef<number>(Date.now());
+  const logPreRef = useRef<HTMLPreElement>(null);
+
+  // Auto-reload software items when any background software task finishes successfully
+  useEffect(() => {
+    const finishedTask = tasks.find(
+      (t) =>
+        t.serverId === serverId &&
+        t.category === 'software' &&
+        t.status === 'success' &&
+        t.finishedAt &&
+        t.finishedAt > lastCompletedRef.current
+    );
+    if (finishedTask && finishedTask.finishedAt) {
+      lastCompletedRef.current = finishedTask.finishedAt;
+      load(true);
+    }
+  }, [tasks, serverId]);
+
+  // Current active task for open modal (strictly scoped to currently inspected tool)
+  const currentModalTask = activeToolModal
+    ? tasks.find(
+      (t) =>
+        t.serverId === serverId &&
+        (t.id.includes(activeToolModal.tool.id) ||
+          t.title.toLowerCase().includes(activeToolModal.tool.name.toLowerCase())) &&
+        t.status === 'running'
+    )
+    : null;
+
+  useEffect(() => {
+    if (currentModalTask && logPreRef.current) {
+      logPreRef.current.scrollTop = logPreRef.current.scrollHeight;
+    }
+  }, [currentModalTask?.logs]);
 
   const load = async (force = false) => {
     setError(null);
     try {
       await Promise.all([
         swr(`software:${serverId}`, () => fetchSoftware(serverId), setItems, setLoading, force),
-        swr(`software-upgrades:${serverId}`, () => fetchSoftwareUpgrades(serverId), setUpgrades, () => {}, force).catch(() => {})
+        swr(`software-upgrades:${serverId}`, () => fetchSoftwareUpgrades(serverId), setUpgrades, () => { }, force).catch(() => { })
       ]);
     } catch (e: any) {
       setError(e.message);
@@ -227,6 +273,73 @@ export default function SoftwareCard({
     setModalResult(null);
     setPromptSudo(false);
     setSudoPasswordInput('');
+    setModalRunning(false);
+    setActiveTaskId(null);
+  };
+
+  const toggleBatchSelect = (toolId: string) => {
+    setSelectedBatchToolIds((prev) =>
+      prev.includes(toolId) ? prev.filter((id) => id !== toolId) : [...prev, toolId]
+    );
+  };
+
+  const handleRunBatchInstall = async (overridePassword?: string) => {
+    if (selectedBatchToolIds.length === 0) return;
+    const tools = MARKETPLACE_CATALOG.filter((m) => selectedBatchToolIds.includes(m.id));
+    if (tools.length === 0) return;
+
+    setBatchRunning(true);
+    const pass = overridePassword !== undefined ? overridePassword : (sudoPasswordInput || undefined);
+    const batchScript = generateBatchToolsScript(tools);
+    const toolNames = tools.map((t) => t.name).join(', ');
+    const taskId = `batch_install_${Date.now()}`;
+
+    await recordTemplateRun(serverId, {
+      templateName: `Multi-Task Batch: ${toolNames}`,
+      templateId: 'batch-install',
+      installed: selectedBatchToolIds.join(','),
+      skipped: ''
+    }).catch(() => { });
+
+    toast.info(`Starting batch installation of ${tools.length} tools in background...`);
+    setBatchMode(false);
+    setSelectedBatchToolIds([]);
+
+    await runStreamTask({
+      id: taskId,
+      serverId,
+      serverName,
+      title: `Batch Install (${tools.length} Tools): ${toolNames}`,
+      category: 'software',
+      url: `/api/servers/${serverId}/software/execute?stream=1`,
+      body: { script: batchScript, sudoPassword: pass },
+      onDone: async () => {
+        if (pass && rememberSudo) {
+          await updateServer(serverId, { sudoPassword: pass }).catch(() => { });
+        }
+        toast.success(`Batch installation of ${tools.length} tools completed successfully!`);
+        setBatchRunning(false);
+        load(true);
+      },
+      onError: async (err: any) => {
+        const errMsg = `${err.message || ''}\n${err.output || ''}`;
+        const isSudo =
+          err.sudoRequired ||
+          err.exitCode === 126 ||
+          /sudo:.*(password|terminal|askpass)/i.test(errMsg) ||
+          /a terminal is required/i.test(errMsg) ||
+          /a password is required/i.test(errMsg);
+
+        if (isSudo) {
+          setPendingSudoAction(() => (pw: string) => handleRunBatchInstall(pw));
+          setSudoModalOpen(true);
+          toast.warning(`Sudo authentication required for batch installation`);
+        } else {
+          toast.error(`Batch installation error: ${err.message}`);
+        }
+        setBatchRunning(false);
+      }
+    });
   };
 
   const activeModalScript = useMemo(() => {
@@ -235,63 +348,80 @@ export default function SoftwareCard({
     return generateSingleToolScript(activeToolModal.tool, modalVersion || undefined);
   }, [activeToolModal, modalVersion, modalCustomScript]);
 
-  // Execute live installation directly via SSH
+  // Execute live installation directly via SSH with background streaming
   const handleRunLiveInstall = async (overridePassword?: string) => {
     if (!activeToolModal) return;
     setModalRunning(true);
     setModalResult(null);
-    try {
-      await recordTemplateRun(serverId, {
-        templateName: activeToolModal.tool.name,
-        templateId: activeToolModal.tool.id,
-        installed: activeToolModal.tool.id,
-        skipped: ''
-      }).catch(() => {});
 
-      const pass = overridePassword !== undefined ? overridePassword : (sudoPasswordInput || undefined);
-      const res = await executeSoftwareScript(serverId, activeModalScript, pass);
-      setModalResult(res);
+    const toolName = activeToolModal.tool.name;
+    const toolId = activeToolModal.tool.id;
+    const taskId = `install_${toolId}_${Date.now()}`;
+    setActiveTaskId(taskId);
 
-      const isSudo =
-        res.sudoRequired ||
-        res.exitCode === 126 ||
-        /sudo:.*(password|terminal|askpass|incorrect)/i.test(res.output || '') ||
-        /a terminal is required/i.test(res.output || '') ||
-        /a password is required/i.test(res.output || '') ||
-        /password.*required/i.test(res.output || '');
+    await recordTemplateRun(serverId, {
+      templateName: toolName,
+      templateId: toolId,
+      installed: toolId,
+      skipped: ''
+    }).catch(() => { });
 
-      if (isSudo) {
-        setPromptSudo(true);
-        setPendingSudoAction(() => (pw: string) => handleRunLiveInstall(pw));
-        setSudoModalOpen(true);
-        toast.warning(`Sudo authentication required to install ${activeToolModal.tool.name}`);
-      } else if (res.ok) {
+    const pass = overridePassword !== undefined ? overridePassword : (sudoPasswordInput || undefined);
+
+    await runStreamTask({
+      id: taskId,
+      serverId,
+      serverName,
+      title: `Install ${toolName}`,
+      category: 'software',
+      url: `/api/servers/${serverId}/software/execute?stream=1`,
+      body: { script: activeModalScript, sudoPassword: pass },
+      onDone: async (res) => {
         if (pass && rememberSudo) {
-          await updateServer(serverId, { sudoPassword: pass }).catch(() => {});
+          await updateServer(serverId, { sudoPassword: pass }).catch(() => { });
         }
+        setModalResult({
+          ok: true,
+          exitCode: 0,
+          output: res.output || 'Installation succeeded',
+          durationMs: 0
+        });
+        setModalRunning(false);
         setPromptSudo(false);
         setSudoModalOpen(false);
-        toast.success(`${activeToolModal.tool.name} successfully installed!`);
-        await load(true);
-      } else {
-        toast.error(`${activeToolModal.tool.name} installation completed with exit code ${res.exitCode}`);
+        load(true);
+      },
+      onError: async (err: any) => {
+        const errMsg = `${err.message || ''}\n${err.output || ''}`;
+        const isSudo =
+          err.sudoRequired ||
+          err.exitCode === 126 ||
+          /sudo:.*(password|terminal|askpass|incorrect)/i.test(errMsg) ||
+          /a terminal is required/i.test(errMsg) ||
+          /a password is required/i.test(errMsg) ||
+          /password.*required/i.test(errMsg);
+
+        if (isSudo) {
+          setPromptSudo(true);
+          setPendingSudoAction(() => (pw: string) => handleRunLiveInstall(pw));
+          setSudoModalOpen(true);
+          toast.warning(`Sudo authentication required to install ${toolName}`);
+        } else {
+          setModalResult({
+            ok: false,
+            exitCode: err.exitCode || 1,
+            output: err.output || errMsg || 'Installation failed',
+            durationMs: 0
+          });
+        }
+        setModalRunning(false);
       }
-    } catch (e: any) {
-      setModalResult({
-        ok: false,
-        exitCode: 1,
-        output: e.message || 'Failed to execute script on server',
-        durationMs: 0
-      });
-      toast.error(e.message || 'Execution failed');
-    } finally {
-      setModalRunning(false);
-    }
+    });
   };
 
   const handleSudoConfirm = async (password: string, remember: boolean) => {
     if (remember) {
-      await updateServer(serverId, { sudoPassword: password }).catch(() => {});
+      await updateServer(serverId, { sudoPassword: password }).catch(() => { });
     }
     setSudoPasswordInput(password);
     setSudoModalOpen(false);
@@ -393,11 +523,10 @@ export default function SoftwareCard({
               <button
                 type="button"
                 onClick={() => setStatusFilter('installed')}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                  statusFilter === 'installed'
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${statusFilter === 'installed'
                     ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm border border-[var(--border)]'
                     : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-                }`}
+                  }`}
               >
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
                 <span>Installed ({installed.length})</span>
@@ -406,11 +535,10 @@ export default function SoftwareCard({
               <button
                 type="button"
                 onClick={() => setStatusFilter('services')}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                  statusFilter === 'services'
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${statusFilter === 'services'
                     ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm border border-[var(--border)]'
                     : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-                }`}
+                  }`}
               >
                 <Activity className="w-3.5 h-3.5 text-sky-400" />
                 <span>Daemons & Services ({serviceItems.length})</span>
@@ -419,11 +547,10 @@ export default function SoftwareCard({
               <button
                 type="button"
                 onClick={() => setStatusFilter('missing')}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                  statusFilter === 'missing'
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${statusFilter === 'missing'
                     ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm border border-[var(--border)]'
                     : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-                }`}
+                  }`}
               >
                 <Plus className="w-3.5 h-3.5 text-amber-500" />
                 <span>Available to Install ({missing.length})</span>
@@ -432,13 +559,34 @@ export default function SoftwareCard({
               <button
                 type="button"
                 onClick={() => setStatusFilter('all')}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                  statusFilter === 'all'
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${statusFilter === 'all'
                     ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm border border-[var(--border)]'
                     : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-                }`}
+                  }`}
               >
                 <span>All ({items.length})</span>
+              </button>
+
+              <div className="w-px h-4 bg-[var(--border)] mx-0.5 hidden sm:block" />
+
+              <button
+                type="button"
+                onClick={() => {
+                  setBatchMode((v) => {
+                    const next = !v;
+                    if (next) setStatusFilter('missing');
+                    else setSelectedBatchToolIds([]);
+                    return next;
+                  });
+                }}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${batchMode
+                    ? 'bg-sky-500 text-white shadow-md ring-1 ring-sky-400 font-bold'
+                    : 'text-sky-400 hover:text-sky-300 border border-dashed border-sky-500/40 bg-sky-500/5 hover:bg-sky-500/10'
+                  }`}
+                title="Select multiple tools to install together in a single pipeline background task"
+              >
+                <ListChecks className="w-3.5 h-3.5" />
+                <span>{batchMode ? `Exit Multi-Task (${selectedBatchToolIds.length})` : 'Multi-Task Install'}</span>
               </button>
             </div>
 
@@ -467,11 +615,10 @@ export default function SoftwareCard({
           <div className="flex items-center gap-1.5 flex-wrap">
             <button
               onClick={() => setSelectedCategory('all')}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition border ${
-                selectedCategory === 'all'
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition border ${selectedCategory === 'all'
                   ? 'bg-[var(--primary)] text-[var(--primary-foreground)] border-transparent shadow-sm'
                   : 'bg-[var(--background)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] border-[var(--border)]'
-              }`}
+                }`}
             >
               All Categories
             </button>
@@ -480,21 +627,20 @@ export default function SoftwareCard({
                 statusFilter === 'installed'
                   ? installed
                   : statusFilter === 'services'
-                  ? serviceItems
-                  : statusFilter === 'missing'
-                  ? missing
-                  : items;
+                    ? serviceItems
+                    : statusFilter === 'missing'
+                      ? missing
+                      : items;
               const count = sourceList.filter((i) => i.category === c.id).length;
               if (count === 0) return null;
               return (
                 <button
                   key={c.id}
                   onClick={() => setSelectedCategory(c.id)}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition border ${
-                    selectedCategory === c.id
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition border ${selectedCategory === c.id
                       ? 'bg-[var(--primary)] text-[var(--primary-foreground)] border-transparent shadow-sm'
                       : 'bg-[var(--background)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] border-[var(--border)]'
-                  }`}
+                    }`}
                 >
                   {t(c.label)} ({count})
                 </button>
@@ -584,25 +730,33 @@ export default function SoftwareCard({
                         const hasService = tool.service !== undefined;
                         const up = tool.installed ? getUpgrade(tool.id) : null;
                         const marketMeta = MARKETPLACE_CATALOG.find((m) => m.id === tool.id);
+                        const isSelectedForBatch = batchMode && !tool.installed && selectedBatchToolIds.includes(tool.id);
 
                         return (
                           <div
                             key={tool.id}
-                            className={`p-3.5 rounded-xl border transition-all flex flex-col justify-between space-y-3 shadow-sm ${
-                              tool.installed
-                                ? 'border-[var(--border)] bg-[var(--background)] hover:border-[var(--muted-foreground)]/40'
-                                : 'border-dashed border-[var(--border)] bg-[var(--muted)]/10 hover:bg-[var(--muted)]/25 hover:border-[var(--primary)]/40'
-                            }`}
+                            onClick={() => {
+                              if (batchMode && !tool.installed) {
+                                toggleBatchSelect(tool.id);
+                              }
+                            }}
+                            className={`p-3.5 rounded-xl border transition-all flex flex-col justify-between space-y-3 shadow-sm ${isSelectedForBatch
+                                ? 'border-sky-500 bg-sky-500/10 ring-2 ring-sky-500/30 cursor-pointer shadow-md'
+                                : tool.installed
+                                  ? 'border-[var(--border)] bg-[var(--background)] hover:border-[var(--muted-foreground)]/40'
+                                  : batchMode
+                                    ? 'border-dashed border-sky-500/40 bg-[var(--muted)]/15 hover:border-sky-500 hover:bg-sky-500/5 cursor-pointer'
+                                    : 'border-dashed border-[var(--border)] bg-[var(--muted)]/10 hover:bg-[var(--muted)]/25 hover:border-[var(--primary)]/40'
+                              }`}
                           >
                             <div className="space-y-2">
                               <div className="flex items-start justify-between gap-2">
                                 <div className="flex items-center gap-2 min-w-0">
                                   <span
-                                    className={`p-1.5 rounded-lg border shrink-0 ${
-                                      tool.installed
+                                    className={`p-1.5 rounded-lg border shrink-0 ${tool.installed
                                         ? 'bg-[var(--muted)]/40 border-[var(--border)]'
                                         : 'bg-[var(--muted)]/20 border-transparent opacity-60'
-                                    }`}
+                                      }`}
                                   >
                                     <BrandIcon
                                       name={tool.id}
@@ -642,6 +796,15 @@ export default function SoftwareCard({
                                         Active
                                       </Badge>
                                     )
+                                  ) : batchMode ? (
+                                    <div
+                                      className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${isSelectedForBatch
+                                          ? 'bg-sky-500 border-sky-400 text-white shadow-sm'
+                                          : 'border-[var(--border)] bg-[var(--background)]/60 text-transparent hover:border-sky-400'
+                                        }`}
+                                    >
+                                      <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                    </div>
                                   ) : (
                                     <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--muted)] text-[var(--muted-foreground)]">
                                       Not installed
@@ -680,111 +843,178 @@ export default function SoftwareCard({
 
                             {/* Bottom Action & Service Control Row */}
                             <div className="flex items-center justify-between gap-2 pt-2 border-t border-[var(--border)]/60">
-                              {tool.installed ? (
-                                <>
-                                  {hasService ? (
-                                    <span
-                                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${
-                                        isServiceActive
-                                          ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30'
-                                          : isServiceFailed
-                                          ? 'bg-red-500/10 text-red-500 border-red-500/30'
-                                          : 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20'
-                                      }`}
-                                    >
-                                      <span
-                                        className={`w-1.5 h-1.5 rounded-full ${
-                                          isServiceActive
-                                            ? 'bg-emerald-500 animate-pulse'
-                                            : isServiceFailed
-                                            ? 'bg-red-500'
-                                            : 'bg-zinc-400'
-                                        }`}
-                                      />
-                                      {isServiceActive
-                                        ? t('software.serviceRunning')
-                                        : isServiceFailed
-                                        ? t('software.serviceFailed')
-                                        : t('software.serviceStopped')}
-                                    </span>
-                                  ) : (
-                                    <span className="text-[10px] text-emerald-500/80 font-mono flex items-center gap-1">
-                                      <Check className="w-3 h-3 text-emerald-500" /> CLI Ready
-                                    </span>
-                                  )}
+                              {(() => {
+                                const runningTask = tasks.find(
+                                  (t) =>
+                                    t.serverId === serverId &&
+                                    t.status === 'running' &&
+                                    (t.id.includes(tool.id) || t.title.toLowerCase().includes(tool.name.toLowerCase()))
+                                );
 
-                                  {/* Quick Action Buttons for Installed Tool */}
-                                  <div className="flex items-center gap-1">
-                                    {hasService && (
-                                      <>
-                                        {isServiceActive ? (
-                                          <>
-                                            <button
-                                              type="button"
-                                              disabled={!!serviceBusy}
-                                              onClick={() => handleServiceAction(tool, 'restart')}
-                                              title={`Restart ${tool.name}`}
-                                              className="p-1 rounded-md border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition disabled:opacity-50"
-                                            >
-                                              <RotateCw
-                                                className={`w-3 h-3 ${
-                                                  serviceBusy === `${tool.id}:restart` ? 'animate-spin text-[var(--primary)]' : ''
-                                                }`}
-                                              />
-                                            </button>
-                                            <button
-                                              type="button"
-                                              disabled={!!serviceBusy}
-                                              onClick={() => handleServiceAction(tool, 'stop')}
-                                              title={`Stop ${tool.name}`}
-                                              className="p-1 rounded-md border border-[var(--border)] hover:bg-red-500/10 text-[var(--muted-foreground)] hover:text-red-400 transition disabled:opacity-50"
-                                            >
-                                              <Square className="w-3 h-3" />
-                                            </button>
-                                          </>
-                                        ) : (
-                                          <button
-                                            type="button"
-                                            disabled={!!serviceBusy}
-                                            onClick={() => handleServiceAction(tool, 'start')}
-                                            title={`Start ${tool.name}`}
-                                            className="px-2 py-0.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-[10px] font-medium inline-flex items-center gap-1 transition disabled:opacity-50"
-                                          >
-                                            <Play className="w-2.5 h-2.5" />
-                                            <span>Start</span>
-                                          </button>
-                                        )}
-                                      </>
-                                    )}
-
-                                    {marketMeta && (
+                                if (runningTask) {
+                                  return (
+                                    <div className="w-full flex items-center justify-between">
+                                      <span className="text-[10px] text-sky-400 flex items-center gap-1.5 font-mono">
+                                        <RotateCw className="w-3 h-3 animate-spin text-sky-400" />
+                                        <span>Running in background...</span>
+                                      </span>
                                       <button
                                         type="button"
-                                        onClick={() => openToolSetup(tool)}
-                                        title={`Configure / Reinstall ${tool.name}`}
-                                        className="p-1 rounded-md border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition"
+                                        onClick={() => {
+                                          const marketTool = MARKETPLACE_CATALOG.find((m) => m.id === tool.id);
+                                          if (marketTool) {
+                                            setActiveToolModal({ tool: marketTool, installedInfo: tool.installed ? tool : undefined });
+                                          }
+                                        }}
+                                        className="h-6 px-2.5 text-[10px] gap-1 rounded-md border border-sky-500/40 bg-sky-500/10 text-sky-400 font-semibold inline-flex items-center hover:bg-sky-500/20 transition cursor-pointer"
+                                        title="Click to view live logs"
                                       >
-                                        <Wrench className="w-3 h-3" />
+                                        <span>Inspect ({runningTask.durationSec || 0}s)</span>
                                       </button>
-                                    )}
-                                  </div>
-                                </>
-                              ) : (
-                                <>
-                                  <span className="text-[10px] text-[var(--muted-foreground)]">
-                                    Ready to install
-                                  </span>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => openToolSetup(tool)}
-                                    className="h-6 px-2.5 text-[10px] gap-1 border-[var(--primary)]/40 text-[var(--primary)] hover:bg-[var(--primary)]/10 font-semibold"
-                                  >
-                                    <Plus className="w-3 h-3" />
-                                    <span>Install</span>
-                                  </Button>
-                                </>
-                              )}
+                                    </div>
+                                  );
+                                }
+
+                                if (tool.installed) {
+                                  return (
+                                    <>
+                                      {hasService ? (
+                                        <span
+                                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${isServiceActive
+                                              ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30'
+                                              : isServiceFailed
+                                                ? 'bg-red-500/10 text-red-500 border-red-500/30'
+                                                : 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20'
+                                            }`}
+                                        >
+                                          <span
+                                            className={`w-1.5 h-1.5 rounded-full ${isServiceActive
+                                                ? 'bg-emerald-500 animate-pulse'
+                                                : isServiceFailed
+                                                  ? 'bg-red-500'
+                                                  : 'bg-zinc-400'
+                                              }`}
+                                          />
+                                          {isServiceActive
+                                            ? t('software.serviceRunning')
+                                            : isServiceFailed
+                                              ? t('software.serviceFailed')
+                                              : t('software.serviceStopped')}
+                                        </span>
+                                      ) : (
+                                        <span className="text-[10px] text-emerald-500/80 font-mono flex items-center gap-1">
+                                          <Check className="w-3 h-3 text-emerald-500" /> CLI Ready
+                                        </span>
+                                      )}
+
+                                      {/* Quick Action Buttons for Installed Tool */}
+                                      <div className="flex items-center gap-1">
+                                        {hasService && (
+                                          <>
+                                            {isServiceActive ? (
+                                              <>
+                                                <button
+                                                  type="button"
+                                                  disabled={!!serviceBusy}
+                                                  onClick={() => handleServiceAction(tool, 'restart')}
+                                                  title={`Restart ${tool.name}`}
+                                                  className="p-1 rounded-md border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition disabled:opacity-50"
+                                                >
+                                                  <RotateCw
+                                                    className={`w-3 h-3 ${serviceBusy === `${tool.id}:restart` ? 'animate-spin text-[var(--primary)]' : ''
+                                                      }`}
+                                                  />
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  disabled={!!serviceBusy}
+                                                  onClick={() => handleServiceAction(tool, 'stop')}
+                                                  title={`Stop ${tool.name}`}
+                                                  className="p-1 rounded-md border border-[var(--border)] hover:bg-red-500/10 text-[var(--muted-foreground)] hover:text-red-400 transition disabled:opacity-50"
+                                                >
+                                                  <Square className="w-3 h-3" />
+                                                </button>
+                                              </>
+                                            ) : (
+                                              <button
+                                                type="button"
+                                                disabled={!!serviceBusy}
+                                                onClick={() => handleServiceAction(tool, 'start')}
+                                                title={`Start ${tool.name}`}
+                                                className="px-2 py-0.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-[10px] font-medium inline-flex items-center gap-1 transition disabled:opacity-50"
+                                              >
+                                                <Play className="w-2.5 h-2.5" />
+                                                <span>Start</span>
+                                              </button>
+                                            )}
+                                          </>
+                                        )}
+
+                                        {marketMeta && (
+                                          <button
+                                            type="button"
+                                            onClick={() => openToolSetup(tool)}
+                                            title={`Configure / Reinstall ${tool.name}`}
+                                            className="p-1 rounded-md border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition"
+                                          >
+                                            <Wrench className="w-3 h-3" />
+                                          </button>
+                                        )}
+                                      </div>
+                                    </>
+                                  );
+                                }
+
+                                if (batchMode && !tool.installed) {
+                                  return (
+                                    <div className="w-full flex items-center justify-between">
+                                      <span
+                                        className={`text-[10px] font-mono ${isSelectedForBatch
+                                            ? 'text-sky-400 font-semibold'
+                                            : 'text-[var(--muted-foreground)]'
+                                          }`}
+                                      >
+                                        {isSelectedForBatch ? 'Selected for batch' : 'Click to select'}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          toggleBatchSelect(tool.id);
+                                        }}
+                                        className={`h-6 px-2.5 text-[10px] gap-1 rounded-md font-semibold inline-flex items-center transition cursor-pointer border ${isSelectedForBatch
+                                            ? 'bg-sky-500 border-sky-400 text-white shadow-sm'
+                                            : 'border-sky-500/40 bg-sky-500/10 text-sky-400 hover:bg-sky-500/20'
+                                          }`}
+                                      >
+                                        {isSelectedForBatch ? (
+                                          <Check className="w-3 h-3 stroke-[2.5]" />
+                                        ) : (
+                                          <Plus className="w-3 h-3" />
+                                        )}
+                                        <span>{isSelectedForBatch ? 'Selected' : 'Select'}</span>
+                                      </button>
+                                    </div>
+                                  );
+                                }
+
+                                return (
+                                  <>
+                                    <span className="text-[10px] text-[var(--muted-foreground)]">
+                                      Ready to install
+                                    </span>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => openToolSetup(tool)}
+                                      className="h-6 px-2.5 text-[10px] gap-1 border-[var(--primary)]/40 text-[var(--primary)] hover:bg-[var(--primary)]/10 font-semibold"
+                                    >
+                                      <Plus className="w-3 h-3" />
+                                      <span>Install</span>
+                                    </Button>
+                                  </>
+                                );
+                              })()}
                             </div>
                           </div>
                         );
@@ -819,6 +1049,46 @@ export default function SoftwareCard({
               </Button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Floating Batch Action Bar */}
+      {batchMode && selectedBatchToolIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-5 py-3 rounded-2xl bg-zinc-950/95 border border-sky-500/50 shadow-2xl backdrop-blur-md animate-in slide-in-from-bottom duration-200">
+          <div className="flex items-center gap-2 pr-3 border-r border-zinc-800">
+            <span className="w-6 h-6 rounded-full bg-sky-500 text-white text-xs font-bold flex items-center justify-center">
+              {selectedBatchToolIds.length}
+            </span>
+            <div className="flex flex-col">
+              <span className="text-xs font-semibold text-zinc-100">
+                {selectedBatchToolIds.length} {selectedBatchToolIds.length === 1 ? 'Tool' : 'Tools'} Selected
+              </span>
+              <span className="text-[10px] text-zinc-400">Sequential background pipeline</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedBatchToolIds([])}
+              className="px-2.5 py-1 text-xs text-zinc-400 hover:text-zinc-200 transition cursor-pointer"
+            >
+              Clear
+            </button>
+            <Button
+              size="sm"
+              disabled={batchRunning}
+              onClick={() => handleRunBatchInstall()}
+              className="h-8 px-4 text-xs font-semibold bg-sky-500 hover:bg-sky-400 text-white shadow-lg flex items-center gap-1.5 cursor-pointer"
+            >
+              {batchRunning ? (
+                <RotateCw className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Play className="w-3.5 h-3.5 fill-current" />
+              )}
+              <span>Install {selectedBatchToolIds.length} Tools in Background</span>
+            </Button>
+          </div>
         </div>
       )}
 
@@ -858,7 +1128,7 @@ export default function SoftwareCard({
               </div>
               <button
                 type="button"
-                onClick={() => !modalRunning && setActiveToolModal(null)}
+                onClick={() => setActiveToolModal(null)}
                 className="p-1.5 rounded-lg text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] transition"
               >
                 <X className="w-4 h-4" />
@@ -999,37 +1269,45 @@ export default function SoftwareCard({
               )}
 
               {/* Live Execution Output */}
-              {(modalRunning || modalResult) && (
+              {(modalRunning || currentModalTask || modalResult) && (
                 <div className="rounded-xl border border-zinc-800 bg-[#09090b] overflow-hidden">
-                  <div className="px-3.5 py-2 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between text-xs">
-                    <span className="font-mono text-[11px] text-zinc-300 flex items-center gap-2">
-                      {modalRunning ? (
+                  <div className="px-3.5 py-2 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between text-xs font-mono">
+                    <span className="text-[11px] text-zinc-300 flex items-center gap-2">
+                      {modalRunning || currentModalTask?.status === 'running' ? (
                         <>
                           <RotateCw className="w-3.5 h-3.5 text-sky-400 animate-spin" />
-                          <span>Executing installation on server via SSH...</span>
+                          <span>Installing on server via SSH ({currentModalTask?.durationSec || 0}s)...</span>
                         </>
-                      ) : modalResult?.ok ? (
+                      ) : (currentModalTask?.status === 'success' || modalResult?.ok) ? (
                         <>
                           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
                           <span className="text-emerald-400 font-semibold">
-                            Installation Complete ({(modalResult.durationMs / 1000).toFixed(1)}s)
+                            Installation Complete
                           </span>
                         </>
                       ) : (
                         <>
                           <AlertCircle className="w-3.5 h-3.5 text-red-400" />
                           <span className="text-red-400 font-semibold">
-                            Failed (Exit Code: {modalResult?.exitCode})
+                            Failed {modalResult?.exitCode ? `(Exit Code: ${modalResult.exitCode})` : ''}
                           </span>
                         </>
                       )}
                     </span>
+                    {(modalRunning || currentModalTask?.status === 'running') && (
+                      <span className="text-[10px] text-zinc-400 font-sans">
+                        Runs in background · Safe to close
+                      </span>
+                    )}
                   </div>
-                  {modalResult && (
-                    <pre className="p-3.5 text-[11px] font-mono text-zinc-300 max-h-52 overflow-auto whitespace-pre-wrap leading-relaxed">
-                      {modalResult.output || '(No stdout output)'}
-                    </pre>
-                  )}
+                  <pre
+                    ref={logPreRef}
+                    className="p-3.5 text-[11px] font-mono text-zinc-300 max-h-52 overflow-auto whitespace-pre-wrap leading-relaxed select-text"
+                  >
+                    {currentModalTask && currentModalTask.logs.length > 0
+                      ? currentModalTask.logs.join('\n')
+                      : modalResult?.output || '(Executing setup script on remote server...)'}
+                  </pre>
                 </div>
               )}
             </div>
@@ -1046,7 +1324,7 @@ export default function SoftwareCard({
                   <Button
                     variant="outline"
                     size="sm"
-                    disabled={modalRunning}
+                    disabled={modalRunning || currentModalTask?.status === 'running'}
                     onClick={handleOpenInTerminal}
                     className="h-8 text-xs gap-1.5"
                   >
@@ -1054,23 +1332,33 @@ export default function SoftwareCard({
                     <span>Open in Terminal</span>
                   </Button>
                 )}
+                {(modalRunning || currentModalTask?.status === 'running') && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setActiveToolModal(null)}
+                    className="h-8 text-xs border-sky-500/30 text-sky-400 hover:bg-sky-500/10"
+                  >
+                    Run in Background (Close)
+                  </Button>
+                )}
                 <Button
                   size="sm"
-                  disabled={modalRunning}
+                  disabled={modalRunning || currentModalTask?.status === 'running'}
                   onClick={() => handleRunLiveInstall()}
                   className="h-8 text-xs gap-1.5 font-semibold bg-[var(--primary)] text-[var(--primary-foreground)] shadow-md"
                 >
-                  {modalRunning ? (
+                  {modalRunning || currentModalTask?.status === 'running' ? (
                     <RotateCw className="w-3.5 h-3.5 animate-spin" />
                   ) : (
                     <Play className="w-3.5 h-3.5" />
                   )}
                   <span>
-                    {modalRunning
+                    {modalRunning || currentModalTask?.status === 'running'
                       ? 'Installing...'
                       : activeToolModal.installedInfo?.installed
-                      ? 'Reinstall Now'
-                      : 'Install Now (Live)'}
+                        ? 'Reinstall Now'
+                        : 'Install Now (Live)'}
                   </span>
                 </Button>
               </div>
