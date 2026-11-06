@@ -22,7 +22,8 @@ const cases: [string, Route][] = [
   ['#/ai-gateway/usage', { page: 'ai-gateway', tab: 'usage' }],
   ['#/users', { page: 'users', tab: 'users' }],
   ['#/users/roles', { page: 'users', tab: 'roles' }],
-  ['#/users/sessions', { page: 'users', tab: 'sessions' }]
+  ['#/users/sessions', { page: 'users', tab: 'sessions' }],
+  ['#/settings/integrations', { page: 'integrations' }]
 ];
 for (const [hash, route] of cases) {
   assert.deepEqual(parseRoute(hash), route, hash);

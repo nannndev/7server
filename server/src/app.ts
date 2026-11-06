@@ -27,6 +27,8 @@ import { backupRoutes } from './modules/backups/routes.js';
 import { aiGatewayPublicRoutes, aiGatewayManagementRoutes } from './modules/ai-gateway/routes.js';
 import { usersRoutes } from './modules/users/routes.js';
 import { firewallRoutes } from './modules/firewall/routes.js';
+import { gitPublicRoutes, gitManagementRoutes } from './modules/git/routes.js';
+import { systemRoutes } from './modules/system/routes.js';
 
 export function createApp() {
   const app = express();
@@ -40,6 +42,7 @@ export function createApp() {
 
   // Public AI Gateway endpoints (authenticated via Virtual API Key)
   app.use('/api/ai', aiGatewayPublicRoutes);
+  app.use('/api', gitPublicRoutes);
 
   app.post('/api/login', loginHandler);
   // First run: no user exists yet -> the UI shows "create admin" (see modules/users/setup.ts).
@@ -60,8 +63,8 @@ export function createApp() {
 
   // Order matters where paths overlap (e.g. /servers/test and /servers/batch-exec vs /servers/:id):
   // this is the order the routes had in the old single-file server.
-  app.use('/api', usersRoutes, firewallRoutes, aiGatewayManagementRoutes, monitoringRoutes, transferRoutes, serversRoutes, diagnosticsRoutes, metricsRoutes, processesRoutes,
-    logsRoutes, filesRoutes, dockerRoutes, databasesRoutes, execRoutes, softwareRoutes, cronRoutes, certificateRoutes, securityRoutes, backupRoutes);
+  app.use('/api', usersRoutes, firewallRoutes, aiGatewayManagementRoutes, gitManagementRoutes, monitoringRoutes, transferRoutes, serversRoutes, diagnosticsRoutes, metricsRoutes, processesRoutes,
+    logsRoutes, filesRoutes, dockerRoutes, databasesRoutes, execRoutes, softwareRoutes, cronRoutes, certificateRoutes, securityRoutes, backupRoutes, systemRoutes);
 
   app.use(errorHandler);
 

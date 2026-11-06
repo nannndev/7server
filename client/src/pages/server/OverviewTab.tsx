@@ -9,7 +9,9 @@ import {
   HardDrive,
   FileText,
   Send,
-  Network
+  Network,
+  Sliders,
+  Settings2
 } from 'lucide-react';
 import { BrandIcon } from '@/shared/ui/brand-icon';
 import { Button } from '@/shared/ui/button';
@@ -18,6 +20,7 @@ import { Progress } from '@/shared/ui/progress';
 import { Input } from '@/shared/ui/input';
 import TelemetryChart from '@/features/servers/components/TelemetryChart';
 import SoftwareCard from '@/features/servers/components/SoftwareCard';
+import { VpsTuningModal } from '@/features/servers/components/VpsTuningModal';
 import { useServerPage, formatMB } from './context';
 import { useT } from '@/shared/i18n';
 import { OverviewGaugesSkeleton } from '@/shared/ui/skeleton';
@@ -28,6 +31,10 @@ export default function OverviewTab() {
   const { server } = ctx;
   const metrics = server.metrics;
   const [customCmd, setCustomCmd] = useState('');
+  const [tuningModal, setTuningModal] = useState<{ open: boolean; tab: 'swap' | 'system' }>({
+    open: false,
+    tab: 'swap'
+  });
 
   if (!metrics) {
     return <OverviewGaugesSkeleton />;
@@ -90,15 +97,23 @@ export default function OverviewTab() {
             </div>
           </Card>
 
-          {/* SWAP */}
-          <Card className="p-4">
+          {/* SWAP (Interactive with VPS Tuning Modal) */}
+          <Card
+            className="p-4 transition-all hover:border-[var(--primary)]/60 cursor-pointer group"
+            onClick={() => setTuningModal({ open: true, tab: 'swap' })}
+          >
             <div className="flex items-center justify-between text-xs text-[var(--muted-foreground)] mb-2">
-              <span className="flex items-center gap-1.5">
-                <Layers className="w-4 h-4" /> {t('overview.swap')}
+              <span className="flex items-center gap-1.5 group-hover:text-[var(--foreground)] transition-colors">
+                <Layers className="w-4 h-4 text-[var(--accent)]" /> {t('overview.swap')}
               </span>
-              <span className="font-mono text-[var(--foreground)] text-sm font-semibold">
-                {metrics?.swap?.totalMB ? `${metrics.swap.usedPercent}%` : '0 MB'}
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="font-mono text-[var(--foreground)] text-sm font-semibold">
+                  {metrics?.swap?.totalMB ? `${metrics.swap.usedPercent}%` : '0 MB'}
+                </span>
+                <span className="rounded border border-[var(--border)] px-1.5 py-0.2 text-[9px] font-mono text-[var(--muted-foreground)] group-hover:border-[var(--primary)] group-hover:text-[var(--primary)] transition-colors">
+                  {t('overview.configSwap')}
+                </span>
+              </div>
             </div>
             <Progress
               value={metrics?.swap?.usedPercent ?? 0}
@@ -117,7 +132,9 @@ export default function OverviewTab() {
                   <span>{t('overview.total', { val: formatMB(metrics.swap.totalMB) })}</span>
                 </>
               ) : (
-                <span className="text-amber-500">{t('overview.swapNotConfigured')}</span>
+                <span className="text-amber-500 font-medium flex items-center gap-1">
+                  {t('overview.swapNotConfigured')} →
+                </span>
               )}
             </div>
           </Card>
@@ -152,9 +169,19 @@ export default function OverviewTab() {
         {/* System Identity & Quick Operations */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card className="p-5 space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
-              {t('overview.systemInfo')}
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
+                {t('overview.systemInfo')}
+              </h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 gap-1 text-[11px]"
+                onClick={() => setTuningModal({ open: true, tab: 'system' })}
+              >
+                <Settings2 className="w-3 h-3 text-[var(--accent)]" /> {t('overview.vpsTuning')}
+              </Button>
+            </div>
             <div className="divide-y divide-[var(--border)] text-xs font-mono">
               <div className="py-2 flex justify-between">
                 <span className="text-[var(--muted-foreground)] font-sans">{t('overview.hostname')}</span>
@@ -191,6 +218,16 @@ export default function OverviewTab() {
               {t('overview.quickActions')}
             </h3>
             <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setTuningModal({ open: true, tab: 'swap' })}
+                className="text-xs justify-start gap-2 h-8"
+              >
+                <Sliders className="w-3.5 h-3.5 text-[var(--accent)]" />
+                {t('overview.vpsTuning')}
+              </Button>
+
               <Button
                 variant="outline"
                 size="sm"
@@ -233,17 +270,6 @@ export default function OverviewTab() {
               >
                 <FileText className="w-3.5 h-3.5" />
                 {t('overview.trimLogs')}
-              </Button>
-
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!!ctx.quickActionRunning}
-                onClick={() => ctx.runQuickAction(t('overview.viewCronjobs'), 'crontab -l 2>/dev/null || echo "No root crontab"; ls -la /etc/cron.d/ 2>/dev/null')}
-                className="text-xs justify-start gap-2 h-8"
-              >
-                <Activity className="w-3.5 h-3.5" />
-                {t('overview.viewCronjobs')}
               </Button>
 
               <Button
@@ -299,6 +325,17 @@ export default function OverviewTab() {
           onOpenTerminal={(cmd) => ctx.openTerminal(cmd)}
         />
       </div>
+
+      {/* VPS System & Swap Tuning Modal */}
+      <VpsTuningModal
+        serverId={server.id}
+        serverName={server.name}
+        serverHost={server.host}
+        isOpen={tuningModal.open}
+        initialTab={tuningModal.tab}
+        onClose={() => setTuningModal((prev) => ({ ...prev, open: false }))}
+        onSuccess={() => ctx.refreshMetrics()}
+      />
     </>
   );
 }

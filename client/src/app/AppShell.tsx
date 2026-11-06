@@ -17,6 +17,7 @@ import AiGatewayPage from '@/pages/AiGatewayPage';
 import AiCopilotDrawer from '@/features/copilot/components/AiCopilotDrawer';
 import AiCopilotTrigger from '@/features/copilot/components/AiCopilotTrigger';
 import UsersPage from '@/pages/UsersPage';
+import IntegrationsPage from '@/pages/IntegrationsPage';
 import ChangePasswordModal from '@/features/users/components/ChangePasswordModal';
 import { useAuth, useCan } from '@/features/auth/AuthContext';
 import { useTheme } from '@/shared/hooks/useTheme';
@@ -36,7 +37,7 @@ const readView = (): FleetView => {
 };
 
 export default function AppShell({ onLogout }: { onLogout: () => void }) {
-  const { servers, loading, history, reload, refreshAll, isRefreshingAll, refreshSec, setRefreshSec, onMetricsUpdated } = useServers();
+  const { servers, loading, history, reload, refreshAll, isRefreshingAll, refreshSec, setRefreshSec, onMetricsUpdated, reorder } = useServers();
   const monitor = useMonitorSettings(servers);
   const { theme, toggleTheme } = useTheme();
   const t = useT();
@@ -165,6 +166,8 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
               onTabChange={(t) => navigate({ page: 'users', tab: t })}
               servers={servers}
             />
+          ) : route.page === 'integrations' ? (
+            <IntegrationsPage />
           ) : route.page === 'server' ? (
             managedServer ? (
               <ServerPage

@@ -390,3 +390,48 @@ export const deleteFirewallRule = async (serverId: string, ruleNumber: number): 
 
 export const toggleFirewall = async (serverId: string, enable: boolean): Promise<FirewallStatus> =>
   unwrap<FirewallStatus>(await apiFetch(`${API_BASE}/servers/${serverId}/firewall/toggle`, jsonPost({ enable })), 'Failed to toggle firewall');
+
+// ---------------- System Tuning & Swap ----------------
+export interface SwapStatus {
+  totalMB: number;
+  usedMB: number;
+  freeMB: number;
+  swappiness: number;
+  vfsCachePressure: number;
+  swapFileExists: boolean;
+  swapFilePath: string;
+  diskFreeMB: number;
+  activeSwaps: { filename: string; type: string; sizeKB: number; usedKB: number; priority: number }[];
+}
+
+export interface SystemTuningStatus {
+  swap: SwapStatus;
+  hostname: string;
+  timezone: string;
+  bbrEnabled: boolean;
+  fileMax: number;
+  somaxconn: number;
+}
+
+export interface ConfigureSwapPayload {
+  sizeMB: number;
+  swappiness?: number;
+  vfsCachePressure?: number;
+}
+
+export interface ConfigureSystemPayload {
+  hostname?: string;
+  timezone?: string;
+  bbr?: boolean;
+  optimizeLimits?: boolean;
+}
+
+export const fetchSystemTuning = async (serverId: string): Promise<SystemTuningStatus> =>
+  unwrap<SystemTuningStatus>(await apiFetch(`${API_BASE}/servers/${serverId}/system/tuning`), 'Failed to fetch system tuning');
+
+export const configureSwap = async (serverId: string, payload: ConfigureSwapPayload): Promise<{ message: string; output: string }> =>
+  unwrap<{ message: string; output: string }>(await apiFetch(`${API_BASE}/servers/${serverId}/system/swap`, jsonPost(payload)), 'Failed to configure swap');
+
+export const configureSystem = async (serverId: string, payload: ConfigureSystemPayload): Promise<{ message: string; output: string }> =>
+  unwrap<{ message: string; output: string }>(await apiFetch(`${API_BASE}/servers/${serverId}/system/tuning`, jsonPost(payload)), 'Failed to configure system');
+

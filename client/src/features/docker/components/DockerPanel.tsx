@@ -3,15 +3,38 @@ import { createPortal } from 'react-dom';
 import { cacheGet, cacheSet } from '@/shared/lib/cache';
 import {
   RefreshCw, Play, Square, RotateCw, Pause, Trash2, ScrollText, Terminal as TermIcon, Info, ChevronDown, ChevronRight,
-  Box, HardDrive, Layers, Download, X, FolderOpen, AlertTriangle
+  Box, HardDrive, Layers, Download, X, FolderOpen, AlertTriangle, Plus, Network as NetIcon, Database, ExternalLink
 } from 'lucide-react';
 import { BrandIcon } from '@/shared/ui/brand-icon';
-import { fetchDocker, inspectDocker, dockerContainerAction, dockerComposeAction, dockerPrune, dockerRemoveImage, DockerOverview, DockerContainer, DockerInspect } from '@/features/docker/api';
+import {
+  fetchDocker,
+  inspectDocker,
+  dockerContainerAction,
+  dockerComposeAction,
+  dockerPrune,
+  dockerRemoveImage,
+  dockerRemoveVolume,
+  dockerInspectVolume,
+  dockerRemoveNetwork,
+  dockerInspectNetwork,
+  DockerOverview,
+  DockerContainer,
+  DockerInspect,
+  DockerVolume,
+  DockerNetwork
+} from '@/features/docker/api';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { Skeleton, RowsSkeleton } from '@/shared/ui/skeleton';
 import { useT } from '@/shared/i18n';
 import { confirmModal } from '@/shared/ui/confirm-dialog';
+
+import { PullImageModal } from './PullImageModal';
+import { VolumeModal } from './VolumeModal';
+import { NetworkModal } from './NetworkModal';
+import { RunContainerModal } from './RunContainerModal';
+import { ComposeStudioModal } from './ComposeStudioModal';
+import { ContainerLogsModal } from './ContainerLogsModal';
 
 interface DockerPanelProps {
   serverId: string;
@@ -21,7 +44,7 @@ interface DockerPanelProps {
   onOpenFolder: (path: string) => void;
 }
 
-type View = 'containers' | 'images' | 'disk';
+type View = 'containers' | 'compose' | 'images' | 'volumes' | 'networks' | 'disk';
 
 const stateColor = (c: DockerContainer) =>
   c.health === 'unhealthy' ? 'bg-amber-500' : c.state === 'running' ? 'bg-emerald-500' : c.state === 'paused' ? 'bg-sky-500' : c.state === 'restarting' ? 'bg-amber-500 animate-pulse' : 'bg-red-500';
@@ -45,7 +68,25 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
   const [output, setOutput] = useState<{ title: string; text: string; ok: boolean } | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [inspect, setInspect] = useState<DockerInspect | null>(null);
+  const [inspectGeneric, setInspectGeneric] = useState<{ title: string; data: any } | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
+
+  // Modals state
+  const [isPullModalOpen, setIsPullModalOpen] = useState(false);
+  const [isVolumeModalOpen, setIsVolumeModalOpen] = useState(false);
+  const [isNetworkModalOpen, setIsNetworkModalOpen] = useState(false);
+  const [isRunModalOpen, setIsRunModalOpen] = useState(false);
+  const [composeModal, setComposeModal] = useState<{
+    open: boolean;
+    project?: string;
+    workingDir?: string;
+    configFile?: string;
+  }>({ open: false });
+  const [logsModal, setLogsModal] = useState<{
+    open: boolean;
+    id: string;
+    name: string;
+  }>({ open: false, id: '', name: '' });
 
   const load = async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -61,15 +102,13 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
     }
   };
 
-  // Cached data is already on screen: refresh quietly instead of showing the spinner.
   useEffect(() => { load(!!cacheGet(cacheKey)); }, [serverId]);
   useEffect(() => {
     if (!autoRefresh) return;
-    const t = setInterval(() => !document.hidden && load(true), 10000);
-    return () => clearInterval(t);
+    const interval = setInterval(() => !document.hidden && load(true), 10000);
+    return () => clearInterval(interval);
   }, [autoRefresh, serverId]);
 
-  // One runner for every mutating action: confirm, show progress, capture output, refresh.
   const run = async (key: string, title: string, fn: () => Promise<string>, confirmMsg?: string) => {
     if (confirmMsg) {
       const ok = await confirmModal({
@@ -99,7 +138,29 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
     run(`compose:${project}:${action}`, `compose ${action} · ${project}`, () => dockerComposeAction(serverId, project, dir, action, files), confirm);
 
   const openInspect = async (c: DockerContainer) => {
-    try { setInspect(await inspectDocker(serverId, c.id)); } catch (e: any) { setOutput({ title: `inspect ${c.name}`, text: e.message, ok: false }); }
+    try {
+      setInspect(await inspectDocker(serverId, c.id));
+    } catch (e: any) {
+      setOutput({ title: `inspect ${c.name}`, text: e.message, ok: false });
+    }
+  };
+
+  const openInspectVol = async (v: DockerVolume) => {
+    try {
+      const data = await dockerInspectVolume(serverId, v.name);
+      setInspectGeneric({ title: `Volume: ${v.name}`, data });
+    } catch (e: any) {
+      setOutput({ title: `inspect ${v.name}`, text: e.message, ok: false });
+    }
+  };
+
+  const openInspectNet = async (n: DockerNetwork) => {
+    try {
+      const data = await dockerInspectNetwork(serverId, n.name);
+      setInspectGeneric({ title: `Network: ${n.name}`, data });
+    } catch (e: any) {
+      setOutput({ title: `inspect ${n.name}`, text: e.message, ok: false });
+    }
   };
 
   const containers = data?.containers || [];
@@ -122,6 +183,24 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
     }
     return [...m.entries()].sort(([a], [b]) => (a === '' ? 1 : b === '' ? -1 : a.localeCompare(b)));
   }, [filtered]);
+
+  // Extract all compose projects for the compose tab
+  const composeProjects = useMemo(() => {
+    const map = new Map<string, { project: string; dir: string; files: string; containers: DockerContainer[] }>();
+    for (const c of containers) {
+      if (!c.project) continue;
+      if (!map.has(c.project)) {
+        map.set(c.project, {
+          project: c.project,
+          dir: c.workingDir,
+          files: c.configFiles,
+          containers: []
+        });
+      }
+      map.get(c.project)!.containers.push(c);
+    }
+    return [...map.values()].sort((a, b) => a.project.localeCompare(b.project));
+  }, [containers]);
 
   const running = containers.filter((c) => c.state === 'running').length;
   const unhealthy = containers.filter((c) => c.health === 'unhealthy' || c.state === 'restarting').length;
@@ -158,7 +237,7 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
 
   return (
     <div className="space-y-4">
-      {/* Summary */}
+      {/* Top Telemetry Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           [t('docker.containers'), `${running}/${containers.length}`, t('docker.subRunning')],
@@ -174,37 +253,90 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
         ))}
       </div>
 
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex rounded-md border border-[var(--border)]" role="tablist">
-          {([['containers', t('docker.containers'), Box], ['images', t('docker.images', { count: data?.images.length || 0 }), Layers], ['disk', t('docker.disk'), HardDrive]] as const).map(([v, label, Icon]) => (
+      {/* Main Navigation Toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5">
+        <div className="flex flex-wrap rounded-lg border border-[var(--border)] p-0.5 bg-[var(--muted)]/40" role="tablist">
+          {([
+            ['containers', t('docker.containers'), Box],
+            ['compose', t('docker.compose'), Layers],
+            ['images', t('docker.images', { count: data?.images.length || 0 }), Download],
+            ['volumes', t('docker.volumes', { count: data?.volumes?.length || 0 }), Database],
+            ['networks', t('docker.networks', { count: data?.networks?.length || 0 }), NetIcon],
+            ['disk', t('docker.disk'), HardDrive]
+          ] as const).map(([v, label, Icon]) => (
             <button
-              key={v} role="tab" aria-selected={view === v} onClick={() => setView(v)}
-              className={`px-2.5 py-1 text-[11px] flex items-center gap-1 ${view === v ? 'bg-[var(--primary)] text-[var(--primary-foreground)]' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'}`}
+              key={v}
+              role="tab"
+              aria-selected={view === v}
+              onClick={() => setView(v)}
+              className={`px-3 py-1 text-xs rounded-md flex items-center gap-1.5 transition-all font-medium ${
+                view === v ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm font-semibold' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+              }`}
             >
-              <Icon className="w-3 h-3" /> {label}
+              <Icon className="w-3.5 h-3.5" /> {label}
             </button>
           ))}
         </div>
-        {view === 'containers' && (
-          <>
-            <Input placeholder={t('docker.searchPlaceholder')} value={query} onChange={(e) => setQuery(e.target.value)} className="h-7 w-56 text-xs" />
-            <select value={stateFilter} onChange={(e) => setStateFilter(e.target.value as typeof stateFilter)} aria-label={t('docker.filterStatus')}
-              className="h-7 text-[11px] bg-[var(--background)] border border-[var(--border)] rounded px-1.5">
-              <option value="all">{t('docker.all')}</option>
-              <option value="running">{t('docker.running')}</option>
-              <option value="stopped">{t('docker.stopped')}</option>
-              <option value="unhealthy">{t('docker.unhealthy')}</option>
-            </select>
-          </>
-        )}
-        <label className="ml-auto flex items-center gap-1 text-[11px] text-[var(--muted-foreground)]">
-          <input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} /> {t('docker.autoRefresh')}
-        </label>
-        <Button variant="outline" size="sm" className="gap-1" onClick={() => load()} disabled={loading}>
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> {t('common.refresh')}
-        </Button>
+
+        {/* Action Buttons for current active tab */}
+        <div className="flex items-center gap-2">
+          {view === 'containers' && (
+            <Button size="sm" className="h-7 text-xs gap-1.5" onClick={() => setIsRunModalOpen(true)}>
+              <Plus className="w-3.5 h-3.5" /> {t('docker.runContainer')}
+            </Button>
+          )}
+          {view === 'compose' && (
+            <Button size="sm" className="h-7 text-xs gap-1.5" onClick={() => setComposeModal({ open: true })}>
+              <Plus className="w-3.5 h-3.5" /> {t('docker.newStack')}
+            </Button>
+          )}
+          {view === 'images' && (
+            <Button size="sm" className="h-7 text-xs gap-1.5" onClick={() => setIsPullModalOpen(true)}>
+              <Download className="w-3.5 h-3.5" /> {t('docker.pullImage')}
+            </Button>
+          )}
+          {view === 'volumes' && (
+            <Button size="sm" className="h-7 text-xs gap-1.5" onClick={() => setIsVolumeModalOpen(true)}>
+              <Plus className="w-3.5 h-3.5" /> {t('docker.createVolume')}
+            </Button>
+          )}
+          {view === 'networks' && (
+            <Button size="sm" className="h-7 text-xs gap-1.5" onClick={() => setIsNetworkModalOpen(true)}>
+              <Plus className="w-3.5 h-3.5" /> {t('docker.createNetwork')}
+            </Button>
+          )}
+          <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => load()} disabled={loading}>
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> {t('common.refresh')}
+          </Button>
+        </div>
       </div>
+
+      {/* Sub-toolbar Filters for Containers */}
+      {view === 'containers' && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            placeholder={t('docker.searchPlaceholder')}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="h-7 w-56 text-xs font-mono"
+          />
+          <select
+            value={stateFilter}
+            onChange={(e) => setStateFilter(e.target.value as typeof stateFilter)}
+            aria-label={t('docker.filterStatus')}
+            className="h-7 text-[11px] bg-[var(--background)] border border-[var(--border)] rounded px-1.5"
+          >
+            <option value="all">{t('docker.all')}</option>
+            <option value="running">{t('docker.running')}</option>
+            <option value="stopped">{t('docker.stopped')}</option>
+            <option value="unhealthy">{t('docker.unhealthy')}</option>
+          </select>
+          <label className="ml-auto flex items-center gap-1.5 text-[11px] text-[var(--muted-foreground)]">
+            <input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} />
+            {t('docker.autoRefresh')}
+          </label>
+        </div>
+      )}
 
       {output && (
         <div className={`p-3 rounded-lg border text-xs relative ${output.ok ? 'border-[var(--border)] bg-[var(--card)]' : 'border-red-500/30 bg-red-500/10'}`}>
@@ -214,7 +346,7 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
         </div>
       )}
 
-      {/* CONTAINERS */}
+      {/* TAB 1: CONTAINERS */}
       {view === 'containers' && (
         <div className="space-y-3">
           {groups.length === 0 && <p className="text-xs text-[var(--muted-foreground)] text-center py-10">{t('docker.emptyContainers')}</p>}
@@ -244,6 +376,14 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
                     <div className="ml-auto flex flex-wrap items-center gap-1">
                       <Button variant="ghost" size="sm" className="h-6 text-[10px] gap-1" onClick={() => onOpenFolder(dir)} title={t('docker.openFolder')}>
                         <FolderOpen className="w-3 h-3" /> {t('common.files')}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-6 text-[10px] gap-1"
+                        onClick={() => setComposeModal({ open: true, project, workingDir: dir, configFile: files ? files.split(',')[0] : 'docker-compose.yml' })}
+                      >
+                        <Layers className="w-3 h-3" /> Edit Stack
                       </Button>
                       {([
                         ['restart', t('docker.restart'), RotateCw, t('docker.composeRestartConfirm', { project })],
@@ -286,7 +426,10 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
                                   <span className={`w-2 h-2 rounded-full shrink-0 ${stateColor(c)}`} aria-hidden />
                                   <div className="min-w-0">
                                     <div className="font-semibold font-mono truncate">{c.name}</div>
-                                    <div className="text-[10px] text-[var(--muted-foreground)] font-mono truncate max-w-xs flex items-center gap-1" title={c.image}><BrandIcon name={c.image} className="w-3 h-3" />{c.image}</div>
+                                    <div className="text-[10px] text-[var(--muted-foreground)] font-mono truncate max-w-xs flex items-center gap-1" title={c.image}>
+                                      <BrandIcon name={c.image} className="w-3 h-3" />
+                                      {c.image}
+                                    </div>
                                   </div>
                                 </div>
                               </td>
@@ -327,7 +470,9 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
                                 ) : <span className="text-[var(--muted-foreground)]" title={c.ports}>{c.ports ? t('docker.internal') : '–'}</span>}
                               </td>
                               <td className="py-1.5 px-3 text-right whitespace-nowrap">
-                                <ActionBtn k={`${c.id}:logs`} title={t('docker.logs')} onClick={() => onLogs(c.name)}><ScrollText className="w-3 h-3" /></ActionBtn>
+                                <ActionBtn k={`${c.id}:live-logs`} title={t('docker.liveLogs')} onClick={() => setLogsModal({ open: true, id: c.id, name: c.name })}>
+                                  <ScrollText className="w-3 h-3 text-[var(--accent)]" />
+                                </ActionBtn>
                                 {isRunning && (
                                   <ActionBtn k={`${c.id}:shell`} title={t('docker.shell')} onClick={() => onShell(`docker exec -it ${c.name} sh -c 'command -v bash >/dev/null && exec bash || exec sh'`)}>
                                     <TermIcon className="w-3 h-3" />
@@ -365,7 +510,96 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
         </div>
       )}
 
-      {/* IMAGES */}
+      {/* TAB 2: COMPOSE STACKS */}
+      {view === 'compose' && (
+        <div className="space-y-3">
+          {composeProjects.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-[var(--border)] p-12 text-center text-xs text-[var(--muted-foreground)]">
+              <Layers className="mx-auto mb-2 h-8 w-8 opacity-40" />
+              <p className="font-semibold text-[var(--foreground)]">No Docker Compose stacks found</p>
+              <p className="mt-1">Deploy multi-container stacks using the "+ New Stack" button above.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {composeProjects.map((cp) => {
+                const runningCnt = cp.containers.filter((c) => c.state === 'running').length;
+                return (
+                  <div key={cp.project} className="metal flex flex-col justify-between rounded-xl border border-[var(--border)] p-4">
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-sm font-semibold flex items-center gap-2">
+                          <Layers className="w-4 h-4 text-[var(--accent)]" />
+                          {cp.project}
+                        </span>
+                        <span className="font-mono text-xs rounded-full bg-[var(--muted)] px-2 py-0.5">
+                          {runningCnt}/{cp.containers.length} active
+                        </span>
+                      </div>
+                      <div className="mt-2 space-y-1 text-xs">
+                        <p className="font-mono text-[11px] text-[var(--muted-foreground)] truncate" title={cp.dir}>
+                          Dir: {cp.dir}
+                        </p>
+                        <p className="font-mono text-[11px] text-[var(--muted-foreground)] truncate" title={cp.files}>
+                          Config: {cp.files || 'docker-compose.yml'}
+                        </p>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        {cp.containers.map((c) => (
+                          <span key={c.id} className="inline-flex items-center gap-1 rounded border border-[var(--border)] bg-[var(--muted)]/50 px-2 py-0.5 font-mono text-[10px]">
+                            <span className={`w-1.5 h-1.5 rounded-full ${stateColor(c)}`} />
+                            {c.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border)] pt-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs gap-1"
+                        onClick={() => setComposeModal({ open: true, project: cp.project, workingDir: cp.dir, configFile: cp.files ? cp.files.split(',')[0] : 'docker-compose.yml' })}
+                      >
+                        <Layers className="w-3 h-3" /> Edit Stack
+                      </Button>
+
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs gap-1"
+                          onClick={() => onOpenFolder(cp.dir)}
+                        >
+                          <FolderOpen className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs gap-1"
+                          onClick={() => compose(cp.project, cp.dir, cp.files, 'restart', t('docker.composeRestartConfirm', { project: cp.project }))}
+                        >
+                          <RotateCw className="w-3 h-3" /> Restart
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs gap-1"
+                          onClick={() => compose(cp.project, cp.dir, cp.files, 'pull-up', t('docker.composePullConfirm', { project: cp.project }))}
+                        >
+                          <Download className="w-3 h-3" /> Pull & Up
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 3: IMAGES */}
       {view === 'images' && (
         <div className="overflow-x-auto border border-[var(--border)] rounded-lg">
           <table className="w-full text-xs">
@@ -384,12 +618,17 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
                 const ref = img.repo === '<none>' ? img.id : `${img.repo}:${img.tag}`;
                 return (
                   <tr key={img.id + img.tag}>
-                    <td className="py-1.5 px-3 max-w-sm truncate" title={img.repo}><span className="inline-flex items-center gap-1.5"><BrandIcon name={img.repo} className="w-3.5 h-3.5" />{img.repo}</span></td>
+                    <td className="py-1.5 px-3 max-w-sm truncate" title={img.repo}>
+                      <span className="inline-flex items-center gap-1.5">
+                        <BrandIcon name={img.repo} className="w-3.5 h-3.5" />
+                        {img.repo}
+                      </span>
+                    </td>
                     <td className="py-1.5 px-3 text-[var(--muted-foreground)]">{img.tag}</td>
                     <td className="py-1.5 px-3 text-right">{img.size}</td>
                     <td className="py-1.5 px-3 text-[var(--muted-foreground)] font-sans">{img.createdSince}</td>
                     <td className="py-1.5 px-3 font-sans">
-                      {img.inUse ? <span className="text-emerald-600">{t('docker.inUse')}</span> : <span className="text-[var(--muted-foreground)]">{t('docker.unused')}</span>}
+                      {img.inUse ? <span className="text-emerald-600 font-medium">{t('docker.inUse')}</span> : <span className="text-[var(--muted-foreground)]">{t('docker.unused')}</span>}
                     </td>
                     <td className="py-1.5 px-3 text-right">
                       {!img.inUse && (
@@ -407,7 +646,133 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
         </div>
       )}
 
-      {/* DISK */}
+      {/* TAB 4: VOLUMES */}
+      {view === 'volumes' && (
+        <div className="overflow-x-auto border border-[var(--border)] rounded-lg">
+          <table className="w-full text-xs">
+            <thead className="bg-[var(--muted)] text-[10px] text-[var(--muted-foreground)] text-left">
+              <tr>
+                <th className="py-2 px-3">{t('docker.volumeName')}</th>
+                <th className="py-2 px-3">{t('docker.driver')}</th>
+                <th className="py-2 px-3">{t('docker.scope')}</th>
+                <th className="py-2 px-3">{t('docker.attachedContainers')}</th>
+                <th className="py-2 px-3 text-right">{t('docker.thActions')}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--border)] font-mono">
+              {(!data?.volumes || data.volumes.length === 0) ? (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-[var(--muted-foreground)]">
+                    {t('docker.emptyVolumes')}
+                  </td>
+                </tr>
+              ) : (
+                data.volumes.map((vol) => (
+                  <tr key={vol.name} className="hover:bg-[var(--muted)]/40">
+                    <td className="py-2 px-3 font-semibold text-[var(--foreground)]">{vol.name}</td>
+                    <td className="py-2 px-3 text-[var(--muted-foreground)]">{vol.driver}</td>
+                    <td className="py-2 px-3 text-[var(--muted-foreground)]">{vol.scope}</td>
+                    <td className="py-2 px-3">
+                      {vol.containers && vol.containers.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {vol.containers.map((c) => (
+                            <span key={c} className="rounded bg-[var(--muted)] px-1.5 py-0.2 text-[10px] text-emerald-500 font-medium border border-[var(--border)]">
+                              {c}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-[var(--muted-foreground)]">{t('docker.unused')}</span>
+                      )}
+                    </td>
+                    <td className="py-2 px-3 text-right whitespace-nowrap">
+                      <ActionBtn k={`vol:insp:${vol.name}`} title="Inspect volume" onClick={() => openInspectVol(vol)}>
+                        <Info className="w-3 h-3" />
+                      </ActionBtn>
+                      {!vol.inUse && (
+                        <ActionBtn
+                          k={`vol:rm:${vol.name}`}
+                          title={t('docker.removeVolume')}
+                          danger
+                          onClick={() => run(`vol:rm:${vol.name}`, `volume rm ${vol.name}`, () => dockerRemoveVolume(serverId, vol.name), t('docker.removeVolumeConfirm', { name: vol.name }))}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </ActionBtn>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* TAB 5: NETWORKS */}
+      {view === 'networks' && (
+        <div className="overflow-x-auto border border-[var(--border)] rounded-lg">
+          <table className="w-full text-xs">
+            <thead className="bg-[var(--muted)] text-[10px] text-[var(--muted-foreground)] text-left">
+              <tr>
+                <th className="py-2 px-3">{t('docker.networkName')}</th>
+                <th className="py-2 px-3">ID</th>
+                <th className="py-2 px-3">{t('docker.driver')}</th>
+                <th className="py-2 px-3">{t('docker.scope')}</th>
+                <th className="py-2 px-3">{t('docker.connectedContainers')}</th>
+                <th className="py-2 px-3 text-right">{t('docker.thActions')}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--border)] font-mono">
+              {(!data?.networks || data.networks.length === 0) ? (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-[var(--muted-foreground)]">
+                    {t('docker.emptyNetworks')}
+                  </td>
+                </tr>
+              ) : (
+                data.networks.map((net) => {
+                  const isDefault = ['bridge', 'host', 'none'].includes(net.name);
+                  return (
+                    <tr key={net.id || net.name} className="hover:bg-[var(--muted)]/40">
+                      <td className="py-2 px-3 font-semibold text-[var(--foreground)]">
+                        <div className="flex items-center gap-1.5">
+                          {net.name}
+                          {isDefault && <span className="rounded bg-[var(--muted)] px-1 py-0.2 text-[9px] text-[var(--muted-foreground)]">default</span>}
+                        </div>
+                      </td>
+                      <td className="py-2 px-3 text-[var(--muted-foreground)]">{net.id}</td>
+                      <td className="py-2 px-3 text-[var(--muted-foreground)]">{net.driver}</td>
+                      <td className="py-2 px-3 text-[var(--muted-foreground)]">{net.scope}</td>
+                      <td className="py-2 px-3">
+                        <span className="rounded bg-[var(--muted)] px-1.5 py-0.5 text-[11px] font-mono">
+                          {net.containersCount || 0}
+                        </span>
+                      </td>
+                      <td className="py-2 px-3 text-right whitespace-nowrap">
+                        <ActionBtn k={`net:insp:${net.name}`} title="Inspect network" onClick={() => openInspectNet(net)}>
+                          <Info className="w-3 h-3" />
+                        </ActionBtn>
+                        {!isDefault && (
+                          <ActionBtn
+                            k={`net:rm:${net.name}`}
+                            title={t('docker.removeNetwork')}
+                            danger
+                            onClick={() => run(`net:rm:${net.name}`, `network rm ${net.name}`, () => dockerRemoveNetwork(serverId, net.name), t('docker.removeNetworkConfirm', { name: net.name }))}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </ActionBtn>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* TAB 6: DISK */}
       {view === 'disk' && (
         <div className="space-y-4">
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -448,7 +813,7 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
         </div>
       )}
 
-      {/* INSPECT DRAWER */}
+      {/* INSPECT DRAWER FOR CONTAINERS */}
       {inspect && createPortal(
         <div className="fixed inset-0 z-[100] bg-black/60 flex justify-end fade-in" onClick={() => setInspect(null)}>
           <div
@@ -499,6 +864,73 @@ export default function DockerPanel({ serverId, serverHost, onLogs, onShell, onO
         </div>,
         document.body
       )}
+
+      {/* INSPECT DRAWER FOR GENERIC (VOLUMES & NETWORKS) */}
+      {inspectGeneric && createPortal(
+        <div className="fixed inset-0 z-[100] bg-black/60 flex justify-end fade-in" onClick={() => setInspectGeneric(null)}>
+          <div
+            className="w-full max-w-xl h-full bg-[var(--card)] text-[var(--foreground)] border-l border-[var(--border)] overflow-auto p-4 space-y-4 text-xs shadow-2xl"
+            onClick={(e) => e.stopPropagation()} role="dialog" aria-label={inspectGeneric.title}
+          >
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-sm font-mono flex-1 truncate">{inspectGeneric.title}</h3>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setInspectGeneric(null)} aria-label={t('common.close')}><X className="w-4 h-4" /></Button>
+            </div>
+            <pre className="font-mono text-[11px] whitespace-pre-wrap bg-[var(--muted)]/40 p-3 rounded-lg border border-[var(--border)] overflow-auto max-h-[85vh]">
+              {JSON.stringify(inspectGeneric.data, null, 2)}
+            </pre>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* MODALS */}
+      <PullImageModal
+        serverId={serverId}
+        isOpen={isPullModalOpen}
+        onClose={() => setIsPullModalOpen(false)}
+        onSuccess={() => load(true)}
+      />
+
+      <VolumeModal
+        serverId={serverId}
+        isOpen={isVolumeModalOpen}
+        onClose={() => setIsVolumeModalOpen(false)}
+        onSuccess={() => load(true)}
+      />
+
+      <NetworkModal
+        serverId={serverId}
+        isOpen={isNetworkModalOpen}
+        onClose={() => setIsNetworkModalOpen(false)}
+        onSuccess={() => load(true)}
+      />
+
+      <RunContainerModal
+        serverId={serverId}
+        dockerData={data}
+        isOpen={isRunModalOpen}
+        onClose={() => setIsRunModalOpen(false)}
+        onSuccess={() => load(true)}
+      />
+
+      <ComposeStudioModal
+        serverId={serverId}
+        isOpen={composeModal.open}
+        initialProject={composeModal.project}
+        initialWorkingDir={composeModal.workingDir}
+        initialConfigFile={composeModal.configFile}
+        onClose={() => setComposeModal({ open: false })}
+        onSuccess={() => load(true)}
+      />
+
+      <ContainerLogsModal
+        serverId={serverId}
+        containerId={logsModal.id}
+        containerName={logsModal.name}
+        isOpen={logsModal.open}
+        onClose={() => setLogsModal({ open: false, id: '', name: '' })}
+      />
     </div>
   );
 }

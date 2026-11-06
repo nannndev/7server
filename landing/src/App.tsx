@@ -1,33 +1,40 @@
 // 7Server landing page. Copy rules: every claim is something the product does today; nothing about
-// pricing, users, uptime or features that are not built. The figure (Fig 1) carries the core idea.
+// pricing, users, uptime or features that are not built.
 import { useEffect, useState, type ReactNode } from 'react';
 import {
-  Activity, ArrowRight, Boxes, Check, Clock, Copy, Database, FileText, Globe, HardDrive, KeyRound,
-  Lock, Moon, ShieldCheck, Sparkles, Sun, Terminal
+  Activity, ArrowLeft, ArrowRight, Boxes, Check, ChevronLeft, ChevronRight, Clock, Copy, Cpu, Database,
+  Expand, FileText, GitBranch, Globe, HardDrive, KeyRound, Languages, Layers, Lock, Moon, Server,
+  ShieldCheck, Sparkles, Sun, Terminal, X
 } from 'lucide-react';
 import { AgentlessBench } from './figure/AgentlessBench';
 import { GithubIcon } from './components/BrandIcons';
 import { ContributorsPage, SupportPage } from './pages';
+import { COPY, type Lang } from './i18n';
 
 const REPO = 'https://github.com/nannndev/7server';
-// The chosen app icon (Server Blade). JPG: the SVG variants use React-style stopColor and render without gradients.
 const LOGO = '/icons/icon-opt2-server-blade.jpg';
 
 const Logo = ({ size = 28 }: { size?: number }) => (
   <img src={LOGO} alt="" width={size} height={size} className="rounded-[22%] shadow-sm" style={{ width: size, height: size }} />
 );
 
-// ---------------------------------------------------------------- small pieces
-function useReveal(route = '') {
+// ---------------------------------------------------------------- hooks & helpers
+function useReveal(route = '', dep: unknown = '') {
   useEffect(() => {
     const els = document.querySelectorAll<HTMLElement>('.reveal');
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) { els.forEach((e) => e.setAttribute('data-shown', '')); return; }
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      els.forEach((e) => e.setAttribute('data-shown', ''));
+      return;
+    }
     const io = new IntersectionObserver((entries) => entries.forEach((e) => {
-      if (e.isIntersecting) { e.target.setAttribute('data-shown', ''); io.unobserve(e.target); }
-    }), { rootMargin: '0px 0px -8% 0px' });
+      if (e.isIntersecting) {
+        e.target.setAttribute('data-shown', '');
+        io.unobserve(e.target);
+      }
+    }), { rootMargin: '0px 0px -6% 0px' });
     els.forEach((e) => io.observe(e));
     return () => io.disconnect();
-  }, [route]);
+  }, [route, dep]);
 }
 
 function useTheme() {
@@ -39,6 +46,22 @@ function useTheme() {
     setTheme(next);
   };
   return { theme, toggle };
+}
+
+function useLang() {
+  const [lang, setLang] = useState<Lang>(() => {
+    try {
+      const saved = localStorage.getItem('7server-lang');
+      if (saved === 'id' || saved === 'en') return saved;
+    } catch { /* ignore */ }
+    return 'en';
+  });
+  const toggleLang = () => {
+    const next: Lang = lang === 'en' ? 'id' : 'en';
+    try { localStorage.setItem('7server-lang', next); } catch { /* ignore */ }
+    setLang(next);
+  };
+  return { lang, toggleLang };
 }
 
 const v = (i: number) => ({ ['--i' as string]: i });
@@ -63,7 +86,7 @@ function CopyLine({ text, label }: { text: string; label: string }) {
 }
 
 const Eyebrow = ({ children }: { children: ReactNode }) => (
-  <p className="reveal mb-3 font-mono text-[11px] uppercase tracking-[0.14em]" style={{ color: 'var(--anatomy-muted)' }}>{children}</p>
+  <p className="reveal mb-3 font-mono text-[11px] uppercase tracking-[0.14em]" style={{ color: 'var(--accent)' }}>{children}</p>
 );
 const H2 = ({ children }: { children: ReactNode }) => (
   <h2 className="reveal text-balance text-3xl font-semibold tracking-tight sm:text-4xl" style={{ color: 'var(--anatomy-strong)', ...v(1) }}>{children}</h2>
@@ -72,9 +95,84 @@ const Lead = ({ children }: { children: ReactNode }) => (
   <p className="reveal mt-4 max-w-2xl text-pretty text-base leading-relaxed sm:text-lg" style={v(2)}>{children}</p>
 );
 
+// ---------------------------------------------------------------- Lightbox Modal
+function Lightbox({
+  item,
+  onClose,
+  closeLabel,
+}: {
+  item: { src: string; title: string; route?: string } | null;
+  onClose: () => void;
+  closeLabel: string;
+}) {
+  useEffect(() => {
+    if (!item) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [item, onClose]);
+
+  if (!item) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-3 backdrop-blur-md sm:p-6"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={item.title}
+    >
+      <div
+        className="metal relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          className="flex items-center justify-between border-b px-4 py-3"
+          style={{ borderColor: 'var(--line)' }}
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex gap-1.5" aria-hidden>
+              <span className="h-2.5 w-2.5 rounded-full bg-red-500/70" />
+              <span className="h-2.5 w-2.5 rounded-full bg-amber-400/70" />
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/70" />
+            </div>
+            <span className="truncate text-sm font-semibold" style={{ color: 'var(--anatomy-strong)' }}>
+              {item.title}
+            </span>
+            {item.route && (
+              <span className="hidden rounded-md border px-2 py-0.5 font-mono text-[11px] sm:inline-block" style={{ borderColor: 'var(--line)', color: 'var(--anatomy-muted)' }}>
+                {item.route}
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={closeLabel}
+            className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-[var(--line)]"
+            style={{ borderColor: 'var(--line)', color: 'var(--anatomy-strong)' }}
+          >
+            <X className="h-3.5 w-3.5" /> Esc
+          </button>
+        </div>
+        <div className="overflow-auto bg-black/50 p-2 sm:p-4">
+          <img
+            src={item.src}
+            alt={item.title}
+            className="mx-auto max-h-[80vh] w-auto rounded-lg object-contain shadow-2xl"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- sections
-function Nav() {
+function Nav({ lang, toggleLang }: { lang: Lang; toggleLang: () => void }) {
   const { theme, toggle } = useTheme();
+  const t = COPY[lang].nav;
   return (
     <header className="sticky top-0 z-40 border-b backdrop-blur-md" style={{ borderColor: 'var(--line)', background: 'color-mix(in srgb, var(--anatomy-page) 82%, transparent)' }}>
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
@@ -82,14 +180,44 @@ function Nav() {
           <Logo />
           7Server
         </a>
-        <nav className="hidden items-center gap-7 text-sm md:flex" aria-label="Sections">
-          {[['#how', 'How it works'], ['#features', 'Features'], ['#ai', 'AI'], ['#security', 'Security'], ['http://localhost:3002', 'Docs'], ['#start', 'Get started']].map(([href, label]) => (
-            <a key={href} href={href} target={href.startsWith('http') ? '_blank' : undefined} rel={href.startsWith('http') ? 'noreferrer' : undefined} className="transition-colors hover:text-[var(--anatomy-strong)]">{label}</a>
+        <nav className="hidden items-center gap-6 text-sm md:flex" aria-label="Sections">
+          {[
+            ['#how', t.how],
+            ['#showcase', t.showcase],
+            ['#features', t.features],
+            ['#ai', t.ai],
+            ['#security', t.security],
+            ['http://localhost:3002', t.docs],
+            ['#start', t.start],
+          ].map(([href, label]) => (
+            <a
+              key={href}
+              href={href}
+              target={href.startsWith('http') ? '_blank' : undefined}
+              rel={href.startsWith('http') ? 'noreferrer' : undefined}
+              className="transition-colors hover:text-[var(--anatomy-strong)]"
+            >
+              {label}
+            </a>
           ))}
         </nav>
         <div className="flex items-center gap-1.5">
-          <button type="button" onClick={toggle} aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-            className="relative grid h-9 w-9 place-items-center rounded-lg transition-colors hover:bg-[var(--line)]">
+          <button
+            type="button"
+            onClick={toggleLang}
+            aria-label={lang === 'en' ? 'Switch language to Bahasa Indonesia' : 'Switch language to English'}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border px-2.5 font-mono text-xs font-medium transition-colors hover:bg-[var(--line)]"
+            style={{ borderColor: 'var(--line)', color: 'var(--anatomy-strong)' }}
+          >
+            <Languages className="h-3.5 w-3.5" style={{ color: 'var(--accent)' }} />
+            <span>{lang.toUpperCase()}</span>
+          </button>
+          <button
+            type="button"
+            onClick={toggle}
+            aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            className="relative grid h-9 w-9 place-items-center rounded-lg transition-colors hover:bg-[var(--line)]"
+          >
             <Sun className="theme-icon absolute h-4 w-4" data-off={theme === 'dark' ? undefined : ''} />
             <Moon className="theme-icon absolute h-4 w-4" data-off={theme === 'dark' ? '' : undefined} />
           </button>
@@ -102,78 +230,569 @@ function Nav() {
   );
 }
 
-function Hero() {
+function Hero({
+  lang,
+  onZoom,
+}: {
+  lang: Lang;
+  onZoom: (item: { src: string; title: string; route?: string }) => void;
+}) {
+  const t = COPY[lang].hero;
+  const [activeTab, setActiveTab] = useState(0);
+  const currentPreview = t.heroTabs[activeTab] || t.heroTabs[0];
+
   return (
-    <section id="top" className="relative isolate mx-auto max-w-6xl px-4 pb-12 pt-16 sm:px-6 sm:pt-24">
+    <section id="top" className="relative isolate mx-auto max-w-6xl px-4 pb-12 pt-14 sm:px-6 sm:pt-20">
       <div className="carbon" aria-hidden />
       <div className="max-w-3xl">
         <p className="metal reveal mb-5 inline-flex items-center gap-2 rounded-full px-3 py-1 font-mono text-[11px]">
-          <span className="led breathe h-1.5 w-1.5 rounded-full" /> self-hosted · open source · agentless
+          <span className="led breathe h-1.5 w-1.5 rounded-full" /> {t.badge}
         </p>
         <h1 className="silver-text reveal text-balance text-4xl font-semibold leading-[1.05] tracking-tight sm:text-6xl" style={{ color: 'var(--anatomy-strong)', ...v(1) }}>
-          Run every VPS from one dashboard. Install nothing on them.
+          {t.title}
         </h1>
         <p className="reveal mt-6 max-w-2xl text-pretty text-lg leading-relaxed" style={v(2)}>
-          7Server connects to your servers over the SSH access you already have. Watch CPU, RAM and disk, open a terminal in the browser,
-          manage Docker, Nginx, cron, SSL, backups and databases, and ask an AI copilot that checks the server itself and asks before it changes anything.
+          {t.lead}
         </p>
-        <div className="reveal mt-8 flex flex-col gap-3 sm:flex-row" style={v(3)}>
+        <div className="reveal mt-8 flex flex-col gap-3 sm:flex-row sm:items-center" style={v(3)}>
           <a href="#start" className="btn-silver inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold">
-            Get started <ArrowRight className="h-4 w-4" />
+            {t.ctaPrimary} <ArrowRight className="h-4 w-4" />
           </a>
-          <a href="#how" className="metal inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold"
-            style={{ color: 'var(--anatomy-strong)' }}>
-            See how it works
+          <a
+            href="#how"
+            className="metal inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold"
+            style={{ color: 'var(--anatomy-strong)' }}
+          >
+            {t.ctaSecondary}
           </a>
+          <div className="sm:ml-2 sm:flex-1 max-w-xs">
+            <CopyLine text="npx sevenserver" label={t.quickInstall} />
+          </div>
         </div>
       </div>
-      <div id="how" className="core-glow reveal mt-14" style={v(4)}>
-        <AgentlessBench />
+
+      {/* Interactive Hero Dashboard Frame */}
+      <div className="core-glow reveal mt-12" style={v(4)}>
+        <div className="metal overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--line)' }}>
+          {/* Window Chrome + Quick View Switcher */}
+          <div
+            className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-2.5"
+            style={{ borderColor: 'var(--line)', background: 'color-mix(in srgb, var(--anatomy-page) 55%, transparent)' }}
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex gap-1.5" aria-hidden>
+                <span className="h-2.5 w-2.5 rounded-full bg-zinc-600/80" />
+                <span className="h-2.5 w-2.5 rounded-full bg-zinc-600/80" />
+                <span className="h-2.5 w-2.5 rounded-full bg-zinc-600/80" />
+              </div>
+              <div className="well hidden items-center gap-2 rounded-lg px-3 py-1 font-mono text-[11px] sm:flex">
+                <span className="led h-1.5 w-1.5 rounded-full" />
+                <span style={{ color: 'var(--anatomy-muted)' }}>127.0.0.1:5001</span>
+                <span style={{ color: 'var(--line-strong)' }}>/</span>
+                <span style={{ color: 'var(--anatomy-strong)' }}>{currentPreview.route}</span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1" role="tablist" aria-label="Dashboard preview tabs">
+              {t.heroTabs.map((tab, idx) => {
+                const selected = idx === activeTab;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    onClick={() => setActiveTab(idx)}
+                    className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-all ${
+                      selected ? 'btn-silver font-semibold' : 'hover:bg-[var(--line)] hover:text-[var(--anatomy-strong)]'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Screenshot Canvas */}
+          <div
+            className="group relative cursor-zoom-in overflow-hidden bg-black/40"
+            onClick={() => onZoom({ src: currentPreview.image, title: currentPreview.label, route: currentPreview.route })}
+          >
+            <img
+              key={currentPreview.image}
+              src={currentPreview.image}
+              alt={currentPreview.label}
+              className="block w-full object-cover transition-transform duration-500 group-hover:scale-[1.005]"
+              loading="eager"
+            />
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onZoom({ src: currentPreview.image, title: currentPreview.label, route: currentPreview.route });
+              }}
+              className="metal absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium opacity-90 shadow-lg transition-opacity group-hover:opacity-100"
+              style={{ color: 'var(--anatomy-strong)' }}
+            >
+              <Expand className="h-3.5 w-3.5" style={{ color: 'var(--accent)' }} />
+              {COPY[lang].showcase.zoomHint}
+            </button>
+          </div>
+        </div>
+        <p className="mt-3 text-center font-mono text-xs" style={{ color: 'var(--anatomy-muted)' }}>
+          {t.previewCaption}
+        </p>
       </div>
     </section>
   );
 }
 
-function HowItWorks() {
-  const steps = [
-    { n: '01', title: 'Add a server', body: 'Host, user and a password or private key. 7Server tests the connection before saving and stores the credential encrypted (AES-256-GCM).' },
-    { n: '02', title: 'It reads over SSH', body: 'Metrics, processes, services, containers and logs come from ordinary commands over SSH. No agent, no daemon, no extra port on the server.' },
-    { n: '03', title: 'You act from one place', body: 'Restart a service, edit a cron job, renew a certificate, query a database or run one command on many servers at once, with the output streamed back.' }
-  ];
+// ---------------------------------------------------------------- How It Works (Interactive Architecture & Step Studio)
+function HowItWorks({
+  lang,
+  onZoom,
+}: {
+  lang: Lang;
+  onZoom: (item: { src: string; title: string; route?: string }) => void;
+}) {
+  const t = COPY[lang].how;
+  const [activeStep, setActiveStep] = useState(0);
+  const [mode, setMode] = useState<'workflow' | 'bench'>('workflow');
+  const step = t.steps[activeStep] || t.steps[0];
+
+  const archIcons = [Server, KeyRound, Cpu];
+
   return (
-    <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-      <Eyebrow>How it works</Eyebrow>
-      <H2>Your servers stay as they are.</H2>
-      <Lead>If you can SSH into it, 7Server can manage it. Remove it from the dashboard and nothing is left behind on the server.</Lead>
-      <ol className="metal mt-12 grid divide-y overflow-hidden rounded-2xl md:grid-cols-3 md:divide-x md:divide-y-0" style={{ ['--tw-divide-opacity' as string]: 1, borderColor: 'var(--line)' }}>
-        {steps.map((s, i) => (
-          <li key={s.n} className="reveal border-[var(--line)] p-6 sm:p-7" style={v(i)}>
-            <span className="font-mono text-xs" style={{ color: 'var(--accent)' }}>{s.n}</span>
-            <h3 className="mt-3 text-lg font-semibold" style={{ color: 'var(--anatomy-strong)' }}>{s.title}</h3>
-            <p className="mt-2 text-[15px] leading-relaxed">{s.body}</p>
-          </li>
-        ))}
-      </ol>
+    <section id="how" className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
+      <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
+        <div>
+          <Eyebrow>{t.eyebrow}</Eyebrow>
+          <H2>{t.title}</H2>
+          <Lead>{t.lead}</Lead>
+        </div>
+        <div
+          className="reveal inline-flex self-start rounded-xl border p-1"
+          style={{ borderColor: 'var(--line)' }}
+          role="tablist"
+          aria-label="How it works view mode"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === 'workflow'}
+            onClick={() => setMode('workflow')}
+            className={`rounded-lg px-3.5 py-1.5 text-xs font-medium transition-all ${
+              mode === 'workflow' ? 'btn-silver font-semibold' : 'hover:text-[var(--anatomy-strong)]'
+            }`}
+          >
+            {t.modeWorkflow}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === 'bench'}
+            onClick={() => setMode('bench')}
+            className={`rounded-lg px-3.5 py-1.5 text-xs font-medium transition-all ${
+              mode === 'bench' ? 'btn-silver font-semibold' : 'hover:text-[var(--anatomy-strong)]'
+            }`}
+          >
+            {t.modeBench}
+          </button>
+        </div>
+      </div>
+
+      {/* 3-Node Architecture Pipeline Bar */}
+      <div className="metal reveal mt-10 rounded-2xl p-4 sm:p-6">
+        <div className="grid gap-4 md:grid-cols-3">
+          {t.archNodes.map((node, i) => {
+            const Icon = archIcons[i] || Server;
+            return (
+              <div key={node.step} className="relative flex flex-col justify-between rounded-xl border p-4" style={{ borderColor: 'var(--line)', background: 'color-mix(in srgb, var(--anatomy-page) 45%, transparent)' }}>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-2 font-mono text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--accent)' }}>
+                    <span className="led h-1.5 w-1.5 rounded-full" />
+                    {node.step}
+                  </span>
+                  <Icon className="h-4 w-4" style={{ color: 'var(--anatomy-muted)' }} />
+                </div>
+                <div className="mt-3">
+                  <h3 className="text-sm font-semibold" style={{ color: 'var(--anatomy-strong)' }}>{node.title}</h3>
+                  <p className="mt-1 text-xs leading-relaxed">{node.sub}</p>
+                </div>
+                <div className="well mt-3 rounded-lg px-2.5 py-1.5 font-mono text-[11px]" style={{ color: 'var(--anatomy-strong)' }}>
+                  {node.meta}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {mode === 'bench' ? (
+        <div className="core-glow mt-8">
+          <AgentlessBench />
+        </div>
+      ) : (
+        /* Interactive 4-Step Walkthrough Studio */
+        <div className="mt-8 grid gap-6 lg:grid-cols-12 lg:items-start">
+          {/* Left Column: 4 Interactive Steps */}
+          <div className="flex flex-col gap-3 lg:col-span-5" role="tablist" aria-label="How 7Server works steps">
+            {t.steps.map((s, idx) => {
+              const active = idx === activeStep;
+              return (
+                <button
+                  key={s.n}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setActiveStep(idx)}
+                  className={`w-full rounded-2xl p-5 text-left transition-all ${
+                    active ? 'metal ring-1 ring-[var(--accent)]/50' : 'well opacity-75 hover:opacity-100'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-xs font-semibold" style={{ color: 'var(--accent)' }}>
+                      STEP {s.n} · {s.badge}
+                    </span>
+                    {active && <span className="led h-2 w-2 rounded-full" />}
+                  </div>
+                  <h3 className="mt-2 text-base font-semibold" style={{ color: 'var(--anatomy-strong)' }}>
+                    {s.title}
+                  </h3>
+                  <p className="mt-1.5 text-sm leading-relaxed">
+                    {s.summary}
+                  </p>
+                  {active && (
+                    <ul className="mt-3.5 space-y-1.5 border-t pt-3 text-xs" style={{ borderColor: 'var(--line)' }}>
+                      {s.details.map((d) => (
+                        <li key={d} className="flex items-start gap-2">
+                          <Check className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: 'var(--accent)' }} />
+                          <span style={{ color: 'var(--anatomy-strong)' }}>{d}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Right Column: Live SSH Inspector + Corresponding Dashboard Screenshot */}
+          <div className="metal flex flex-col overflow-hidden rounded-2xl lg:col-span-7">
+            {/* Top Bar */}
+            <div
+              className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3"
+              style={{ borderColor: 'var(--line)', background: 'color-mix(in srgb, var(--anatomy-page) 55%, transparent)' }}
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="rounded-md px-2 py-0.5 font-mono text-xs font-semibold" style={{ background: 'color-mix(in srgb, var(--accent) 18%, transparent)', color: 'var(--accent)' }}>
+                  {step.n}
+                </span>
+                <span className="text-sm font-semibold" style={{ color: 'var(--anatomy-strong)' }}>
+                  {step.screenshotTitle}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setActiveStep((prev) => (prev - 1 + t.steps.length) % t.steps.length)}
+                  aria-label="Previous step"
+                  className="rounded-lg border p-1.5 transition-colors hover:bg-[var(--line)]"
+                  style={{ borderColor: 'var(--line)', color: 'var(--anatomy-strong)' }}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <span className="px-1 font-mono text-xs" style={{ color: 'var(--anatomy-muted)' }}>
+                  {activeStep + 1} / {t.steps.length}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setActiveStep((prev) => (prev + 1) % t.steps.length)}
+                  aria-label="Next step"
+                  className="rounded-lg border p-1.5 transition-colors hover:bg-[var(--line)]"
+                  style={{ borderColor: 'var(--line)', color: 'var(--anatomy-strong)' }}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Screenshot View */}
+            <div
+              className="group relative cursor-zoom-in overflow-hidden border-b bg-black/40"
+              style={{ borderColor: 'var(--line)' }}
+              onClick={() => onZoom({ src: step.screenshot, title: step.screenshotTitle, route: `Step ${step.n} · ${step.badge}` })}
+            >
+              <img
+                key={step.screenshot}
+                src={step.screenshot}
+                alt={step.screenshotTitle}
+                className="block w-full object-cover transition-transform duration-500 group-hover:scale-[1.01]"
+                loading="lazy"
+              />
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onZoom({ src: step.screenshot, title: step.screenshotTitle, route: `Step ${step.n} · ${step.badge}` });
+                }}
+                className="metal absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium opacity-90 shadow-md transition-opacity group-hover:opacity-100"
+                style={{ color: 'var(--anatomy-strong)' }}
+              >
+                <Expand className="h-3.5 w-3.5" style={{ color: 'var(--accent)' }} />
+                {t.viewFullScreen}
+              </button>
+            </div>
+
+            {/* Under the Hood SSH / Command Inspector */}
+            <div className="p-4 sm:p-5">
+              <div className="mb-2.5 flex items-center justify-between">
+                <span className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-wider" style={{ color: 'var(--anatomy-muted)' }}>
+                  <Terminal className="h-3.5 w-3.5" style={{ color: 'var(--accent)' }} />
+                  {t.underTheHood} — {step.sshLabel}
+                </span>
+              </div>
+              <div className="well space-y-2.5 rounded-xl p-3.5 font-mono text-xs">
+                {step.sshCommands.map((item) => (
+                  <div key={item.cmd}>
+                    <div className="flex items-center gap-2" style={{ color: 'var(--anatomy-strong)' }}>
+                      <span style={{ color: 'var(--accent)' }}>$</span>
+                      <span className="break-all font-medium">{item.cmd}</span>
+                    </div>
+                    <pre className="mt-1 overflow-x-auto whitespace-pre-wrap pl-4 text-[11px] leading-relaxed" style={{ color: 'var(--anatomy-muted)' }}>
+                      {item.out}
+                    </pre>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
 
-function Features() {
-  const items: { icon: typeof Activity; title: string; body: string }[] = [
-    { icon: Activity, title: 'Fleet overview', body: 'CPU, RAM, disk and uptime for every server, with history charts, a rack and topology view, and alerts sent to Discord.' },
-    { icon: Terminal, title: 'Browser terminal', body: 'A full xterm.js shell over WebSocket. htop, vim and nano work, and the window resizes with the session.' },
+// ---------------------------------------------------------------- Product Screenshot Showcase
+function ProductShowcase({
+  lang,
+  onZoom,
+}: {
+  lang: Lang;
+  onZoom: (item: { src: string; title: string; route?: string }) => void;
+}) {
+  const t = COPY[lang].showcase;
+  const [catIdx, setCatIdx] = useState(0);
+  const [screenIdx, setScreenIdx] = useState(0);
+
+  const category = t.categories[catIdx] || t.categories[0];
+  const screen = category.screens[screenIdx] || category.screens[0];
+
+  const selectCategory = (idx: number) => {
+    setCatIdx(idx);
+    setScreenIdx(0);
+  };
+
+  const stepScreen = (dir: -1 | 1) => {
+    const nextScreenIdx = screenIdx + dir;
+    if (nextScreenIdx >= 0 && nextScreenIdx < category.screens.length) {
+      setScreenIdx(nextScreenIdx);
+    } else if (dir === 1) {
+      const nextCat = (catIdx + 1) % t.categories.length;
+      setCatIdx(nextCat);
+      setScreenIdx(0);
+    } else {
+      const prevCat = (catIdx - 1 + t.categories.length) % t.categories.length;
+      setCatIdx(prevCat);
+      setScreenIdx(t.categories[prevCat].screens.length - 1);
+    }
+  };
+
+  const catIcons = [Layers, Activity, Boxes, Terminal, Sparkles, ShieldCheck];
+
+  return (
+    <section id="showcase" className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
+      <Eyebrow>{t.eyebrow}</Eyebrow>
+      <H2>{t.title}</H2>
+      <Lead>{t.lead}</Lead>
+
+      {/* Top Category Bar */}
+      <div className="reveal mt-8 flex flex-wrap gap-2" role="tablist" aria-label="Screenshot categories">
+        {t.categories.map((cat, idx) => {
+          const Icon = catIcons[idx] || Layers;
+          const active = idx === catIdx;
+          return (
+            <button
+              key={cat.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => selectCategory(idx)}
+              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all ${
+                active ? 'btn-silver font-semibold' : 'metal hover:text-[var(--anatomy-strong)]'
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              <span>{cat.label}</span>
+              <span className="rounded-full px-1.5 py-0.2 font-mono text-[11px] opacity-75">
+                {cat.screens.length}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Main Showcase Stage */}
+      <div className="metal reveal mt-6 overflow-hidden rounded-2xl">
+        {/* Stage Header: Breadcrumb + Sub-screen Tabs */}
+        <div
+          className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 sm:px-6"
+          style={{ borderColor: 'var(--line)', background: 'color-mix(in srgb, var(--anatomy-page) 55%, transparent)' }}
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex gap-1.5" aria-hidden>
+              <span className="h-2.5 w-2.5 rounded-full bg-zinc-600/80" />
+              <span className="h-2.5 w-2.5 rounded-full bg-zinc-600/80" />
+              <span className="h-2.5 w-2.5 rounded-full bg-zinc-600/80" />
+            </div>
+            <span className="truncate font-mono text-xs" style={{ color: 'var(--anatomy-strong)' }}>
+              {screen.route}
+            </span>
+          </div>
+
+          {category.screens.length > 1 && (
+            <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Sub-views">
+              {category.screens.map((sc, sIdx) => {
+                const isSelected = sIdx === screenIdx;
+                return (
+                  <button
+                    key={sc.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={isSelected}
+                    onClick={() => setScreenIdx(sIdx)}
+                    className={`rounded-lg px-3 py-1 text-xs font-medium transition-all ${
+                      isSelected
+                        ? 'btn-silver font-semibold'
+                        : 'well opacity-80 hover:opacity-100 hover:text-[var(--anatomy-strong)]'
+                    }`}
+                  >
+                    {sc.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Screenshot Viewport */}
+        <div
+          className="group relative cursor-zoom-in overflow-hidden border-b bg-black/40"
+          style={{ borderColor: 'var(--line)' }}
+          onClick={() => onZoom({ src: screen.image, title: screen.title, route: screen.route })}
+        >
+          <img
+            key={screen.image}
+            src={screen.image}
+            alt={screen.title}
+            className="block w-full object-cover transition-transform duration-500 group-hover:scale-[1.006]"
+            loading="lazy"
+          />
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onZoom({ src: screen.image, title: screen.title, route: screen.route });
+            }}
+            className="metal absolute bottom-4 right-4 inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium opacity-90 shadow-lg transition-opacity group-hover:opacity-100"
+            style={{ color: 'var(--anatomy-strong)' }}
+          >
+            <Expand className="h-3.5 w-3.5" style={{ color: 'var(--accent)' }} />
+            {t.zoomHint}
+          </button>
+        </div>
+
+        {/* Stage Footer: Caption, Feature Pills & Prev/Next Controls */}
+        <div className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center sm:px-6">
+          <div className="max-w-2xl">
+            <h3 className="text-lg font-semibold" style={{ color: 'var(--anatomy-strong)' }}>
+              {screen.title}
+            </h3>
+            <p className="mt-1 text-sm leading-relaxed">
+              {screen.caption}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {screen.highlights.map((h) => (
+                <span
+                  key={h}
+                  className="well inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-mono text-[11px]"
+                  style={{ color: 'var(--anatomy-strong)' }}
+                >
+                  <span className="led h-1.5 w-1.5 rounded-full" />
+                  {h}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-end sm:self-center">
+            <button
+              type="button"
+              onClick={() => stepScreen(-1)}
+              aria-label="Previous screenshot"
+              className="metal inline-flex h-10 w-10 items-center justify-center rounded-xl transition-colors hover:text-[var(--anatomy-strong)]"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => stepScreen(1)}
+              aria-label="Next screenshot"
+              className="metal inline-flex h-10 w-10 items-center justify-center rounded-xl transition-colors hover:text-[var(--anatomy-strong)]"
+            >
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Features({ lang }: { lang: Lang }) {
+  const itemsEn: { icon: typeof Activity; title: string; body: string }[] = [
+    { icon: Activity, title: 'Fleet overview & 3D views', body: 'CPU, RAM, disk and uptime for every server, with history charts, a 3D rack, 3D resource matrix, topology view, and alerts sent to Discord.' },
+    { icon: GitBranch, title: 'Git auto-discovery & deploy', body: 'Connect a GitHub Personal Access Token to browse repositories, auto-detect frameworks and monorepo root folders, and deploy with live streaming logs.' },
+    { icon: Terminal, title: 'Browser terminal', body: 'A full multi-tab xterm.js shell over WebSocket with command shortcuts. htop, vim and nano work, and the window resizes with the session.' },
     { icon: Boxes, title: 'Docker and Compose', body: 'See containers, images and stacks; start, stop and restart them; read logs; act on a whole Compose project.' },
-    { icon: Globe, title: 'Web apps, Nginx and SSL', body: 'Which domain points to which port, Nginx sites, listening ports, and Let’s Encrypt certificates with renewal.' },
+    { icon: Globe, title: 'Web apps, Nginx and SSL', body: 'Which domain points to which port, Nginx sites with nginx -t syntax verification, listening ports, and Let’s Encrypt certificates.' },
     { icon: Database, title: 'Database workbench', body: 'PostgreSQL, MySQL, MongoDB, Redis and SQLite, including databases inside containers. Browse tables, run queries, see the ER diagram.' },
     { icon: HardDrive, title: 'Backups', body: 'Database and file backups on demand or on a schedule, with retention, download and restore.' },
-    { icon: Clock, title: 'Cron, services and processes', body: 'Edit crontabs, control systemd units and PM2 apps, and find the process that is eating the CPU.' },
+    { icon: Clock, title: 'Cron, services and processes', body: 'Edit crontabs with visual presets, control systemd units and PM2 apps, and find the process that is eating the CPU.' },
     { icon: FileText, title: 'Files and logs', body: 'Browse and edit files over SFTP, and search system and app logs without leaving the dashboard.' },
-    { icon: KeyRound, title: 'SSH keys, hardening and firewall', body: 'Manage authorized keys, check root login and password auth, and open or close UFW ports. It refuses to remove the last rule that keeps SSH open.' }
+    { icon: KeyRound, title: 'SSH keys, hardening and firewall', body: 'Manage authorized keys, check root login and password auth, and open or close UFW ports. It refuses to remove the last rule that keeps SSH open.' },
   ];
+
+  const itemsId: { icon: typeof Activity; title: string; body: string }[] = [
+    { icon: Activity, title: 'Ringkasan Fleet & Visual 3D', body: 'Pantau CPU, RAM, disk, dan uptime setiap server lengkap dengan grafik riwayat, rak 3D, matriks 3D, peta topologi, dan notifikasi Discord.' },
+    { icon: GitBranch, title: 'Auto-Discovery & Deploy Git', body: 'Hubungkan GitHub Personal Access Token untuk memilih repositori, deteksi otomatis framework & subfolder monorepo, lalu deploy dengan log real-time.' },
+    { icon: Terminal, title: 'Terminal Browser Multi-Tab', body: 'Shell xterm.js penuh melalui WebSocket dengan tombol pintasan perintah. htop, vim, dan nano berjalan lancar dan responsif.' },
+    { icon: Boxes, title: 'Docker dan Compose', body: 'Pantau container, image, dan stack; start, stop, dan restart; baca log langsung; atau kelola seluruh proyek Docker Compose.' },
+    { icon: Globe, title: 'Aplikasi Web, Nginx & SSL', body: 'Lihat pemetaan domain ke port lokal, konfigurasi Nginx lengkap dengan tes sintaks nginx -t, serta sertifikasi SSL Let’s Encrypt.' },
+    { icon: Database, title: 'Database Workbench', body: 'Mendukung PostgreSQL, MySQL, MongoDB, Redis, dan SQLite—termasuk database di dalam container Docker. Jelajahi tabel, jalankan query, dan lihat diagram ER.' },
+    { icon: HardDrive, title: 'Backup Terjadwal', body: 'Backup database dan direktori file secara instan atau terjadwal, lengkap dengan retensi otomatis, unduh, dan restore.' },
+    { icon: Clock, title: 'Cron, Systemd & Proses PM2', body: 'Edit jadwal crontab dengan preset visual, kontrol unit systemd maupun worker PM2, serta lacak proses yang membebani CPU.' },
+    { icon: FileText, title: 'Manajer File SFTP & Log', body: 'Jelajahi dan edit file langsung lewat jalur SFTP, serta cari log sistem maupun aplikasi tanpa meninggalkan browser.' },
+    { icon: KeyRound, title: 'Kunci SSH, Hardening & Firewall', body: 'Kelola authorized_keys, audit konfigurasi login root, dan atur port UFW dengan proteksi anti-terkunci dari port SSH.' },
+  ];
+
+  const items = lang === 'id' ? itemsId : itemsEn;
+
   return (
     <section id="features" className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-      <Eyebrow>Features</Eyebrow>
-      <H2>The day-to-day work of running servers, in one place.</H2>
+      <Eyebrow>{lang === 'id' ? 'Fitur Lengkap' : 'Features'}</Eyebrow>
+      <H2>{lang === 'id' ? 'Seluruh operasional harian server Anda dalam satu tempat.' : 'The day-to-day work of running servers, in one place.'}</H2>
       <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {items.map(({ icon: Icon, title, body }, i) => (
           <article key={title} className="metal reveal rounded-2xl p-6" style={v(i % 3)}>
@@ -187,24 +806,34 @@ function Features() {
   );
 }
 
-function AI() {
+function AI({ lang }: { lang: Lang }) {
+  const bullets = lang === 'id'
+    ? [
+        ['Gunakan langganan yang sudah ada', 'Login dengan akun Claude, ChatGPT, GitHub Copilot, atau Gemini, atau masukkan API key biasa. Tanpa tagihan AI tambahan.'],
+        ['Meminta izin sebelum bertindak', 'Perintah pengecekan (read-only) berjalan otomatis. Restart, edit, dan hapus wajib mendapat persetujuan Anda.'],
+        ['Memisahkan data log dari instruksi', 'Output server diisolasi agar teks berbahaya di dalam log tidak dapat membajak instruksi AI (proteksi prompt injection).'],
+        ['Satu kunci universal untuk coding tools', 'AI Gateway yang sama memberikan satu kunci API 7Server untuk Claude Code, Cursor, dan CLI Anda.'],
+      ]
+    : [
+        ['Uses your subscriptions', 'Log in with Claude, ChatGPT, GitHub Copilot or Gemini, or add an API key. No separate AI bill.'],
+        ['Asks before it acts', 'Read-only commands run on their own. Restarts, edits and deletes need approval, and risky ones a second confirmation.'],
+        ['Treats logs as data', 'Server output is fenced off from the instructions, and text that tries to steer the AI turns automatic runs off.'],
+        ['One key for your tools', 'The same gateway gives Claude Code, Cursor and other tools one 7Server key, usable only from your own servers.'],
+      ];
+
   return (
     <section id="ai" className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
       <div className="grid gap-12 lg:grid-cols-2 lg:items-start">
         <div>
-          <Eyebrow>AI copilot and gateway</Eyebrow>
-          <H2>An assistant that looks before it answers.</H2>
+          <Eyebrow>{lang === 'id' ? 'AI Copilot & Universal Gateway' : 'AI copilot and gateway'}</Eyebrow>
+          <H2>{lang === 'id' ? 'Asisten cerdas yang memeriksa data nyata sebelum menjawab.' : 'An assistant that looks before it answers.'}</H2>
           <Lead>
-            Ask why a server is slow and the copilot runs the read-only checks itself (status, logs, disk, containers), reads the output and explains what it found.
-            Anything that would change the server waits for your click.
+            {lang === 'id'
+              ? 'Tanyakan mengapa server melambat dan Copilot akan menjalankan pengecekan read-only sendiri (status, log, disk, container), membaca hasilnya, lalu menjelaskan penyebabnya. Setiap tindakan yang mengubah server akan menunggu klik persetujuan Anda.'
+              : 'Ask why a server is slow and the copilot runs the read-only checks itself (status, logs, disk, containers), reads the output and explains what it found. Anything that would change the server waits for your click.'}
           </Lead>
           <ul className="mt-8 space-y-4 text-[15px]">
-            {[
-              ['Uses your subscriptions', 'Log in with Claude, ChatGPT, GitHub Copilot or Gemini, or add an API key. No separate AI bill.'],
-              ['Asks before it acts', 'Read-only commands run on their own. Restarts, edits and deletes need approval, and risky ones a second confirmation.'],
-              ['Treats logs as data', 'Server output is fenced off from the instructions, and text that tries to steer the AI turns automatic runs off.'],
-              ['One key for your tools', 'The same gateway gives Claude Code, Cursor and other tools one 7Server key, usable only from your own servers.']
-            ].map(([t, b], i) => (
+            {bullets.map(([t, b], i) => (
               <li key={t} className="reveal flex gap-3" style={v(i)}>
                 <Check className="mt-1 h-4 w-4 shrink-0" style={{ color: 'var(--accent)' }} aria-hidden />
                 <span><strong className="font-semibold" style={{ color: 'var(--anatomy-strong)' }}>{t}.</strong> {b}</span>
@@ -239,17 +868,28 @@ function AI() {
   );
 }
 
-function Security() {
-  const items: { icon: typeof Lock; title: string; body: string }[] = [
-    { icon: Lock, title: 'Encrypted at rest', body: 'Everything lives in one SQLite file. SSH credentials, AI tokens and webhooks inside it are encrypted with AES-256-GCM, with the key kept in a separate file on your machine.' },
-    { icon: ShieldCheck, title: 'Users and roles', body: 'Each person gets an account: Admin, Operator or Viewer, optionally limited to some servers. Sessions can be revoked, and every change is written to an audit log with who did it.' },
-    { icon: Sparkles, title: 'Gateway stays inside', body: 'The AI gateway only answers this machine, private networks and the servers you registered. Everyone else gets 403.' }
-  ];
+function Security({ lang }: { lang: Lang }) {
+  const items: { icon: typeof Lock; title: string; body: string }[] = lang === 'id'
+    ? [
+        { icon: Lock, title: 'Terenkripsi Penuh (At-Rest)', body: 'Seluruh data tersimpan dalam satu file SQLite lokal. Kredensial SSH, token Git/AI, dan webhook dienkripsi dengan AES-256-GCM menggunakan file kunci terpisah di mesin Anda.' },
+        { icon: ShieldCheck, title: 'Pengguna, Peran (RBAC) & Audit', body: 'Setiap anggota tim memiliki akun sendiri: Admin, Operator, atau Viewer, yang dapat dibatasi per VPS. Sesi login dapat dicabut kapan saja dan setiap aksi tercatat di Audit Log.' },
+        { icon: Sparkles, title: 'Gateway Terisolasi Jaringan Privat', body: 'AI Gateway hanya merespons localhost, jaringan privat, dan IP VPS yang telah Anda daftarkan di 7Server. Akses luar lainnya otomatis ditolak (403).' },
+      ]
+    : [
+        { icon: Lock, title: 'Encrypted at rest', body: 'Everything lives in one SQLite file. SSH credentials, AI tokens and webhooks inside it are encrypted with AES-256-GCM, with the key kept in a separate file on your machine.' },
+        { icon: ShieldCheck, title: 'Users and roles', body: 'Each person gets an account: Admin, Operator or Viewer, optionally limited to some servers. Sessions can be revoked, and every change is written to an audit log with who did it.' },
+        { icon: Sparkles, title: 'Gateway stays inside', body: 'The AI gateway only answers this machine, private networks and the servers you registered. Everyone else gets 403.' },
+      ];
+
   return (
     <section id="security" className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-      <Eyebrow>Security</Eyebrow>
-      <H2>Your keys stay on your hardware.</H2>
-      <Lead>7Server is self-hosted. There is no account to create and no cloud service between you and your servers.</Lead>
+      <Eyebrow>{lang === 'id' ? 'Keamanan & Privasi' : 'Security'}</Eyebrow>
+      <H2>{lang === 'id' ? 'Kunci rahasia Anda tetap berada di perangkat Anda sendiri.' : 'Your keys stay on your hardware.'}</H2>
+      <Lead>
+        {lang === 'id'
+          ? '7Server sepenuhnya self-hosted. Tidak ada akun cloud yang perlu dibuat dan tidak ada server perantara di antara Anda dan VPS Anda.'
+          : '7Server is self-hosted. There is no account to create and no cloud service between you and your servers.'}
+      </Lead>
       <div className="mt-12 grid gap-4 md:grid-cols-3">
         {items.map(({ icon: Icon, title, body }, i) => (
           <article key={title} className="metal reveal rounded-2xl p-6" style={v(i)}>
@@ -269,15 +909,19 @@ const INSTALL = {
   source: { label: 'From source', note: 'For development: UI on :3000, API on :5001.', steps: [['Clone', `git clone ${REPO}.git && cd 7server`], ['Install', '(cd server && npm install) && (cd client && npm install)'], ['Run', 'npm run dev']] as [string, string][] }
 };
 
-function GetStarted() {
+function GetStarted({ lang }: { lang: Lang }) {
   const [tab, setTab] = useState<keyof typeof INSTALL>('npm');
   const cur = INSTALL[tab];
   return (
     <section id="start" className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
       <div className="metal rounded-3xl p-6 sm:p-10">
-        <Eyebrow>Get started</Eyebrow>
-        <H2>Running in a few minutes.</H2>
-        <Lead>Pick how you want to run it. You need SSH access to at least one server.</Lead>
+        <Eyebrow>{lang === 'id' ? 'Mulai Cepat' : 'Get started'}</Eyebrow>
+        <H2>{lang === 'id' ? 'Siap berjalan dalam hitungan menit.' : 'Running in a few minutes.'}</H2>
+        <Lead>
+          {lang === 'id'
+            ? 'Pilih metode instalasi yang Anda sukai. Anda hanya membutuhkan akses SSH ke minimal satu server.'
+            : 'Pick how you want to run it. You need SSH access to at least one server.'}
+        </Lead>
         <div className="reveal mt-8 inline-flex rounded-xl border p-1" role="tablist" aria-label="Install method" style={{ borderColor: 'var(--line)', ...v(3) }}>
           {(Object.keys(INSTALL) as (keyof typeof INSTALL)[]).map((k) => (
             <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} type="button"
@@ -298,7 +942,15 @@ function GetStarted() {
         </div>
         <p className="mt-4 text-sm">{cur.note}</p>
         <p className="mt-4 text-sm leading-relaxed">
-          On the first visit you create the admin account in the browser. From another machine it also asks for the 6-digit setup code printed in the terminal. Back up <code style={{ color: 'var(--anatomy-strong)' }}>7server.db</code> and <code style={{ color: 'var(--anatomy-strong)' }}>secret.key</code> together.
+          {lang === 'id' ? (
+            <>
+              Pada kunjungan pertama, Anda langsung membuat akun Admin di browser. Jika diakses dari mesin lain, sistem akan meminta 6 digit kode setup yang tercetak di terminal. Pastikan selalu mem-backup <code style={{ color: 'var(--anatomy-strong)' }}>7server.db</code> dan <code style={{ color: 'var(--anatomy-strong)' }}>secret.key</code> secara bersamaan.
+            </>
+          ) : (
+            <>
+              On the first visit you create the admin account in the browser. From another machine it also asks for the 6-digit setup code printed in the terminal. Back up <code style={{ color: 'var(--anatomy-strong)' }}>7server.db</code> and <code style={{ color: 'var(--anatomy-strong)' }}>secret.key</code> together.
+            </>
+          )}
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <a href={REPO} className="btn-silver inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold">
@@ -339,7 +991,6 @@ function useRoute() {
       const r = read();
       setRoute(r);
       if (r) window.scrollTo(0, 0);
-      // A section anchor (#features) clicked on a sub-page: render home first, then scroll to it.
       else if (location.hash.length > 1) requestAnimationFrame(() => document.querySelector(location.hash)?.scrollIntoView());
     };
     addEventListener('hashchange', on);
@@ -350,23 +1001,32 @@ function useRoute() {
 
 export default function App() {
   const route = useRoute();
-  useReveal(route);
+  const { lang, toggleLang } = useLang();
+  const [lightbox, setLightbox] = useState<{ src: string; title: string; route?: string } | null>(null);
+  useReveal(route, lang);
+
   return (
     <>
-      <Nav />
+      <Nav lang={lang} toggleLang={toggleLang} />
       <main key={route}>
         {route === 'contributors' ? <ContributorsPage /> : route === 'support' ? <SupportPage /> : (
           <>
-            <Hero />
-            <HowItWorks />
-            <Features />
-            <AI />
-            <Security />
-            <GetStarted />
+            <Hero lang={lang} onZoom={setLightbox} />
+            <HowItWorks lang={lang} onZoom={setLightbox} />
+            <ProductShowcase lang={lang} onZoom={setLightbox} />
+            <Features lang={lang} />
+            <AI lang={lang} />
+            <Security lang={lang} />
+            <GetStarted lang={lang} />
           </>
         )}
       </main>
       <Footer />
+      <Lightbox
+        item={lightbox}
+        onClose={() => setLightbox(null)}
+        closeLabel={COPY[lang].showcase.closeHint}
+      />
     </>
   );
 }

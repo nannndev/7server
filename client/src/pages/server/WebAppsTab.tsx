@@ -10,8 +10,10 @@ import {
   FolderOpen,
   GitPullRequest,
   Wrench,
-  ChevronDown
+  ChevronDown,
+  Plus
 } from 'lucide-react';
+import NewAppModal from '@/features/webapps/components/NewAppModal';
 import { BrandIcon } from '@/shared/ui/brand-icon';
 import type { WebAppInfo } from '@/features/webapps/types';
 import { fetchWebApps } from '@/features/webapps/api';
@@ -33,9 +35,15 @@ export default function WebAppsTab() {
   const [appSearchQuery, setAppSearchQuery] = useState('');
   const [appTypeFilter, setAppTypeFilter] = useState<string>('ALL');
   const [appMenu, setAppMenu] = useState<string | null>(null);
+  const [showNewAppModal, setShowNewAppModal] = useState(false);
+  const mockKey = `7server_mock_webapps_${server.id}`;
+  const getLocalMocks = (): WebAppInfo[] => {
+    try { return JSON.parse(localStorage.getItem(mockKey) || '[]'); } catch { return []; }
+  };
+
   const appActions = (app: WebAppInfo) => {
     const cd = `cd ${sq(app.path)} && `;
-    const list: { label: string; cmd: string; confirm?: boolean }[] = [];
+    const list: { label: string; cmd: string; confirm?: boolean; action?: () => void }[] = [];
     if (app.gitBranch) {
       list.push({ label: t('webapps.gitStatusLog'), cmd: `${cd}git status -sb && echo "---" && git log --oneline -5` });
       list.push({ label: t('webapps.gitPull'), cmd: `${cd}git pull 2>&1`, confirm: true });
@@ -45,30 +53,66 @@ export default function WebAppsTab() {
       list.push({ label: t('webapps.artisanClear'), cmd: `${cd}php artisan optimize:clear 2>&1`, confirm: true });
       list.push({ label: t('webapps.artisanMigrate'), cmd: `${cd}php artisan migrate:status 2>&1` });
     }
-    if (app.type.includes('Node')) {
+    if (app.type.includes('Node') || app.type.includes('Next') || app.type.includes('Vite')) {
       list.push({ label: t('webapps.npmBuild'), cmd: `${cd}npm run build 2>&1 | tail -n 40`, confirm: true });
     }
     list.push({ label: t('webapps.folderSize'), cmd: `du -sh ${sq(app.path)} 2>&1` });
+
+    // Allow deleting mock/locally added apps
+    const mocks = getLocalMocks();
+    if (mocks.some((m) => m.path === app.path)) {
+      list.push({
+        label: t('webapps.removeDemo'),
+        cmd: '',
+        confirm: true,
+        action: () => {
+          const updated = mocks.filter((m) => m.path !== app.path);
+          localStorage.setItem(mockKey, JSON.stringify(updated));
+          setWebApps((prev) => prev.filter((a) => a.path !== app.path));
+        }
+      });
+    }
+
     return list;
   };
-  const runAppAction = async (app: WebAppInfo, a: { label: string; cmd: string; confirm?: boolean }) => {
+  const runAppAction = async (app: WebAppInfo, a: { label: string; cmd: string; confirm?: boolean; action?: () => void }) => {
     setAppMenu(null);
     if (a.confirm) {
       const ok = await confirmModal({
         title: a.label,
         message: t('webapps.confirmRun', { label: a.label, path: app.path }),
         variant: 'warning',
-        confirmText: 'Jalankan'
+        confirmText: t('webapps.continue')
       });
       if (!ok) return;
+    }
+    if (a.action) {
+      a.action();
+      return;
     }
     ctx.runQuickAction(`${app.name}: ${a.label}`, a.cmd);
   };
   const loadWebAppsData = async (manual?: unknown) => {
     try {
-      await swr(`webapps:${server.id}`, () => fetchWebApps(server.id), setWebApps, setLoadingWebApps, !!manual);
+      const localMocks = getLocalMocks();
+      await swr(
+        `webapps:${server.id}`,
+        async () => {
+          const remote = await fetchWebApps(server.id);
+          const remotePaths = new Set(remote.map((r) => r.path));
+          return [...localMocks.filter((m) => !remotePaths.has(m.path)), ...remote];
+        },
+        (merged) => {
+          const paths = new Set(merged.map((m) => m.path));
+          setWebApps([...localMocks.filter((m) => !paths.has(m.path)), ...merged]);
+        },
+        setLoadingWebApps,
+        !!manual
+      );
     } catch (e) {
       console.error(e);
+      const fallback = getLocalMocks();
+      if (fallback.length > 0) setWebApps(fallback);
     }
   };
   const filteredApps = webApps.filter((a) => {
@@ -87,9 +131,28 @@ export default function WebAppsTab() {
   // Layout effect: cached data is applied before the first paint, so there's no empty-state flash.
   useLayoutEffect(() => { loadWebAppsData(); }, [server.id]);
 
+  if (showNewAppModal) {
+    return (
+      <NewAppModal
+        isOpen={true}
+        onClose={() => setShowNewAppModal(false)}
+        server={server}
+        onAppCreated={(newApp) => {
+          try {
+            const existing = getLocalMocks();
+            localStorage.setItem(mockKey, JSON.stringify([newApp, ...existing.filter((a) => a.path !== newApp.path)]));
+          } catch {}
+          setWebApps((prev) => [newApp, ...prev.filter((a) => a.path !== newApp.path)]);
+        }}
+        onOpenIntegrations={() => {
+          window.location.hash = '#/settings/integrations';
+        }}
+      />
+    );
+  }
+
   return (
-    <>
-      <Card className="p-5 space-y-4">
+    <Card className="p-5 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
@@ -120,6 +183,15 @@ export default function WebAppsTab() {
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loadingWebApps ? 'animate-spin' : ''}`} />
               <span>{t('webapps.rescan')}</span>
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => setShowNewAppModal(true)}
+              className="gap-1.5 h-8"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>{t('webapps.newApp')}</span>
             </Button>
           </div>
         </div>
@@ -335,7 +407,6 @@ export default function WebAppsTab() {
             </table>
           </div>
         )}
-      </Card>
-    </>
+    </Card>
   );
 }

@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   LayoutDashboard, LayoutGrid, Box, Network, Activity, Server, Plus, Bell, Globe, ScrollText,
   PanelLeftClose, PanelLeftOpen, Sun, Moon, Search, X, Bot, ShieldCheck,
-  ArrowUpDown, ChevronUp, ChevronDown, Pencil
+  ArrowUpDown, ChevronUp, ChevronDown, Pencil, FolderGit2
 } from 'lucide-react';
 import { ServerItem } from '@/features/servers/types';
 import { Route, FleetView } from '@/app/router';
@@ -435,6 +435,16 @@ export default function Sidebar(p: SidebarProps) {
             onClick={() => go({ page: 'users', tab: 'users' })}
             icon={ShieldCheck}
             label={t('nav.users')}
+          />
+
+          <Section rail={rail} title={t('nav.gitAndServices')} />
+          <Item
+            rail={rail}
+            tip={tipProps}
+            active={p.route.page === 'integrations'}
+            onClick={() => go({ page: 'integrations' })}
+            icon={FolderGit2}
+            label={t('nav.integrations')}
           />
         </nav>
 
