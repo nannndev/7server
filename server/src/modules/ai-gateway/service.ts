@@ -9,6 +9,7 @@ import type { VirtualApiKey, AiProviderId } from './types.js';
 import { resolveModel, subscriptionChat, subscriptionModels, claudeMessages, UpstreamError, comboName, isRetryable, COMBO_PREFIX } from './subscription.js';
 import { isCoolingDown } from './usage.js';
 import { isConnected } from './accounts.js';
+import { resolveCompatModel, COMPAT_PROVIDERS } from './compatProviders.js';
 
 export function authenticateVirtualKey(req: Request): VirtualApiKey | null {
   const authHeader = req.headers['authorization'];
@@ -343,8 +344,13 @@ export async function handleOpenAiChatCompletions(req: Request, res: Response): 
   const cfg = getInternalConfig();
   const model = req.body?.model || 'gpt-4o';
   let targetProviderId: AiProviderId = 'openai';
+  // "groq/llama-3.3-70b", "openrouter/anthropic/claude-sonnet-4"... → that provider, model sent without the prefix.
+  const compat = resolveCompatModel(model);
+  const upstreamBody = compat ? { ...req.body, model: compat.model } : req.body;
 
-  if (model.toLowerCase().includes('deepseek')) {
+  if (compat) {
+    targetProviderId = compat.provider.id;
+  } else if (model.toLowerCase().includes('deepseek')) {
     targetProviderId = 'deepseek';
   } else if (model.toLowerCase().includes('llama') || model.toLowerCase().includes('mistral') || model.toLowerCase().includes('qwen')) {
     if (cfg.providers.ollama?.enabled) {
@@ -363,7 +369,8 @@ export async function handleOpenAiChatCompletions(req: Request, res: Response): 
   }
 
   const provider = cfg.providers[targetProviderId];
-  if (!provider || !provider.enabled || (targetProviderId !== 'ollama' && !provider.apiKey)) {
+  // Ollama and a custom endpoint (local LiteLLM/vLLM/LM Studio) may run without a key.
+  if (!provider || !provider.enabled || (targetProviderId !== 'ollama' && targetProviderId !== 'custom' && !provider.apiKey)) {
     res.status(503).json({
       error: {
         message: `Provider ${targetProviderId} is not configured or disabled in 7Server AI Gateway.`,
@@ -374,7 +381,7 @@ export async function handleOpenAiChatCompletions(req: Request, res: Response): 
   }
 
   const isStreaming = Boolean(req.body?.stream);
-  const baseUrl = (provider.baseUrl || (targetProviderId === 'deepseek' ? 'https://api.deepseek.com' : 'https://api.openai.com/v1')).replace(/\/+$/, '');
+  const baseUrl = (provider.baseUrl || compat?.provider.baseUrl || (targetProviderId === 'deepseek' ? 'https://api.deepseek.com' : 'https://api.openai.com/v1')).replace(/\/+$/, '');
   const targetUrl = `${baseUrl}/chat/completions`;
 
   const upstreamHeaders: Record<string, string> = {
@@ -388,7 +395,7 @@ export async function handleOpenAiChatCompletions(req: Request, res: Response): 
     const upstreamRes = await fetch(targetUrl, {
       method: 'POST',
       headers: upstreamHeaders,
-      body: JSON.stringify(req.body)
+      body: JSON.stringify(upstreamBody)
     });
 
     if (!isStreaming) {
@@ -585,7 +592,10 @@ export async function handleListModels(req: Request, res: Response): Promise<voi
     data: [
       ...Object.keys(getInternalConfig().combos || {}).map((name) => ({ id: `${COMBO_PREFIX}${name}`, object: 'model', owned_by: '7server-combo' })),
       ...(await subscriptionModels()),
-      ...staticModels.filter((m) => connected.has(m.owned_by))
+      ...staticModels.filter((m) => connected.has(m.owned_by)),
+      // Connected OpenAI-compatible providers: the models found when the key was verified, already prefixed.
+      ...COMPAT_PROVIDERS.filter((p) => connected.has(p.id)).flatMap((p) =>
+        (cfg.providers[p.id]?.models || (p.sampleModel ? [`${p.id}/${p.sampleModel}`] : [])).map((id) => ({ id, object: 'model', owned_by: p.id })))
     ]
   });
 }

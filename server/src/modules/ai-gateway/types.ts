@@ -1,4 +1,6 @@
 export type AiProviderId = 'anthropic' | 'openai' | 'gemini' | 'deepseek' | 'ollama' | 'openrouter'
+  // OpenAI-compatible API-key providers (see compatProviders.ts)
+  | 'groq' | 'mistral' | 'xai' | 'together' | 'fireworks' | 'cerebras' | 'perplexity' | 'moonshot' | 'dashscope' | 'zai' | 'minimax' | 'nvidia' | 'custom'
   // logged-in subscription accounts (OAuth)
   | 'claude' | 'codex' | 'copilot' | 'gemini-cli';
 
@@ -28,6 +30,8 @@ export interface ProviderConfig {
   verifiedAt?: string;      // ISO timestamp of last successful check
   latencyMs?: number;
   defaultModel?: string;
+  /** Models the key could list when it was verified (OpenAI-compatible providers), "<id>/<model>". */
+  models?: string[];
   error?: string;
 }
 

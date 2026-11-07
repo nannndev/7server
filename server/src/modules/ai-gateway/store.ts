@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { listDocs, replaceDocs, getKv, setKv, appendUsage, readUsageRows, allUsageRows, clearUsage, compact } from '../../infra/db.js';
 import { encrypt, decrypt } from '../../infra/crypto.js';
+import { COMPAT_PROVIDERS } from './compatProviders.js';
 import type {
   VirtualApiKey,
   AiGatewayConfig,
@@ -107,7 +108,9 @@ const DEFAULT_CONFIG: AiGatewayConfig = {
     deepseek: { enabled: false, connected: false, baseUrl: 'https://api.deepseek.com', defaultModel: 'deepseek-chat' },
     gemini: { enabled: false, connected: false, baseUrl: 'https://generativelanguage.googleapis.com', defaultModel: 'gemini-2.0-flash' },
     openrouter: { enabled: false, connected: false, baseUrl: 'https://openrouter.ai/api/v1', defaultModel: 'anthropic/claude-3.7-sonnet' },
-    ollama: { enabled: false, connected: false, baseUrl: 'http://localhost:11434', defaultModel: 'llama3.2' }
+    ollama: { enabled: false, connected: false, baseUrl: 'http://localhost:11434', defaultModel: 'llama3.2' },
+    // OpenAI-compatible API-key providers; base URLs come from compatProviders.ts
+    ...Object.fromEntries(COMPAT_PROVIDERS.filter((p) => p.id !== 'openrouter').map((p) => [p.id, { enabled: false, connected: false, baseUrl: p.baseUrl, defaultModel: p.sampleModel }]))
   },
   defaultProvider: 'anthropic',
   defaultModel: 'claude-3-7-sonnet-20250219'
@@ -195,7 +198,8 @@ export function connectProvider(
   providerId: AiProviderId,
   apiKey: string,
   baseUrl?: string,
-  latencyMs?: number
+  latencyMs?: number,
+  models?: string[]
 ): AiGatewayConfig {
   const currentStored = readConfig();
   const target = currentStored.providers[providerId] || {
@@ -214,6 +218,7 @@ export function connectProvider(
     connected: true,
     verifiedAt: new Date().toISOString(),
     latencyMs,
+    ...(models ? { models } : {}),
     error: undefined
   };
 

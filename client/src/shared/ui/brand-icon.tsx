@@ -2,17 +2,7 @@
 // Look a product up by id or by free text ("Laravel (PHP)", "nginx:1.25-alpine", "Ubuntu 22.04.4 LTS").
 import React from 'react';
 import {
-  siNodedotjs, siNpm, siPnpm, siYarn, siBun, siDeno, siPhp, siComposer, siPython, siGo, siOpenjdk,
-  siNginx, siApache, siCaddy, siLetsencrypt, siCloudflare, siTailscale, siWireguard,
-  siMysql, siMariadb, siPostgresql, siRedis, siMongodb, siSqlite, siMeilisearch, siMinio,
-  siDocker, siPodman, siK3s, siKubernetes, siPm2, siGit, siLaravel, siVite, siPhpmyadmin,
-  siUbuntu, siDebian, siCentos, siRockylinux, siAlmalinux, siFedora, siLinux,
-  siClaude, siAnthropic, siGithubcopilot, siGooglegemini, siDeepseek, siOllama, siOpenrouter,
-  siNextdotjs, siNuxt, siRemix, siAstro, siReact, siVuedotjs, siSvelte, siAngular,
-  siNestjs, siExpress, siFastify, siHono, siDjango, siFastapi, siFlask,
-  siTypescript, siJavascript, siSwift, siDart, siFlutter, siRust, siKotlin, siRuby, siRubyonrails, siHtml5,
-  siGithub, siGitlab, siBitbucket, siTmux, siFfmpeg, siGnubash, siCurl,
-  type SimpleIcon
+  siNodedotjs, siNpm, siPnpm, siYarn, siBun, siDeno, siPhp, siComposer, siPython, siGo, siOpenjdk, siNginx, siApache, siCaddy, siLetsencrypt, siCloudflare, siTailscale, siWireguard, siMysql, siMariadb, siPostgresql, siRedis, siMongodb, siSqlite, siMeilisearch, siMinio, siDocker, siPodman, siK3s, siKubernetes, siPm2, siGit, siLaravel, siVite, siPhpmyadmin, siUbuntu, siDebian, siCentos, siRockylinux, siAlmalinux, siFedora, siLinux, siClaude, siAnthropic, siGithubcopilot, siGooglegemini, siDeepseek, siOllama, siOpenrouter, siNextdotjs, siNuxt, siRemix, siAstro, siReact, siVuedotjs, siSvelte, siAngular, siNestjs, siExpress, siFastify, siHono, siDjango, siFastapi, siFlask, siTypescript, siJavascript, siSwift, siDart, siFlutter, siRust, siKotlin, siRuby, siRubyonrails, siHtml5, siGithub, siGitlab, siBitbucket, siTmux, siFfmpeg, siGnubash, siCurl, siMistralai, siX, siPerplexity, siNvidia, siAlibabacloud, siMinimax, type SimpleIcon
 } from 'simple-icons';
 
 // OpenAI's mark is not in simple-icons (trademark request); same 24x24 path format.
@@ -35,6 +25,12 @@ const BRANDS: [id: string, icon: SimpleIcon, match: RegExp][] = [
   ['deepseek', siDeepseek, /deepseek/i],
   ['openrouter', siOpenrouter, /openrouter/i],
   ['ollama', siOllama, /ollama/i],
+  ['mistral', siMistralai, /mistral/i],
+  ['xai', siX, /\bxai\b|grok/i],
+  ['perplexity', siPerplexity, /perplexity|sonar/i],
+  ['nvidia', siNvidia, /nvidia/i],
+  ['dashscope', siAlibabacloud, /dashscope|qwen|alibaba/i],
+  ['minimax', siMinimax, /minimax/i],
   ['nextjs', siNextdotjs, /next\.?js|^next$/i],
   ['nuxt', siNuxt, /nuxt/i],
   ['remix', siRemix, /\bremix\b/i],

@@ -128,7 +128,7 @@ aiGatewayManagementRoutes.post('/ai-gateway/providers/:providerId/connect', asyn
     res.status(400).json({ error: verifyResult.error || 'Connection verification failed' });
     return;
   }
-  const updatedConfig = connectProvider(providerId, apiKey, baseUrl, verifyResult.latencyMs);
+  const updatedConfig = connectProvider(providerId, apiKey, baseUrl, verifyResult.latencyMs, verifyResult.models);
   res.json({ config: updatedConfig, verification: verifyResult });
 });
 

@@ -1,4 +1,5 @@
 import type { AiProviderId, ProviderVerificationResult } from './types.js';
+import { compatProvider } from './compatProviders.js';
 
 export async function verifyProviderConnection(
   providerId: AiProviderId,
@@ -121,30 +122,6 @@ export async function verifyProviderConnection(
       return { providerId, valid: false, error: `Google Gemini returned HTTP ${res.status}` };
     }
 
-    if (providerId === 'openrouter') {
-      if (!trimmedKey) {
-        return { providerId, valid: false, error: 'API key is required for OpenRouter' };
-      }
-      const res = await fetch(`https://openrouter.ai/api/v1/auth/key`, {
-        headers: { authorization: `Bearer ${trimmedKey}` }
-      });
-      const latencyMs = Date.now() - t0;
-      if (res.ok) {
-        return {
-          providerId,
-          valid: true,
-          latencyMs,
-          models: [
-            'anthropic/claude-3.7-sonnet',
-            'openai/gpt-4o',
-            'deepseek/deepseek-r1',
-            'google/gemini-2.0-flash'
-          ]
-        };
-      }
-      return { providerId, valid: false, error: `OpenRouter returned HTTP ${res.status}` };
-    }
-
     if (providerId === 'ollama') {
       const baseUrl = (customBaseUrl || 'http://localhost:11434').replace(/\/+$/, '');
       const res = await fetch(`${baseUrl}/api/tags`);
@@ -160,6 +137,29 @@ export async function verifyProviderConnection(
         };
       }
       return { providerId, valid: false, error: `Ollama at ${baseUrl} returned HTTP ${res.status}` };
+    }
+
+    // OpenAI-compatible providers: GET /models with the key lists what this key can use.
+    const compat = compatProvider(providerId);
+    if (compat) {
+      const baseUrl = (customBaseUrl || compat.baseUrl).replace(/\/+$/, '');
+      if (!baseUrl) return { providerId, valid: false, error: 'Base URL is required' };
+      if (!/^https?:\/\//.test(baseUrl)) return { providerId, valid: false, error: 'Base URL must start with http:// or https://' };
+      if (!trimmedKey && providerId !== 'custom') return { providerId, valid: false, error: `API key is required for ${providerId}` };
+      const res = await fetch(`${baseUrl}/models`, {
+        headers: trimmedKey ? { authorization: `Bearer ${trimmedKey}` } : {},
+        signal: AbortSignal.timeout(15000)
+      });
+      const latencyMs = Date.now() - t0;
+      if (!res.ok) {
+        let msg = `${providerId} returned HTTP ${res.status}`;
+        try { const j: any = await res.json(); msg = j?.error?.message || j?.message || msg; } catch { /* not JSON */ }
+        return { providerId, valid: false, error: msg };
+      }
+      const data: any = await res.json().catch(() => ({}));
+      const ids = (Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : []).map((m: any) => m?.id).filter(Boolean);
+      // Prefixed so they can be pasted straight into a client: "groq/llama-3.3-70b-versatile".
+      return { providerId, valid: true, latencyMs, models: (ids.length ? ids : [compat.sampleModel]).filter(Boolean).slice(0, 50).map((id: string) => `${providerId}/${id}`) };
     }
 
     return { providerId, valid: false, error: `Unknown provider ${providerId}` };

@@ -123,7 +123,7 @@ const PROVIDERS_META: ProviderMeta[] = [
     tagline: 'aiGw.p.openrouter.tagline',
     badge: 'aiGw.p.openrouter.badge',
     color: 'from-[var(--foreground)]/10 to-pink-500/10 text-[var(--foreground)] border-[var(--rim)]',
-    models: ['anthropic/claude-3.7-sonnet', 'openai/gpt-4o', 'deepseek/deepseek-r1'],
+    models: ['openrouter/anthropic/claude-sonnet-4', 'openrouter/openai/gpt-4o-mini'],
     defaultUrl: 'https://openrouter.ai/api/v1',
     keyPlaceholder: 'sk-or-v1-...',
     docsUrl: 'https://openrouter.ai/keys'
@@ -149,6 +149,150 @@ const PROVIDERS_META: ProviderMeta[] = [
     defaultUrl: 'http://localhost:11434',
     keyPlaceholder: 'aiGw.ollamaNoKey',
     docsUrl: 'https://ollama.com'
+  },
+  // OpenAI-compatible API-key providers; requests use a "<id>/<model>" prefix (server: compatProviders.ts)
+  {
+    id: 'groq',
+    name: 'Groq',
+    tagline: 'aiGw.p.groq.tagline',
+    badge: 'aiGw.p.groq.badge',
+    color: 'from-orange-500/20 to-red-500/10 text-orange-500 border-orange-500/30',
+    models: ['groq/llama-3.3-70b-versatile', 'groq/qwen/qwen3-32b'],
+    defaultUrl: 'https://api.groq.com/openai/v1',
+    keyPlaceholder: 'gsk_...',
+    docsUrl: 'https://console.groq.com/keys'
+  },
+  {
+    id: 'mistral',
+    name: 'Mistral AI',
+    tagline: 'aiGw.p.mistral.tagline',
+    badge: 'aiGw.p.mistral.badge',
+    color: 'from-orange-500/20 to-amber-500/10 text-orange-400 border-orange-500/30',
+    models: ['mistral/mistral-large-latest', 'mistral/codestral-latest'],
+    defaultUrl: 'https://api.mistral.ai/v1',
+    keyPlaceholder: '...',
+    docsUrl: 'https://console.mistral.ai/api-keys'
+  },
+  {
+    id: 'xai',
+    name: 'xAI Grok',
+    tagline: 'aiGw.p.xai.tagline',
+    badge: 'aiGw.p.xai.badge',
+    color: 'from-zinc-500/20 to-zinc-500/10 text-[var(--foreground)] border-[var(--rim)]',
+    models: ['xai/grok-4', 'xai/grok-3-mini'],
+    defaultUrl: 'https://api.x.ai/v1',
+    keyPlaceholder: 'xai-...',
+    docsUrl: 'https://console.x.ai'
+  },
+  {
+    id: 'together',
+    name: 'Together AI',
+    tagline: 'aiGw.p.together.tagline',
+    badge: 'aiGw.p.together.badge',
+    color: 'from-blue-500/20 to-indigo-500/10 text-blue-400 border-blue-500/30',
+    models: ['together/meta-llama/Llama-3.3-70B-Instruct-Turbo'],
+    defaultUrl: 'https://api.together.xyz/v1',
+    keyPlaceholder: '...',
+    docsUrl: 'https://api.together.ai/settings/api-keys'
+  },
+  {
+    id: 'fireworks',
+    name: 'Fireworks AI',
+    tagline: 'aiGw.p.fireworks.tagline',
+    badge: 'aiGw.p.fireworks.badge',
+    color: 'from-violet-500/20 to-fuchsia-500/10 text-violet-400 border-violet-500/30',
+    models: ['fireworks/accounts/fireworks/models/llama-v3p3-70b-instruct'],
+    defaultUrl: 'https://api.fireworks.ai/inference/v1',
+    keyPlaceholder: 'fw_...',
+    docsUrl: 'https://fireworks.ai/account/api-keys'
+  },
+  {
+    id: 'cerebras',
+    name: 'Cerebras',
+    tagline: 'aiGw.p.cerebras.tagline',
+    badge: 'aiGw.p.cerebras.badge',
+    color: 'from-orange-500/20 to-rose-500/10 text-orange-400 border-orange-500/30',
+    models: ['cerebras/llama-3.3-70b', 'cerebras/qwen-3-32b'],
+    defaultUrl: 'https://api.cerebras.ai/v1',
+    keyPlaceholder: 'csk-...',
+    docsUrl: 'https://cloud.cerebras.ai'
+  },
+  {
+    id: 'perplexity',
+    name: 'Perplexity',
+    tagline: 'aiGw.p.perplexity.tagline',
+    badge: 'aiGw.p.perplexity.badge',
+    color: 'from-teal-500/20 to-cyan-500/10 text-teal-400 border-teal-500/30',
+    models: ['perplexity/sonar', 'perplexity/sonar-pro'],
+    defaultUrl: 'https://api.perplexity.ai',
+    keyPlaceholder: 'pplx-...',
+    docsUrl: 'https://www.perplexity.ai/settings/api'
+  },
+  {
+    id: 'moonshot',
+    name: 'Moonshot Kimi',
+    tagline: 'aiGw.p.moonshot.tagline',
+    badge: 'aiGw.p.moonshot.badge',
+    color: 'from-slate-500/20 to-zinc-500/10 text-[var(--foreground)] border-[var(--rim)]',
+    models: ['moonshot/kimi-k2-0711-preview'],
+    defaultUrl: 'https://api.moonshot.ai/v1',
+    keyPlaceholder: 'sk-...',
+    docsUrl: 'https://platform.moonshot.ai/console/api-keys'
+  },
+  {
+    id: 'dashscope',
+    name: 'Alibaba Qwen (DashScope)',
+    tagline: 'aiGw.p.dashscope.tagline',
+    badge: 'aiGw.p.dashscope.badge',
+    color: 'from-orange-500/20 to-amber-500/10 text-orange-400 border-orange-500/30',
+    models: ['dashscope/qwen-plus', 'dashscope/qwen3-coder-plus'],
+    defaultUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
+    keyPlaceholder: 'sk-...',
+    docsUrl: 'https://bailian.console.alibabacloud.com'
+  },
+  {
+    id: 'zai',
+    name: 'Z.ai GLM',
+    tagline: 'aiGw.p.zai.tagline',
+    badge: 'aiGw.p.zai.badge',
+    color: 'from-blue-500/20 to-sky-500/10 text-blue-400 border-blue-500/30',
+    models: ['zai/glm-4.5', 'zai/glm-4.5-air'],
+    defaultUrl: 'https://api.z.ai/api/paas/v4',
+    keyPlaceholder: '...',
+    docsUrl: 'https://z.ai/manage-apikey/apikey-list'
+  },
+  {
+    id: 'minimax',
+    name: 'MiniMax',
+    tagline: 'aiGw.p.minimax.tagline',
+    badge: 'aiGw.p.minimax.badge',
+    color: 'from-rose-500/20 to-pink-500/10 text-rose-400 border-rose-500/30',
+    models: ['minimax/MiniMax-M1'],
+    defaultUrl: 'https://api.minimax.io/v1',
+    keyPlaceholder: '...',
+    docsUrl: 'https://www.minimax.io/platform'
+  },
+  {
+    id: 'nvidia',
+    name: 'NVIDIA NIM',
+    tagline: 'aiGw.p.nvidia.tagline',
+    badge: 'aiGw.p.nvidia.badge',
+    color: 'from-lime-500/20 to-green-500/10 text-lime-500 border-lime-500/30',
+    models: ['nvidia/meta/llama-3.3-70b-instruct'],
+    defaultUrl: 'https://integrate.api.nvidia.com/v1',
+    keyPlaceholder: 'nvapi-...',
+    docsUrl: 'https://build.nvidia.com'
+  },
+  {
+    id: 'custom',
+    name: 'Custom (OpenAI-compatible)',
+    tagline: 'aiGw.p.custom.tagline',
+    badge: 'aiGw.p.custom.badge',
+    color: 'from-zinc-500/20 to-stone-500/10 text-[var(--muted-foreground)] border-[var(--border)]',
+    models: ['custom/<model-name>'],
+    defaultUrl: '',
+    keyPlaceholder: 'sk-... (optional)',
+    docsUrl: 'https://platform.openai.com/docs/api-reference/chat'
   }
 ];
 
@@ -528,7 +672,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {PROVIDERS_META.map((p) => {
               const provConfig = config?.providers?.[p.id];
-              const isConnected = provConfig?.connected === true && (provConfig?.apiKey || p.id === 'ollama');
+              const isConnected = provConfig?.connected === true && (provConfig?.apiKey || p.id === 'ollama' || p.id === 'custom');
 
               return (
                 <Card
@@ -916,11 +1060,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                 className="h-8 px-2.5 text-xs rounded-lg bg-[var(--background)] border border-[var(--border)] text-[var(--foreground)]"
               >
                 <option value="all">{t('aiGw.allProviders')}</option>
-                <option value="anthropic">Anthropic</option>
-                <option value="openai">OpenAI</option>
-                <option value="deepseek">DeepSeek</option>
-                <option value="openrouter">OpenRouter</option>
-                <option value="ollama">Ollama</option>
+                {PROVIDERS_META.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
 
@@ -1057,12 +1197,13 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
 
             <div>
               <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1">
-                {t('aiGw.baseUrlLabel')}
+                {connectingProvider.defaultUrl ? t('aiGw.baseUrlLabel') : t('aiGw.baseUrlRequired')}
               </label>
               <Input
                 value={connectBaseUrl}
                 onChange={(e) => setConnectBaseUrl(e.target.value)}
-                placeholder={connectingProvider.defaultUrl}
+                placeholder={connectingProvider.defaultUrl || 'http://localhost:4000/v1'}
+                required={!connectingProvider.defaultUrl}
                 className="font-mono text-xs"
               />
             </div>
