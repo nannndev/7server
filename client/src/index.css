@@ -2,7 +2,18 @@
 @import "@xterm/xterm/css/xterm.css";
 
 /* Privacy mode (toggle in the top bar): blur IPs, domains, paths so the screen can be shared. */
-html.privacy .sensitive { filter: blur(5px); user-select: none; }
+html.privacy .sensitive {
+  filter: blur(6px);
+  user-select: none;
+  display: inline-block;
+  vertical-align: baseline;
+  transition: filter 0.15s ease-out;
+}
+html.privacy .sensitive:hover,
+html.privacy .sensitive:focus,
+html.privacy .sensitive:focus-within {
+  filter: blur(0px);
+}
 
 :root {
   --background: #0b0b0c;

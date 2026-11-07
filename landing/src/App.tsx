@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import {
   Activity, ArrowLeft, ArrowRight, Boxes, Check, ChevronLeft, ChevronRight, Clock, Copy, Cpu, Database,
-  Expand, FileText, GitBranch, Globe, HardDrive, KeyRound, Languages, Layers, Lock, Moon, Server,
+  Expand, EyeOff, FileText, GitBranch, Globe, HardDrive, KeyRound, Languages, Layers, Lock, Moon, Network, Server,
   ShieldCheck, Sparkles, Sun, Terminal, X
 } from 'lucide-react';
 import { AgentlessBench } from './figure/AgentlessBench';
@@ -764,27 +764,31 @@ function Features({ lang }: { lang: Lang }) {
   const itemsEn: { icon: typeof Activity; title: string; body: string }[] = [
     { icon: Activity, title: 'Fleet overview & 3D views', body: 'CPU, RAM, disk and uptime for every server, with history charts, a 3D rack, 3D resource matrix, topology view, and alerts sent to Discord.' },
     { icon: GitBranch, title: 'Git auto-discovery & deploy', body: 'Connect a GitHub Personal Access Token to browse repositories, auto-detect frameworks and monorepo root folders, and deploy with live streaming logs.' },
-    { icon: Terminal, title: 'Browser terminal', body: 'A full multi-tab xterm.js shell over WebSocket with command shortcuts. htop, vim and nano work, and the window resizes with the session.' },
+    { icon: Network, title: 'Cloudflare Tunnels & Zero-Trust', body: 'Expose internal webapps behind NAT or Tailscale without opening any public ports. Includes 1-click Zero Trust token setup and visual ingress route mapping.' },
+    { icon: Globe, title: 'Nginx, SSL & DNS pre-flight', body: 'Which domain points to which port, Nginx sites with nginx -t syntax verification, automated Let\'s Encrypt certificates, and real-time DNS A-record pre-flight checks.' },
     { icon: Boxes, title: 'Docker and Compose', body: 'See containers, images and stacks; start, stop and restart them; read logs; act on a whole Compose project.' },
-    { icon: Globe, title: 'Web apps, Nginx and SSL', body: 'Which domain points to which port, Nginx sites with nginx -t syntax verification, listening ports, and Let’s Encrypt certificates.' },
+    { icon: Terminal, title: 'Browser terminal', body: 'A full multi-tab xterm.js shell over WebSocket with command shortcuts. htop, vim and nano work, and the window resizes with the session.' },
     { icon: Database, title: 'Database workbench', body: 'PostgreSQL, MySQL, MongoDB, Redis and SQLite, including databases inside containers. Browse tables, run queries, see the ER diagram.' },
     { icon: HardDrive, title: 'Backups', body: 'Database and file backups on demand or on a schedule, with retention, download and restore.' },
     { icon: Clock, title: 'Cron, services and processes', body: 'Edit crontabs with visual presets, control systemd units and PM2 apps, and find the process that is eating the CPU.' },
     { icon: FileText, title: 'Files and logs', body: 'Browse and edit files over SFTP, and search system and app logs without leaving the dashboard.' },
     { icon: KeyRound, title: 'SSH keys, hardening and firewall', body: 'Manage authorized keys, check root login and password auth, and open or close UFW ports. It refuses to remove the last rule that keeps SSH open.' },
+    { icon: EyeOff, title: 'Screencast Privacy Mode', body: '1-click streamer privacy mode blurs all sensitive server IPs, public domains, application paths, local ports, and auth tokens with instant hover reveal.' },
   ];
 
   const itemsId: { icon: typeof Activity; title: string; body: string }[] = [
     { icon: Activity, title: 'Ringkasan Fleet & Visual 3D', body: 'Pantau CPU, RAM, disk, dan uptime setiap server lengkap dengan grafik riwayat, rak 3D, matriks 3D, peta topologi, dan notifikasi Discord.' },
     { icon: GitBranch, title: 'Auto-Discovery & Deploy Git', body: 'Hubungkan GitHub Personal Access Token untuk memilih repositori, deteksi otomatis framework & subfolder monorepo, lalu deploy dengan log real-time.' },
-    { icon: Terminal, title: 'Terminal Browser Multi-Tab', body: 'Shell xterm.js penuh melalui WebSocket dengan tombol pintasan perintah. htop, vim, dan nano berjalan lancar dan responsif.' },
+    { icon: Network, title: 'Cloudflare Tunnel & Ingress Zero-Trust', body: 'Buka akses webapp lokal di balik NAT atau Tailscale tanpa membuka port firewall publik. Dilengkapi setup token 1-klik dan peta visual rute ingress.' },
+    { icon: Globe, title: 'Nginx, SSL & DNS Pre-Flight', body: 'Pemetaan domain ke port lokal, konfigurasi Nginx dengan tes sintaks nginx -t, sertifikat Let’s Encrypt otomatis, dan validasi DNS record sebelum penerbitan SSL.' },
     { icon: Boxes, title: 'Docker dan Compose', body: 'Pantau container, image, dan stack; start, stop, dan restart; baca log langsung; atau kelola seluruh proyek Docker Compose.' },
-    { icon: Globe, title: 'Aplikasi Web, Nginx & SSL', body: 'Lihat pemetaan domain ke port lokal, konfigurasi Nginx lengkap dengan tes sintaks nginx -t, serta sertifikasi SSL Let’s Encrypt.' },
+    { icon: Terminal, title: 'Terminal Browser Multi-Tab', body: 'Shell xterm.js penuh melalui WebSocket dengan tombol pintasan perintah. htop, vim, dan nano berjalan lancar dan responsif.' },
     { icon: Database, title: 'Database Workbench', body: 'Mendukung PostgreSQL, MySQL, MongoDB, Redis, dan SQLite—termasuk database di dalam container Docker. Jelajahi tabel, jalankan query, dan lihat diagram ER.' },
     { icon: HardDrive, title: 'Backup Terjadwal', body: 'Backup database dan direktori file secara instan atau terjadwal, lengkap dengan retensi otomatis, unduh, dan restore.' },
     { icon: Clock, title: 'Cron, Systemd & Proses PM2', body: 'Edit jadwal crontab dengan preset visual, kontrol unit systemd maupun worker PM2, serta lacak proses yang membebani CPU.' },
     { icon: FileText, title: 'Manajer File SFTP & Log', body: 'Jelajahi dan edit file langsung lewat jalur SFTP, serta cari log sistem maupun aplikasi tanpa meninggalkan browser.' },
     { icon: KeyRound, title: 'Kunci SSH, Hardening & Firewall', body: 'Kelola authorized_keys, audit konfigurasi login root, dan atur port UFW dengan proteksi anti-terkunci dari port SSH.' },
+    { icon: EyeOff, title: 'Mode Privasi untuk Screencast', body: 'Sensor instan sekali klik untuk menyamarkan IP server, domain publik, path aplikasi, port lokal, dan token saat presentasi atau rekaman video.' },
   ];
 
   const items = lang === 'id' ? itemsId : itemsEn;
@@ -873,11 +877,13 @@ function Security({ lang }: { lang: Lang }) {
     ? [
         { icon: Lock, title: 'Terenkripsi Penuh (At-Rest)', body: 'Seluruh data tersimpan dalam satu file SQLite lokal. Kredensial SSH, token Git/AI, dan webhook dienkripsi dengan AES-256-GCM menggunakan file kunci terpisah di mesin Anda.' },
         { icon: ShieldCheck, title: 'Pengguna, Peran (RBAC) & Audit', body: 'Setiap anggota tim memiliki akun sendiri: Admin, Operator, atau Viewer, yang dapat dibatasi per VPS. Sesi login dapat dicabut kapan saja dan setiap aksi tercatat di Audit Log.' },
+        { icon: EyeOff, title: 'Mode Privasi Demo & Screencast', body: 'Sembunyikan seluruh IP server, domain, path file, dan port secara instan dengan satu tombol privasi di TopBar. Aman digunakan saat rekaman video, webinar, atau livestreaming.' },
         { icon: Sparkles, title: 'Gateway Terisolasi Jaringan Privat', body: 'AI Gateway hanya merespons localhost, jaringan privat, dan IP VPS yang telah Anda daftarkan di 7Server. Akses luar lainnya otomatis ditolak (403).' },
       ]
     : [
         { icon: Lock, title: 'Encrypted at rest', body: 'Everything lives in one SQLite file. SSH credentials, AI tokens and webhooks inside it are encrypted with AES-256-GCM, with the key kept in a separate file on your machine.' },
         { icon: ShieldCheck, title: 'Users and roles', body: 'Each person gets an account: Admin, Operator or Viewer, optionally limited to some servers. Sessions can be revoked, and every change is written to an audit log with who did it.' },
+        { icon: EyeOff, title: 'Privacy Mode for Screencasts', body: 'Instantly blur all server IPs, domain names, application paths, local ports, and tokens with one click in the top bar. Built for live demos, streaming, and video recording.' },
         { icon: Sparkles, title: 'Gateway stays inside', body: 'The AI gateway only answers this machine, private networks and the servers you registered. Everyone else gets 403.' },
       ];
 
@@ -890,7 +896,7 @@ function Security({ lang }: { lang: Lang }) {
           ? '7Server sepenuhnya self-hosted. Tidak ada akun cloud yang perlu dibuat dan tidak ada server perantara di antara Anda dan VPS Anda.'
           : '7Server is self-hosted. There is no account to create and no cloud service between you and your servers.'}
       </Lead>
-      <div className="mt-12 grid gap-4 md:grid-cols-3">
+      <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {items.map(({ icon: Icon, title, body }, i) => (
           <article key={title} className="metal reveal rounded-2xl p-6" style={v(i)}>
             <Icon className="h-5 w-5" style={{ color: 'var(--accent)' }} aria-hidden />

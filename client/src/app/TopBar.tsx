@@ -321,7 +321,7 @@ export default function TopBar({
               <div className="w-6 h-6 rounded-full bg-primary/20 text-primary font-bold text-[11px] flex items-center justify-center">
                 {user.username.slice(0, 2).toUpperCase()}
               </div>
-              <span className="text-xs font-medium max-w-[90px] truncate hidden sm:inline">
+              <span className="text-xs font-medium max-w-[90px] truncate hidden sm:inline sensitive">
                 {user.username}
               </span>
               <span className={`text-[10px] px-1.5 py-0.2 rounded border font-medium hidden md:inline uppercase ${roleBadgeColor}`}>
@@ -336,7 +336,7 @@ export default function TopBar({
                 <div className="pop-in absolute right-0 mt-1 w-56 z-50 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl p-2 space-y-1 text-xs">
                   <div className="px-3 py-2 border-b border-[var(--border)]">
                     <div className="font-semibold text-xs flex items-center gap-1.5">
-                      <span>{user.username}</span>
+                      <span className="sensitive">{user.username}</span>
                       <span className={`text-[10px] px-1.5 py-0.2 rounded border font-medium uppercase ${roleBadgeColor}`}>
                         {user.role}
                       </span>

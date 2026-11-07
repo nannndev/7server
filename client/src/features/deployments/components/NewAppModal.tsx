@@ -23,15 +23,7 @@ import { DeployProgress, type PipelineStage } from './DeployProgress';
 import DnsPreFlightBadge from '@/features/tunnels/components/DnsPreFlightBadge';
 import { fetchCloudflareTunnelStatus } from '@/features/tunnels/api';
 import type { CloudflareTunnelStatus } from '@/features/tunnels/types';
-
-function isPrivateOrTailscaleIp(ip?: string): boolean {
-  if (!ip) return false;
-  const clean = ip.trim().replace(/^.*@/, '').replace(/:\d+$/, '');
-  if (/^100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\./.test(clean)) return true;
-  if (clean === 'localhost' || clean.startsWith('127.')) return true;
-  if (/^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(clean)) return true;
-  return false;
-}
+import { isPrivateOrTailscaleIp } from '../lib/requirements';
 
 interface NewAppModalProps {
   isOpen: boolean;
@@ -1678,7 +1670,7 @@ Periksa apakah ada konfigurasi port, Docker compose, atau variabel environment y
                         <BrandIcon name="nginx" className="w-3.5 h-3.5" />
                         <span>{t('gitApp.bpProxy')}</span>
                       </div>
-                      <span className="font-mono text-[var(--foreground)] truncate max-w-[150px]">
+                      <span className="font-mono text-[var(--foreground)] truncate max-w-[150px] sensitive">
                         {customDomain || `${server.host}:${internalPort}`}
                       </span>
                     </div>

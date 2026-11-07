@@ -62,3 +62,13 @@ export function freePort(wanted: number, used: Iterable<number>): number {
   while (taken.has(p) && p < 65535) p++;
   return p;
 }
+
+/** Check if host/IP is private (RFC 1918), localhost, or Tailscale CGNAT */
+export function isPrivateOrTailscaleIp(ip?: string): boolean {
+  if (!ip) return false;
+  const clean = ip.trim().replace(/^.*@/, '').replace(/:\d+$/, '');
+  if (/^100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\./.test(clean)) return true;
+  if (clean === 'localhost' || clean.startsWith('127.')) return true;
+  if (/^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(clean)) return true;
+  return false;
+}

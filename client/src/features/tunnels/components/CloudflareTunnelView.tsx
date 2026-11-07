@@ -16,7 +16,14 @@ import {
   Network,
   ArrowRight,
   Sparkles,
-  Layers
+  Layers,
+  Zap,
+  Terminal as TermIcon,
+  Key,
+  Copy,
+  Check,
+  Info,
+  Shield
 } from 'lucide-react';
 import type { CloudflareTunnelStatus, CloudflareTunnelRoute } from '../types';
 import { addCloudflareRoute, removeCloudflareRoute } from '../api';
@@ -28,6 +35,8 @@ import { Card } from '@/shared/ui/card';
 import { Input } from '@/shared/ui/input';
 import { toast } from '@/shared/ui/toast';
 import { confirmModal } from '@/shared/ui/confirm-dialog';
+import { useTaskManager } from '@/shared/tasks/TaskContext';
+import { useServerPage } from '@/pages/server/context';
 
 interface CloudflareTunnelViewProps {
   serverId: string;
@@ -80,8 +89,15 @@ export default function CloudflareTunnelView({
   onInstall,
   apps: initialApps
 }: CloudflareTunnelViewProps) {
+  const ctx = useServerPage();
+  const { runStreamTask } = useTaskManager();
+
   const [viewMode, setViewMode] = useState<'map' | 'table'>('map');
   const [modalOpen, setModalOpen] = useState(false);
+  const [showSetupModal, setShowSetupModal] = useState(false);
+  const [setupMode, setSetupMode] = useState<'token' | 'cli'>('token');
+  const [setupToken, setSetupToken] = useState('');
+
   const [hostname, setHostname] = useState('');
   const [service, setService] = useState('http://localhost:80');
   const [autoDns, setAutoDns] = useState(true);
@@ -173,23 +189,254 @@ export default function CloudflareTunnelView({
     }
   };
 
+  const handleConnectToken = (e: React.FormEvent) => {
+    e.preventDefault();
+    const raw = setupToken.trim();
+    const match = raw.match(/service\s+install\s+([A-Za-z0-9._-]+)/i) || raw.match(/eyJ[A-Za-z0-9._-]+/);
+    const cleanToken = match ? (match[1] || match[0]) : raw;
+
+    if (!cleanToken || cleanToken.length < 20) {
+      toast.error('Please enter a valid Cloudflare Tunnel token (starts with eyJ...)');
+      return;
+    }
+
+    setShowSetupModal(false);
+    runStreamTask({
+      serverId,
+      serverName: ctx.server.name || 'Server',
+      title: 'Setup & Connect Cloudflare Tunnel',
+      category: 'services',
+      url: `/api/servers/${serverId}/tunnels/cloudflare/setup-token?stream=1`,
+      body: { token: cleanToken },
+      onDone: () => {
+        toast.success('Cloudflare Tunnel successfully connected!');
+        onRefresh();
+      },
+      onError: (err: any) => {
+        toast.error(err.message || 'Failed to connect Cloudflare Tunnel');
+      }
+    });
+  };
+
+  const handleOpenCliLogin = () => {
+    setShowSetupModal(false);
+    if (ctx.openTerminal) {
+      ctx.openTerminal('cloudflared tunnel login');
+    }
+  };
+
+  const renderSetupModal = () => {
+    if (!showSetupModal) return null;
+    return (
+      <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className="px-5 py-4 border-b border-[var(--border)] flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center">
+                <Zap className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-[var(--foreground)]">Setup Cloudflare Tunnel</h3>
+                <p className="text-[11px] text-[var(--muted-foreground)]">Expose your apps securely without a public IP or open ports</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowSetupModal(false)}
+              className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] p-1 rounded-md"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="p-5 space-y-4">
+            {/* Mode Switcher */}
+            <div className="flex items-center gap-1.5 p-1 bg-[var(--muted)]/50 border border-[var(--border)] rounded-lg text-xs">
+              <button
+                type="button"
+                onClick={() => setSetupMode('token')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md font-medium transition ${
+                  setupMode === 'token'
+                    ? 'bg-[var(--card)] text-amber-400 shadow-sm border border-[var(--border)] font-semibold'
+                    : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                }`}
+              >
+                <Zap className="w-3.5 h-3.5" />
+                <span>Zero Trust Token (1-Click)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSetupMode('cli')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md font-medium transition ${
+                  setupMode === 'cli'
+                    ? 'bg-[var(--card)] text-emerald-400 shadow-sm border border-[var(--border)] font-semibold'
+                    : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                }`}
+              >
+                <TermIcon className="w-3.5 h-3.5" />
+                <span>CLI Login (cert.pem)</span>
+              </button>
+            </div>
+
+            {setupMode === 'token' ? (
+              <form onSubmit={handleConnectToken} className="space-y-4">
+                <div className="p-3.5 rounded-xl bg-amber-500/5 border border-amber-500/20 text-xs space-y-2">
+                  <div className="font-semibold text-amber-400 flex items-center gap-1.5">
+                    <Info className="w-3.5 h-3.5" />
+                    <span>How to get your token:</span>
+                  </div>
+                  <ol className="list-decimal list-inside space-y-1 text-[11px] text-[var(--muted-foreground)] leading-relaxed">
+                    <li>Go to <a href="https://one.dash.cloudflare.com/" target="_blank" rel="noreferrer" className="text-amber-400 underline font-medium">Cloudflare Zero Trust → Networks → Tunnels</a></li>
+                    <li>Click <strong>Add a Tunnel</strong> → select <strong>Cloudflared</strong> → name your tunnel.</li>
+                    <li>Select <strong>Debian (64-bit)</strong> and copy the connector token or command.</li>
+                    <li>Paste it below and click connect:</li>
+                  </ol>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-[var(--foreground)] flex items-center justify-between">
+                    <span>Tunnel Token or Install Command</span>
+                    <span className="text-[10px] text-[var(--muted-foreground)] font-mono">Format: eyJhIj...</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    placeholder="Paste token (eyJhIj...) or full command (sudo cloudflared service install eyJh...)"
+                    value={setupToken}
+                    onChange={(e) => setSetupToken(e.target.value)}
+                    className="w-full font-mono text-xs p-2.5 rounded-lg bg-[var(--background)] border border-[var(--border)] text-[var(--foreground)] focus:outline-none focus:ring-1 focus:ring-amber-500/50"
+                    required
+                  />
+                  <p className="text-[11px] text-[var(--muted-foreground)]">
+                    7Server automatically installs <code>cloudflared</code> (if missing), configures the service, and connects to Cloudflare edge.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border)]">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowSetupModal(false)}
+                    className="text-xs"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="default"
+                    size="sm"
+                    className="text-xs bg-amber-600 hover:bg-amber-500 text-white font-medium gap-1.5"
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    Connect Tunnel
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <div className="space-y-4 text-xs">
+                <div className="p-3.5 rounded-xl bg-[var(--muted)]/50 border border-[var(--border)] space-y-2">
+                  <div className="font-semibold text-[var(--foreground)] flex items-center gap-1.5">
+                    <Key className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Authorize with Cloudflare Account:</span>
+                  </div>
+                  <p className="text-[11px] text-[var(--muted-foreground)] leading-relaxed">
+                    Running <code>cloudflared tunnel login</code> generates an authentication URL. Open it in your browser to select your domain and download the <code>cert.pem</code> certificate to this server.
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-lg bg-zinc-950 font-mono text-[11px] border border-zinc-800 text-zinc-300 space-y-1">
+                  <div className="text-zinc-500"># 1. Authorize in browser</div>
+                  <div className="text-emerald-400">cloudflared tunnel login</div>
+                  <div className="text-zinc-500 pt-1"># 2. Create named tunnel</div>
+                  <div className="text-emerald-400">cloudflared tunnel create my-server</div>
+                  <div className="text-zinc-500 pt-1"># 3. Start systemd service</div>
+                  <div className="text-emerald-400">sudo cloudflared service install</div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border)]">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowSetupModal(false)}
+                    className="text-xs"
+                  >
+                    Close
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="sm"
+                    onClick={handleOpenCliLogin}
+                    className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-medium gap-1.5"
+                  >
+                    <TermIcon className="w-3.5 h-3.5" />
+                    Open Terminal & Run Login
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   if (!status?.installed && !loading) {
     return (
-      <Card className="p-8 text-center space-y-4 border-dashed border-[var(--border)]">
-        <div className="w-12 h-12 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto">
-          <Radio className="w-6 h-6" />
+      <Card className="p-8 text-center space-y-5 border-dashed border-[var(--border)] max-w-2xl mx-auto">
+        <div className="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center mx-auto border border-amber-500/20 shadow-inner">
+          <Radio className="w-7 h-7 animate-pulse" />
         </div>
-        <div className="max-w-md mx-auto space-y-2">
-          <h4 className="text-base font-semibold text-[var(--foreground)]">Cloudflare Tunnel Not Installed</h4>
-          <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
-            Cloudflare Tunnel (<code>cloudflared</code>) lets you securely expose local servers, homelabs, or private VPS to the internet without a public IPv4 address or open firewall ports.
+        <div className="space-y-2">
+          <h4 className="text-lg font-semibold text-[var(--foreground)]">Setup Cloudflare Tunnel</h4>
+          <p className="text-xs text-[var(--muted-foreground)] leading-relaxed max-w-lg mx-auto">
+            Securely expose local webapps and Docker containers to the internet without a public IPv4 address or firewall port forwarding.
           </p>
         </div>
-        {onInstall && (
-          <Button variant="default" size="sm" onClick={onInstall} className="gap-2 text-xs">
-            <Plus className="w-4 h-4" /> Install cloudflared on Server
-          </Button>
-        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left pt-2">
+          <div
+            onClick={() => {
+              setSetupMode('token');
+              setShowSetupModal(true);
+            }}
+            className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 cursor-pointer transition space-y-2 group"
+          >
+            <div className="flex items-center gap-2 text-amber-400 font-semibold text-xs">
+              <Zap className="w-4 h-4" />
+              <span>Zero Trust Token (1-Click)</span>
+            </div>
+            <p className="text-[11px] text-[var(--muted-foreground)] leading-snug">
+              Create a tunnel in Cloudflare Dashboard, copy the connector token, and paste it here.
+            </p>
+            <div className="text-[11px] text-amber-400 font-medium flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+              <span>Connect Token</span>
+              <ArrowRight className="w-3 h-3" />
+            </div>
+          </div>
+
+          <div
+            onClick={() => {
+              setSetupMode('cli');
+              setShowSetupModal(true);
+            }}
+            className="p-4 rounded-xl border border-[var(--border)] bg-[var(--card)] hover:border-zinc-600 cursor-pointer transition space-y-2 group"
+          >
+            <div className="flex items-center gap-2 text-[var(--foreground)] font-semibold text-xs">
+              <TermIcon className="w-4 h-4 text-emerald-400" />
+              <span>CLI Login (cert.pem)</span>
+            </div>
+            <p className="text-[11px] text-[var(--muted-foreground)] leading-snug">
+              Authorize directly from the server terminal using <code>cloudflared tunnel login</code> and browser.
+            </p>
+            <div className="text-[11px] text-emerald-400 font-medium flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+              <span>Open Terminal</span>
+              <ArrowRight className="w-3 h-3" />
+            </div>
+          </div>
+        </div>
+
+        {renderSetupModal()}
       </Card>
     );
   }
@@ -208,14 +455,14 @@ export default function CloudflareTunnelView({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-[var(--foreground)]">
+                <span className="text-sm font-semibold text-[var(--foreground)] sensitive">
                   {status?.tunnelName || status?.tunnelId || 'Cloudflare Tunnel'}
                 </span>
                 <Badge variant={status?.active ? 'success' : 'secondary'} className="text-[10px]">
                   {status?.active ? '● Healthy / Active' : '● Inactive'}
                 </Badge>
               </div>
-              <p className="text-xs text-[var(--muted-foreground)] font-mono flex items-center gap-1.5 mt-0.5">
+              <p className="text-xs text-[var(--muted-foreground)] font-mono flex items-center gap-1.5 mt-0.5 sensitive">
                 <FolderOpen className="w-3 h-3" />
                 {status?.configPath || 'Locally managed tunnel'}
               </p>
@@ -254,6 +501,20 @@ export default function CloudflareTunnelView({
             <Button
               variant="outline"
               size="sm"
+              onClick={() => {
+                setSetupMode('token');
+                setShowSetupModal(true);
+              }}
+              className="gap-1.5 text-xs text-amber-400 border-amber-500/30 hover:bg-amber-500/10"
+              title="Connect or reconfigure Cloudflare Zero Trust Tunnel"
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-400" />
+              Connect Tunnel
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
               onClick={onRefresh}
               disabled={loading}
               className="gap-1.5 text-xs"
@@ -273,6 +534,29 @@ export default function CloudflareTunnelView({
           </div>
         </div>
       </Card>
+
+      {/* Inactive Banner */}
+      {!status?.active && (
+        <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-xs">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+            <span className="text-[var(--foreground)]">
+              Cloudflare service is installed but currently <strong>inactive</strong>. Connect a tunnel token to activate it.
+            </span>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setSetupMode('token');
+              setShowSetupModal(true);
+            }}
+            className="h-6 px-2.5 text-[11px] gap-1 bg-amber-500/20 border-amber-500/30 text-amber-300 hover:bg-amber-500/30"
+          >
+            <Zap className="w-3 h-3" /> Connect Token
+          </Button>
+        </div>
+      )}
 
       {/* Unpointed Apps Quick-Action Banner */}
       {unpointedApps.length > 0 && (
@@ -296,8 +580,8 @@ export default function CloudflareTunnelView({
                 onClick={() => openModalForApp(app)}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--foreground)] border border-[var(--border)] hover:border-amber-500/50 font-mono text-[11px] transition shadow-sm"
               >
-                <span className="font-semibold text-emerald-400 font-sans">{app.name}</span>
-                <span className="text-[var(--muted-foreground)]">(:{app.ports || '80'})</span>
+                <span className="font-semibold text-emerald-400 font-sans sensitive">{app.name}</span>
+                <span className="text-[var(--muted-foreground)] sensitive">(:{app.ports || '80'})</span>
                 <Plus className="w-3 h-3 text-amber-400 ml-0.5" />
               </button>
             ))}
@@ -337,16 +621,16 @@ export default function CloudflareTunnelView({
                         href={`https://${r.hostname}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs font-mono font-medium text-emerald-400 hover:underline truncate flex items-center gap-1"
+                        className="text-xs font-mono font-medium text-emerald-400 hover:underline truncate flex items-center gap-1 sensitive"
                         title={r.hostname}
                       >
-                        {r.hostname}
+                        <span className="sensitive">{r.hostname}</span>
                         <ExternalLink className="w-3 h-3 text-[var(--muted-foreground)] shrink-0" />
                       </a>
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-[10px] text-zinc-300 bg-[var(--muted)] px-2 py-0.5 rounded font-mono">
+                      <span className="text-[10px] text-zinc-300 bg-[var(--muted)] px-2 py-0.5 rounded font-mono sensitive">
                         {r.service}
                       </span>
                       <button
@@ -386,10 +670,10 @@ export default function CloudflareTunnelView({
                       <Radio className="w-4 h-4 animate-pulse" />
                     </div>
                     <div>
-                      <h4 className="text-xs font-semibold text-[var(--foreground)]">
+                      <h4 className="text-xs font-semibold text-[var(--foreground)] sensitive">
                         {status?.tunnelName || status?.tunnelId || 'Cloudflare Tunnel'}
                       </h4>
-                      <p className="text-[10px] text-zinc-400 font-mono truncate max-w-[170px]">
+                      <p className="text-[10px] text-zinc-400 font-mono truncate max-w-[170px] sensitive">
                         {status?.tunnelId}
                       </p>
                     </div>
@@ -401,7 +685,7 @@ export default function CloudflareTunnelView({
 
                 <div className="pt-2 border-t border-emerald-500/10 flex items-center justify-between text-[11px] text-zinc-400">
                   <span>Server Host:</span>
-                  <span className="font-mono text-[var(--foreground)]">{serverIp || '127.0.0.1'}</span>
+                  <span className="font-mono text-[var(--foreground)] sensitive">{serverIp || '127.0.0.1'}</span>
                 </div>
                 <div className="flex items-center justify-between text-[11px] text-zinc-400">
                   <span>Daemon Engine:</span>
@@ -435,9 +719,9 @@ export default function CloudflareTunnelView({
                         href={`https://${r.hostname}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="font-mono text-emerald-400 hover:underline flex items-center gap-1 truncate"
+                        className="font-mono text-emerald-400 hover:underline flex items-center gap-1 truncate sensitive"
                       >
-                        {r.hostname}
+                        <span className="sensitive">{r.hostname}</span>
                         <ExternalLink className="w-3 h-3 text-[var(--muted-foreground)]" />
                       </a>
                       <Badge variant="outline" className="text-[10px] text-zinc-400 border-zinc-700">
@@ -445,12 +729,12 @@ export default function CloudflareTunnelView({
                       </Badge>
                     </div>
                     {r.path && (
-                      <span className="text-[11px] text-[var(--muted-foreground)]">Path: {r.path}</span>
+                      <span className="text-[11px] text-[var(--muted-foreground)] sensitive">Path: {r.path}</span>
                     )}
                   </div>
 
                   <div className="flex items-center gap-3 shrink-0">
-                    <span className="font-mono text-zinc-300 bg-[var(--muted)] px-2 py-0.5 rounded text-[11px]">
+                    <span className="font-mono text-zinc-300 bg-[var(--muted)] px-2 py-0.5 rounded text-[11px] sensitive">
                       {r.service}
                     </span>
                     <Button
@@ -522,8 +806,8 @@ export default function CloudflareTunnelView({
                         >
                           <div className="min-w-0 pr-1">
                             <div className="font-semibold truncate flex items-center gap-1">
-                              <span>{app.name}</span>
-                              <span className="text-[10px] font-mono text-[var(--muted-foreground)]">(:{app.ports || '80'})</span>
+                              <span className="sensitive">{app.name}</span>
+                              <span className="text-[10px] font-mono text-[var(--muted-foreground)] sensitive">(:{app.ports || '80'})</span>
                             </div>
                             <div className="text-[10px] text-[var(--muted-foreground)] truncate">
                               {app.type}
@@ -556,7 +840,7 @@ export default function CloudflareTunnelView({
                     const clean = e.target.value.toLowerCase().trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
                     setHostname(clean);
                   }}
-                  className="font-mono text-xs"
+                  className="font-mono text-xs sensitive"
                   required
                 />
                 <p className="text-[11px] text-[var(--muted-foreground)]">
@@ -572,7 +856,7 @@ export default function CloudflareTunnelView({
                   placeholder="http://localhost:3004 or http://localhost:80"
                   value={service}
                   onChange={(e) => setService(e.target.value)}
-                  className="font-mono text-xs"
+                  className="font-mono text-xs sensitive"
                   required
                 />
                 <div className="flex flex-wrap items-center gap-1.5 pt-1">
@@ -580,7 +864,7 @@ export default function CloudflareTunnelView({
                   <button
                     type="button"
                     onClick={() => setService('http://localhost:80')}
-                    className="text-[10px] bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-zinc-300 px-1.5 py-0.5 rounded"
+                    className="text-[10px] bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-zinc-300 px-1.5 py-0.5 rounded sensitive"
                   >
                     Nginx (port 80)
                   </button>
@@ -596,7 +880,7 @@ export default function CloudflareTunnelView({
                           setService(`http://localhost:${p}`);
                           if (baseDomain) setHostname(`${a.name}.${baseDomain}`);
                         }}
-                        className="text-[10px] bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-emerald-400 px-1.5 py-0.5 rounded font-mono"
+                        className="text-[10px] bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-emerald-400 px-1.5 py-0.5 rounded font-mono sensitive"
                       >
                         {a.name} (:{p})
                       </button>
@@ -647,6 +931,8 @@ export default function CloudflareTunnelView({
           </div>
         </div>
       )}
+
+      {renderSetupModal()}
     </div>
   );
 }

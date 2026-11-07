@@ -686,3 +686,106 @@ rmdir "$BACKUP" 2>/dev/null || true
 echo "App ${appName} removed"
 `;
 }
+
+export function buildPointDomainScript(opts: {
+  appName: string;
+  domain: string;
+  port?: number;
+  enableSsl?: boolean;
+}): string {
+  const { appName, domain, port, enableSsl = true } = opts;
+  if (!appName || !/^[a-zA-Z0-9_-]+$/.test(appName)) {
+    throw new Error('Invalid app name: only letters, numbers, hyphens, and underscores are allowed');
+  }
+  const cleanDomain = (domain || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  if (!cleanDomain || !/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(cleanDomain) || cleanDomain.includes('..')) {
+    throw new Error('Invalid domain: must be a valid fully-qualified domain name');
+  }
+  if (port !== undefined && (!Number.isInteger(port) || port < 1 || port > 65535)) {
+    throw new Error('Invalid port: must be between 1 and 65535');
+  }
+
+  const site = `7server-${appName}`;
+  const workDir = `/var/www/${appName}`;
+
+  const nginxBlock = port
+    ? `cat > "/etc/nginx/sites-available/${site}" <<'NGINX_EOF'
+server {
+  listen 80;
+  server_name ${cleanDomain};
+
+  location / {
+    proxy_pass http://127.0.0.1:${port};
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade \\$http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host \\$host;
+    proxy_set_header X-Real-IP \\$remote_addr;
+    proxy_set_header X-Forwarded-For \\$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \\$scheme;
+  }
+}
+NGINX_EOF`
+    : `WEBROOT=${sq(workDir)}
+FALLBACK="/index.html"
+PHPBLOCK=""
+for d in dist build out .output/public public; do
+  if [ -d "${workDir}/$d" ]; then WEBROOT="${workDir}/$d"; break; fi
+done
+if [ -f "$WEBROOT/index.php" ]; then
+  SOCK=$(ls /run/php/php*-fpm.sock 2>/dev/null | head -n 1 || true)
+  FALLBACK='/index.php?$query_string'
+  [ -n "$SOCK" ] && PHPBLOCK="  location ~ \\\\.php\\$ { include snippets/fastcgi-php.conf; fastcgi_pass unix:$SOCK; }"
+fi
+
+cat > "/etc/nginx/sites-available/${site}" <<NGINX_EOF
+server {
+  listen 80;
+  server_name ${cleanDomain};
+  root $WEBROOT;
+  index index.php index.html;
+  location / {
+    try_files \\$uri \\$uri/ $FALLBACK;
+  }
+$PHPBLOCK
+}
+NGINX_EOF`;
+
+  const sslBlock = enableSsl
+    ? `if command -v certbot >/dev/null 2>&1; then
+  echo "Requesting Let's Encrypt SSL certificate for ${cleanDomain}..."
+  certbot --nginx -d ${cleanDomain} --non-interactive --agree-tos --register-unsafely-without-email --redirect || {
+    echo "Warning: SSL certificate request failed. Verify that your DNS A record points to this server IP."
+  }
+  nginx -t && systemctl reload nginx || true
+else
+  echo "Notice: Certbot not installed. Skipping automatic SSL."
+fi`
+    : '';
+
+  return `set -eo pipefail
+echo "==> Configuring Nginx VirtualHost for ${appName} on ${cleanDomain}"
+if ! command -v nginx >/dev/null 2>&1; then
+  echo "Error: Nginx is not installed. Please install Nginx first from Software."
+  exit 1
+fi
+
+mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
+
+${nginxBlock}
+
+ln -sf "/etc/nginx/sites-available/${site}" "/etc/nginx/sites-enabled/${site}"
+
+echo "Testing Nginx configuration..."
+nginx -t
+
+echo "Reloading Nginx..."
+systemctl reload nginx
+echo "✓ Nginx reloaded successfully"
+
+${sslBlock}
+
+echo "App ${appName} successfully pointed to http${enableSsl ? 's' : ''}://${cleanDomain}"
+`;
+}
+

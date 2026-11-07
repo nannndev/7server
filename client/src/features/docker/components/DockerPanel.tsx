@@ -837,7 +837,7 @@ export default function DockerPanel({
                     onClick={() => setCollapsed((s) => { const n = new Set(s); n.has(project) ? n.delete(project) : n.add(project); return n; })}
                   >
                     {isOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                    {project ? <>🐳 {project}</> : t('docker.standalone')}
+                    {project ? <>🐳 <span className="sensitive">{project}</span></> : t('docker.standalone')}
                     <span className="font-normal text-[var(--muted-foreground)]">({t('docker.groupRunning', { up, total: list.length })})</span>
                   </button>
                   {dir && (
@@ -898,10 +898,10 @@ export default function DockerPanel({
                                 <div className="flex items-center gap-2">
                                   <span className={`w-2 h-2 rounded-full shrink-0 ${stateColor(c)}`} aria-hidden />
                                   <div className="min-w-0">
-                                    <div className="font-semibold font-mono truncate">{c.name}</div>
+                                    <div className="font-semibold font-mono truncate sensitive">{c.name}</div>
                                     <div className="text-[10px] text-[var(--muted-foreground)] font-mono truncate max-w-xs flex items-center gap-1" title={c.image}>
                                       <BrandIcon name={c.image} className="w-3 h-3" />
-                                      {c.image}
+                                      <span className="sensitive">{c.image}</span>
                                     </div>
                                   </div>
                                 </div>
@@ -937,10 +937,10 @@ export default function DockerPanel({
                                   <div className="flex flex-wrap gap-1">
                                     {links.map((p) => (
                                       <a key={p} href={`http://${serverHost}:${p}`} target="_blank" rel="noopener noreferrer"
-                                        className="px-1.5 rounded bg-[var(--muted)] border border-[var(--border)] hover:underline">:{p}</a>
+                                        className="px-1.5 rounded bg-[var(--muted)] border border-[var(--border)] hover:underline sensitive">:{p}</a>
                                     ))}
                                   </div>
-                                ) : <span className="text-[var(--muted-foreground)]" title={c.ports}>{c.ports ? t('docker.internal') : '–'}</span>}
+                                ) : <span className="text-[var(--muted-foreground)] sensitive" title={c.ports}>{c.ports ? t('docker.internal') : '–'}</span>}
                               </td>
                               <td className="py-1.5 px-3 text-right whitespace-nowrap">
                                 <ActionBtn k={`${c.id}:live-logs`} title={t('docker.liveLogs')} onClick={() => setLogsModal({ open: true, id: c.id, name: c.name })}>

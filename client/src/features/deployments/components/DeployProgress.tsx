@@ -381,7 +381,7 @@ Tolong periksa status proses dan container di server, analisa penyebab kegagalan
                 <span className="w-2.5 h-2.5 rounded-full bg-green-500/80" />
               </div>
               <span className="text-[11px] font-mono text-zinc-400 flex items-center gap-1.5 ml-2">
-                <Terminal className="w-3.5 h-3.5" /> build-pipeline.log — {server.name} ({server.host})
+                <Terminal className="w-3.5 h-3.5" /> build-pipeline.log — {server.name} (<span className="sensitive">{server.host}</span>)
               </span>
             </div>
 

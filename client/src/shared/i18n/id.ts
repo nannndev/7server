@@ -549,6 +549,8 @@ export const id: Record<keyof typeof en, string> = {
   'webapps.folderSize': 'Ukuran Folder (du -sh)',
   'webapps.pointTunnel': 'Hubungkan ke Cloudflare Tunnel',
   'webapps.pointTunnelDesc': 'Buka akses publik aplikasi lokal ini ke internet via Cloudflare Tunnel dengan SSL otomatis',
+  'webapps.pointDomain': 'Hubungkan Domain (Nginx)',
+  'webapps.pointDomainDesc': 'Konfigurasi Nginx VirtualHost dan SSL Let\'s Encrypt untuk aplikasi ini',
   'webapps.mutating': 'ubah',
 
   // pm2

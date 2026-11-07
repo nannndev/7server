@@ -5,7 +5,7 @@ import { getServerById } from '../servers/store.js';
 import { manageDockerContainer } from '../docker/service.js';
 import { need } from '../../http/auth.js';
 import { isServerAllowed, withServer } from '../../http/handlers.js';
-import { parseDeploySpec, buildDeployScript, buildRemoveScript } from '../deployments/deploy.js';
+import { parseDeploySpec, buildDeployScript, buildRemoveScript, buildPointDomainScript } from '../deployments/deploy.js';
 import { runScript } from '../software/routes.js';
 import { getActiveIntegration, getDecryptedAccessToken } from '../git/store.js';
 
@@ -92,6 +92,18 @@ processesRoutes.post('/servers/:id/webapps/deploy', need('service.control'), wit
 processesRoutes.post('/servers/:id/webapps/remove', need('service.control'), withServer((t, req, res) =>
   runScript(t, req, res, buildRemoveScript(req.body?.name))
 ));
+
+// Point an existing webapp to a public domain via Nginx + optional Let's Encrypt SSL
+processesRoutes.post('/servers/:id/webapps/point-domain', need('service.control'), withServer((t, req, res) => {
+  const { appName, domain, port, enableSsl } = req.body || {};
+  const script = buildPointDomainScript({
+    appName: String(appName || ''),
+    domain: String(domain || ''),
+    port: port ? Number(port) : undefined,
+    enableSsl: enableSsl !== false
+  });
+  return runScript(t, req, res, script);
+}));
 
 processesRoutes.post('/servers/:id/docker/control', need('service.control'), async (req: Request, res: Response) => {
   if (!checkServerScope(req, res)) return;

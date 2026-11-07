@@ -556,6 +556,8 @@ export const en = {
   'webapps.folderSize': 'Folder Size (du -sh)',
   'webapps.pointTunnel': 'Point to Cloudflare Tunnel',
   'webapps.pointTunnelDesc': 'Expose this local app to the public internet via Cloudflare Tunnel with automatic SSL',
+  'webapps.pointDomain': 'Point Domain (Nginx)',
+  'webapps.pointDomainDesc': 'Configure Nginx VirtualHost and Let\'s Encrypt SSL for this app',
   'webapps.mutating': 'mutate',
 
   // pm2

@@ -152,7 +152,7 @@ export default function NginxTab() {
 
           {nginxTestOutput && (
             <div
-              className={`px-3 py-2 rounded-lg border text-xs font-mono ${
+              className={`px-3 py-2 rounded-lg border text-xs font-mono sensitive ${
                 nginxTestOutput.includes('successful')
                   ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
                   : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
@@ -185,7 +185,7 @@ export default function NginxTab() {
                 <tbody className="divide-y divide-[var(--border)] bg-[var(--card)] font-mono">
                   {nginxSites.map((site) => (
                     <tr key={site.configPath} className="hover:bg-[var(--muted)]/50 transition">
-                      <td className="py-2.5 px-3 font-semibold text-[var(--foreground)]">{site.name}</td>
+                      <td className="py-2.5 px-3 font-semibold text-[var(--foreground)] sensitive">{site.name}</td>
                       <td className="py-2.5 px-3">
                         {site.domains.length > 0 ? (
                           <div className="flex flex-wrap gap-1.5">
@@ -197,7 +197,7 @@ export default function NginxTab() {
                                   href={`${site.ssl ? 'https' : 'http'}://${d}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-sky-500 hover:underline"
+                                  className="inline-flex items-center gap-1 text-sky-500 hover:underline sensitive"
                                 >
                                   <span className="sensitive">{d}</span>
                                   <ExternalLink className="w-3 h-3" />
@@ -205,12 +205,12 @@ export default function NginxTab() {
                               ))}
                           </div>
                         ) : (
-                          <span className="text-[var(--muted-foreground)]">{t('nginx.defaultIp')}</span>
+                          <span className="text-[var(--muted-foreground)] sensitive">{t('nginx.defaultIp')}</span>
                         )}
                       </td>
                       <td className="py-2.5 px-3 text-[var(--muted-foreground)]">
                         {site.proxyPort ? (
-                          <span className="text-amber-500">proxy → {site.proxyPort}</span>
+                          <span className="text-amber-500 sensitive">proxy → {site.proxyPort}</span>
                         ) : (
                           <span className="sensitive">{site.rootPath || '-'}</span>
                         )}

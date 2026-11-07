@@ -43,7 +43,7 @@ export default function DnsPreFlightBadge({ domain, serverIp }: DnsPreFlightBadg
     return (
       <div className="flex items-center gap-1.5 text-[11px] text-[var(--muted-foreground)] pt-1">
         <Loader2 className="w-3 h-3 animate-spin text-emerald-400" />
-        <span>Checking DNS resolution for {cleanDomain}...</span>
+        <span>Checking DNS resolution for <span className="sensitive">{cleanDomain}</span>...</span>
       </div>
     );
   }
@@ -63,7 +63,7 @@ export default function DnsPreFlightBadge({ domain, serverIp }: DnsPreFlightBadg
     return (
       <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 pt-1">
         <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-        <span>DNS verified: points to {result.serverIp || result.resolvedIps[0]} (Let's Encrypt SSL ready)</span>
+        <span>DNS verified: points to <span className="sensitive">{result.serverIp || result.resolvedIps[0]}</span> (Let's Encrypt SSL ready)</span>
       </div>
     );
   }
@@ -91,7 +91,7 @@ export default function DnsPreFlightBadge({ domain, serverIp }: DnsPreFlightBadg
           {serverIp ? (
             <>
               Before Let's Encrypt SSL can be issued, add an <strong>A-Record</strong> in Cloudflare/DNS provider:{' '}
-              <code className="text-amber-100 bg-amber-950/60 px-1 py-0.5 rounded font-mono">
+              <code className="text-amber-100 bg-amber-950/60 px-1 py-0.5 rounded font-mono sensitive">
                 {targetSubdomain} → {serverIp}
               </code>
             </>
@@ -110,8 +110,8 @@ export default function DnsPreFlightBadge({ domain, serverIp }: DnsPreFlightBadg
         <span>DNS IP Mismatch</span>
       </div>
       <p className="text-[11px] text-yellow-200/80">
-        Domain resolves to <code className="font-mono text-white">{result.resolvedIps.join(', ')}</code>, but server IP is{' '}
-        <code className="font-mono text-white">{result.serverIp}</code>. SSL challenge may fail if DNS is pointed to another host.
+        Domain resolves to <code className="font-mono text-white sensitive">{result.resolvedIps.join(', ')}</code>, but server IP is{' '}
+        <code className="font-mono text-white sensitive">{result.serverIp}</code>. SSL challenge may fail if DNS is pointed to another host.
       </p>
     </div>
   );

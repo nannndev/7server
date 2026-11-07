@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { withServer } from '../../http/handlers.js';
 import { need } from '../../http/auth.js';
 import { badRequest } from '../../http/errors.js';
+import { runScript } from '../software/routes.js';
 import {
   fetchCloudflareTunnelStatus,
   addTunnelRouteOnServer,
@@ -39,6 +40,47 @@ tunnelsRoutes.post('/servers/:id/tunnels/cloudflare/routes', need('service.contr
   }
 
   return addTunnelRouteOnServer(server, { hostname, service }, autoDns);
+}));
+
+// POST Setup / install cloudflared with Zero Trust token
+tunnelsRoutes.post('/servers/:id/tunnels/cloudflare/setup-token', need('service.control'), withServer((t, req, res) => {
+  const rawInput = String(req.body?.token || '').trim();
+  const tokenMatch = rawInput.match(/service\s+install\s+([A-Za-z0-9._-]+)/i) || rawInput.match(/eyJ[A-Za-z0-9._-]+/);
+  const token = tokenMatch ? (tokenMatch[1] || tokenMatch[0]) : rawInput;
+
+  if (!token || token.length < 20 || !/^[A-Za-z0-9._-]+$/.test(token)) {
+    throw badRequest('Invalid Cloudflare Tunnel token. It should be a Zero Trust connector token (starting with eyJ...)');
+  }
+
+  const script = `set -eo pipefail
+echo "==> Configuring Cloudflare Tunnel on $(hostname)..."
+
+if ! command -v cloudflared >/dev/null 2>&1; then
+  echo "==> Installing cloudflared package..."
+  curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null
+  echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/cloudflared.list
+  apt-get update -qq
+  apt-get install -y cloudflared
+  echo "✓ cloudflared installed successfully ($(cloudflared --version))"
+fi
+
+echo "==> Installing and starting cloudflared service..."
+systemctl stop cloudflared 2>/dev/null || true
+cloudflared service install ${token}
+systemctl daemon-reload
+systemctl enable cloudflared
+systemctl restart cloudflared
+
+sleep 2
+if systemctl is-active --quiet cloudflared; then
+  echo "✓ Cloudflare Tunnel service is active and running!"
+else
+  echo "Notice: Cloudflare service started. Verifying logs..."
+  journalctl -u cloudflared -n 10 --no-pager || true
+fi
+`;
+
+  return runScript(t, req, res, script);
 }));
 
 // DELETE Remove an ingress route from cloudflared config.yml

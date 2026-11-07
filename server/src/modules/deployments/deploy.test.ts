@@ -37,12 +37,27 @@ execFileSync('bash', ['-n'], { input: buildDeployScript(parseDeploySpec({ ...bas
   execFileSync('bash', ['-n'], { input: st });
 }
 {
-  const { buildRemoveScript } = await import('./deploy.js');
+  const { buildRemoveScript, buildPointDomainScript } = await import('./deploy.js');
   for (const bad of ['', '..', 'html', '../etc', 'a b', 'x;id', '-rf', '$(id)']) assert.throws(() => buildRemoveScript(bad), bad);
   const r = buildRemoveScript('my-app');
   assert.ok(r.includes("DIR='/var/www/my-app'"));
   assert.ok(r.includes('also used by other apps'), 'shared nginx configs are kept');
   execFileSync('bash', ['-n'], { input: r });
+
+  // buildPointDomainScript validation & bash syntax
+  assert.throws(() => buildPointDomainScript({ appName: 'bad/app', domain: 'sub.domain.com' }));
+  assert.throws(() => buildPointDomainScript({ appName: 'myapp', domain: 'bad domain; id' }));
+  assert.throws(() => buildPointDomainScript({ appName: 'myapp', domain: 'sub.domain.com', port: 999999 }));
+
+  const scriptProxied = buildPointDomainScript({ appName: 'my-app', domain: 'app.example.com', port: 3000, enableSsl: true });
+  assert.ok(scriptProxied.includes('proxy_pass http://127.0.0.1:3000;'));
+  assert.ok(scriptProxied.includes('certbot --nginx -d app.example.com'));
+  execFileSync('bash', ['-n'], { input: scriptProxied });
+
+  const scriptStatic = buildPointDomainScript({ appName: 'static-app', domain: 'static.example.com', enableSsl: false });
+  assert.ok(scriptStatic.includes('root $WEBROOT;'));
+  assert.ok(!scriptStatic.includes('certbot --nginx'));
+  execFileSync('bash', ['-n'], { input: scriptStatic });
 }
 assert.ok(buildDeployScript(parseDeploySpec({ ...base, composeSidecar: true })).includes('docker compose up -d'), 'sidecar compose started');
 assert.ok(spec && buildDeployScript(spec).includes('exit 1\n    fi\n    sleep 2'), 'dead port fails the deploy');
