@@ -1,0 +1,15 @@
+{
+  "name": "7server-docs",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vitepress dev . --port 3002",
+    "build": "vitepress build .",
+    "preview": "vitepress preview . --port 3002"
+  },
+  "devDependencies": {
+    "vitepress": "^1.6.3"
+  }
+}
+

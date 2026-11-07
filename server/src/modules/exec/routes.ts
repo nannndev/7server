@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { BatchResultItem } from './types.js';
 import { executeCommand } from '../../infra/ssh.js';
+import { sq } from '../../databases/shell.js';
 import { getAllServers, getServerById } from '../servers/store.js';
 import { need } from '../../http/auth.js';
 import { isServerAllowed } from '../../http/handlers.js';
@@ -13,13 +14,17 @@ execRoutes.post('/servers/:id/exec', need('terminal.open'), async (req: Request,
     return res.status(403).json({ success: false, error: 'Forbidden: Akses ke server ini dibatasi untuk akun Anda' });
   }
 
-  const { command } = req.body;
+  const { command, sudo } = req.body;
   if (!command) return res.status(400).json({ success: false, error: 'Command is required' });
 
   const target = getServerById(serverId, true);
   if (!target) return res.status(404).json({ success: false, error: 'Server not found' });
 
-  const result = await executeCommand(target, command, 30000);
+  // sudo: run as root with the saved sudo password (nginx -t, reload, drop_caches need it on non-root SSH users).
+  const pass = target.sudoPassword || (target.authType === 'password' ? target.password : undefined);
+  const result = sudo === true
+    ? await executeCommand(target, `if [ "$(id -u)" -eq 0 ]; then sh -c ${sq(command)}; else sudo ${pass ? "-k -S -p ''" : '-n'} sh -c ${sq(command)}; fi`, 30000, pass ? { stdin: `${pass}\n` } : {})
+    : await executeCommand(target, command, 30000);
   res.json({ success: true, data: result });
 });
 

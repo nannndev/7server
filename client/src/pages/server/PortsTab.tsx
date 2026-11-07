@@ -7,8 +7,8 @@ import {
   Shield,
   Network
 } from 'lucide-react';
-import type { ListeningPortInfo } from '@/features/webapps/types';
-import { fetchListeningPorts } from '@/features/webapps/api';
+import type { ListeningPortInfo } from '@/features/deployments/types';
+import { fetchListeningPorts } from '@/features/deployments/api';
 import { killProcess } from '@/features/processes/api';
 import { Button } from '@/shared/ui/button';
 import { Card } from '@/shared/ui/card';
@@ -115,7 +115,7 @@ export default function PortsTab() {
           )}
 
           {showRawPorts ? (
-            <div className="bg-[#09090b] border border-[var(--border)] rounded-lg p-3 font-mono text-xs text-zinc-200 overflow-x-auto max-h-[60vh] overflow-y-auto">
+            <div className="bg-[var(--background)] border border-[var(--border)] rounded-lg p-3 font-mono text-xs text-[var(--foreground)] overflow-x-auto max-h-[60vh] overflow-y-auto">
               <pre className="whitespace-pre-wrap">{portsRaw || t('ports.scanning')}</pre>
             </div>
           ) : loadingPorts && portsList.length === 0 ? (
@@ -143,10 +143,10 @@ export default function PortsTab() {
                   {filteredPorts.map((item, idx) => (
                     <tr key={`${item.proto}-${item.port}-${idx}`} className="hover:bg-[var(--muted)]/50 transition">
                       <td className="py-2 px-3 uppercase text-[var(--muted-foreground)]">{item.proto}</td>
-                      <td className="py-2 px-3 font-semibold text-[var(--foreground)]">:{item.port}</td>
+                      <td className="py-2 px-3 font-semibold text-[var(--foreground)] sensitive">:{item.port}</td>
                       <td className="py-2 px-3 text-[var(--muted-foreground)] sensitive">{item.localAddress}</td>
-                      <td className="py-2 px-3 text-[var(--foreground)]">{item.process}</td>
-                      <td className="py-2 px-3 text-[var(--muted-foreground)]">{item.pid}</td>
+                      <td className="py-2 px-3 text-[var(--foreground)] sensitive">{item.process}</td>
+                      <td className="py-2 px-3 text-[var(--muted-foreground)] sensitive">{item.pid}</td>
                       <td className="py-2 px-3 text-right">
                         <div className="inline-flex items-center gap-1.5">
                           {item.proto.startsWith('tcp') &&
@@ -156,7 +156,7 @@ export default function PortsTab() {
                                 href={`http://${server.host}:${item.port}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="px-2 py-0.5 rounded bg-[var(--muted)] border border-[var(--border)] text-[10px] text-sky-500 hover:underline inline-flex items-center gap-1 font-sans"
+                                className="px-2 py-0.5 rounded bg-[var(--muted)] border border-[var(--border)] text-[10px] text-sky-500 hover:underline inline-flex items-center gap-1 font-sans sensitive"
                               >
                                 {t('ports.open')} <ExternalLink className="w-2.5 h-2.5" />
                               </a>

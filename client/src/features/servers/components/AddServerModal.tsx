@@ -27,6 +27,7 @@ export default function AddServerModal({ server, onSave, onClose }: AddServerMod
     password: '',
     privateKey: '',
     passphrase: '',
+    sudoPassword: '',
     tags: server?.tags ? server.tags.join(', ') : '',
     description: server?.description || ''
   });
@@ -228,6 +229,25 @@ export default function AddServerModal({ server, onSave, onClose }: AddServerMod
                   value={formData.passphrase}
                   onChange={handleChange}
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-zinc-300 mb-1">
+                  Sudo Password (Optional)
+                  {server?.hasSudoPassword && (
+                    <span className="text-emerald-400 font-normal ml-1.5 text-[11px]">✓ Sudo password saved</span>
+                  )}
+                </label>
+                <Input
+                  type="password"
+                  name="sudoPassword"
+                  placeholder={server?.hasSudoPassword ? '••••••••' : 'Enter sudo password if user requires it'}
+                  value={formData.sudoPassword}
+                  onChange={handleChange}
+                />
+                <span className="text-[10px] text-zinc-500 mt-0.5 block">
+                  Enables 1-click package installs and service restarts for non-root sudo users.
+                </span>
               </div>
             </div>
           )}

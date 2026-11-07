@@ -2,6 +2,8 @@
   "name": "sevenserver",
   "version": "0.1.1",
   "description": "Self-hosted dashboard for your servers: monitoring, browser terminal, Docker, Nginx, cron, backups, databases and an AI copilot. Agentless, over SSH.",
+  "license": "MIT",
+  "author": "Nandang Eka Prasetya (nannndev)",
   "type": "module",
   "bin": {
     "7server": "bin/7server.js"

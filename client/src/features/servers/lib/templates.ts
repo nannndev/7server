@@ -6,20 +6,25 @@ export interface ToolVersionOption {
 }
 
 export interface TemplateToolItem {
-  id: string; // matches id in SoftwareItem from Tahap 1 scan
+  id: string; // matches id in SoftwareItem from software scan
   name: string;
   description: string;
   versions?: ToolVersionOption[];
   defaultVersion?: string;
+  steps?: string[];
+  configPath?: string;
+  defaultPort?: string;
   installScript: string | ((version?: string) => string);
 }
 
 export interface TemplatePreset {
   id: string;
   name: string;
-  category: 'runtime' | 'container' | 'security';
+  category: 'runtime' | 'container' | 'database' | 'web' | 'security' | 'tooling';
   badge: string;
   description: string;
+  recommendedRam?: string;
+  estimatedTime?: string;
   tools: TemplateToolItem[];
 }
 
@@ -30,517 +35,1686 @@ export interface MarketplaceTool {
   description: string;
   versions?: ToolVersionOption[];
   defaultVersion?: string;
+  steps?: string[];
+  configPath?: string;
+  defaultPort?: string;
+  verifyCmd?: string;
   getInstallScript: (version?: string) => string;
 }
 
+export const PREFLIGHT_HEADER = `# --- Pre-flight: Environment & APT Lock Guard ---
+export DEBIAN_FRONTEND=noninteractive
+export PATH="$PATH:/usr/local/bin:/usr/local/sbin:/usr/local/go/bin:$HOME/.bun/bin:$HOME/.cargo/bin:$HOME/.deno/bin:$HOME/.local/bin"
+APT_FLAGS="-y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold -o DPkg::Lock::Timeout=300"
+
+# Wait gracefully if another concurrent task holds apt/dpkg lock
+for i in $(seq 1 60); do
+  if fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || fuser /var/lib/apt/lists/lock >/dev/null 2>&1; then
+    echo "[$i/60] Concurrent task holds apt/dpkg lock, waiting for release..."
+    sleep 2
+  else
+    break
+  fi
+done`;
+
 // ---------------------------------------------------------------------------
-// Preset Stacks
+// Shared Tool Script Builders (Debian & Ubuntu safe, idempotent)
 // ---------------------------------------------------------------------------
 
-export const TEMPLATE_PRESETS: TemplatePreset[] = [
-  {
-    id: 'node-app',
-    name: 'Node App',
-    category: 'runtime',
-    badge: 'Node LTS · PM2 · Nginx · Certbot',
-    description: 'Stack lengkap untuk menjalankan aplikasi Node.js, Express, NestJS, atau Next.js standalone dengan process manager dan reverse proxy SSL.',
-    tools: [
-      {
-        id: 'node',
-        name: 'Node.js',
-        description: 'Runtime JavaScript server-side dengan npm package manager',
-        versions: [
-          { label: 'Node.js 22 (Current / Latest)', value: '22.x' },
-          { label: 'Node.js 20 (Active LTS - Disarankan)', value: '20.x' },
-          { label: 'Node.js 18 (Maintenance LTS)', value: '18.x' }
-        ],
-        defaultVersion: '20.x',
-        installScript: (v = '20.x') => `# Pasang Node.js (${v})
-echo "==> Memasang Node.js ${v}..."
+const SCRIPTS = {
+  node: (v = '20.x') => `# Install Node.js (${v}) & Corepack
+echo "==> [1/3] Configuring prerequisites & NodeSource repository (${v})..."
+apt-get update -o DPkg::Lock::Timeout=60
+apt-get install $APT_FLAGS ca-certificates curl gnupg
 curl -fsSL https://deb.nodesource.com/setup_${v} | bash -
-apt-get install -y nodejs
-echo -n "Node.js terpasang: " && node -v
-echo -n "npm terpasang: " && npm -v`
-      },
-      {
-        id: 'pm2',
-        name: 'PM2 Process Manager',
-        description: 'Production process manager dengan auto-restart, cluster mode, dan logging',
-        installScript: `# Pasang PM2 global
-echo "==> Memasang PM2..."
-npm install -g pm2
-pm2 startup systemd -u root --hp /root || true
-echo -n "PM2 terpasang: " && pm2 -v`
-      },
-      {
-        id: 'nginx',
-        name: 'Nginx Web Server',
-        description: 'High-performance HTTP server & reverse proxy untuk domain web',
-        installScript: `# Pasang Nginx Web Server
-echo "==> Memasang Nginx..."
-apt-get update && apt-get install -y nginx
-systemctl enable --now nginx
-echo -n "Nginx terpasang: " && nginx -v`
-      },
-      {
-        id: 'certbot',
-        name: "Certbot (Let's Encrypt SSL)",
-        description: "Otomasi sertifikat HTTPS gratis dari Let's Encrypt untuk Nginx",
-        installScript: `# Pasang Certbot & plugin Nginx
-echo "==> Memasang Certbot SSL..."
-apt-get update && apt-get install -y certbot python3-certbot-nginx
-certbot --version`
-      }
-    ]
-  },
-  {
-    id: 'laravel-php',
-    name: 'Laravel / PHP',
-    category: 'runtime',
-    badge: 'PHP-FPM · Composer · Nginx · MySQL',
-    description: 'Stack produksi lengkap untuk framework Laravel, Lumen, Symfony, atau aplikasi web PHP modern dengan database MySQL.',
-    tools: [
-      {
-        id: 'php',
-        name: 'PHP & PHP-FPM',
-        description: 'PHP-FPM fastCGI processor dan modul umum (mbstring, mysql, xml, bcmath, curl, zip)',
-        versions: [
-          { label: 'PHP 8.3 (Latest Stable)', value: '8.3' },
-          { label: 'PHP 8.2 (Standard LTS - Disarankan)', value: '8.2' },
-          { label: 'PHP 8.1 (Extended Support)', value: '8.1' }
-        ],
-        defaultVersion: '8.2',
-        installScript: (v = '8.2') => `# Pasang PHP-FPM ${v} dan ekstensi Laravel
-echo "==> Memasang PPA Ondřej dan PHP ${v}..."
-apt-get update
-apt-get install -y software-properties-common
-add-apt-repository -y ppa:ondrej/php 2>/dev/null || true
-apt-get update
-apt-get install -y php${v}-fpm php${v}-cli php${v}-mysql php${v}-mbstring php${v}-xml php${v}-bcmath php${v}-curl php${v}-zip php${v}-intl php${v}-gd php${v}-sqlite3
-systemctl enable --now php${v}-fpm || systemctl enable --now php*-fpm || true
-php -v`
-      },
-      {
-        id: 'composer',
-        name: 'Composer',
-        description: 'Dependency package manager resmi untuk ekosistem PHP',
-        installScript: `# Pasang Composer
-echo "==> Memasang Composer..."
+echo "==> [2/3] Installing nodejs & npm packages..."
+apt-get install $APT_FLAGS nodejs
+corepack enable 2>/dev/null || true
+echo "==> [3/3] Verifying Node.js installation:"
+echo -n "  Node.js : " && node -v
+echo -n "  npm     : " && npm -v`,
+
+  pnpm: () => `# Install pnpm Package Manager
+echo "==> [1/2] Installing pnpm globally..."
+if command -v corepack >/dev/null 2>&1; then
+  corepack enable
+  corepack prepare pnpm@latest --activate || npm install -g pnpm
+elif command -v npm >/dev/null 2>&1; then
+  npm install -g pnpm
+else
+  curl -fsSL https://get.pnpm.io/install.sh | ENV="$HOME/.bashrc" SHELL="$(which bash)" bash -
+  ln -sf "$HOME/.local/share/pnpm/pnpm" /usr/local/bin/pnpm 2>/dev/null || true
+fi
+echo "==> [2/2] Verifying pnpm: $(pnpm -v)"`,
+
+  yarn: () => `# Install Yarn Package Manager
+echo "==> [1/2] Installing Yarn globally..."
+if command -v corepack >/dev/null 2>&1; then
+  corepack enable
+  corepack prepare yarn@stable --activate || npm install -g yarn
+else
+  npm install -g yarn
+fi
+echo "==> [2/2] Verifying Yarn: $(yarn -v)"`,
+
+  bun: () => `# Install Bun Runtime & Toolkit
+echo "==> [1/3] Ensuring curl and unzip packages are installed..."
+apt-get update -o DPkg::Lock::Timeout=60 && apt-get install $APT_FLAGS curl unzip
+echo "==> [2/3] Downloading and installing Bun..."
+curl -fsSL https://bun.sh/install | bash
+ln -sf "$HOME/.bun/bin/bun" /usr/local/bin/bun
+ln -sf "$HOME/.bun/bin/bunx" /usr/local/bin/bunx
+echo "==> [3/3] Verifying Bun: v$(/usr/local/bin/bun --version)"`,
+
+  deno: () => `# Install Deno Runtime
+echo "==> [1/2] Downloading and installing Deno..."
+apt-get update -o DPkg::Lock::Timeout=60 && apt-get install $APT_FLAGS curl unzip
+curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/usr/local sh
+echo "==> [2/2] Verifying Deno: $(deno --version | head -1)"`,
+
+  php: (v = '8.3') => `# Install PHP ${v}, PHP-FPM & Production Extensions (Ubuntu & Debian)
+echo "==> [1/3] Adding official PHP (${v}) repository..."
+apt-get update -o DPkg::Lock::Timeout=60
+apt-get install $APT_FLAGS ca-certificates apt-transport-https software-properties-common curl gnupg lsb-release
+. /etc/os-release
+if [ "$ID" = "debian" ]; then
+  curl -sSLo /usr/share/keyrings/deb.sury.org-php.gpg https://packages.sury.org/php/apt.gpg
+  echo "deb [signed-by=/usr/share/keyrings/deb.sury.org-php.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main" > /etc/apt/sources.list.d/php.list
+else
+  LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php 2>/dev/null || true
+fi
+echo "==> [2/3] Installing PHP ${v}-FPM and production extensions..."
+apt-get update -o DPkg::Lock::Timeout=60
+apt-get install $APT_FLAGS php${v}-fpm php${v}-cli php${v}-common php${v}-mysql php${v}-pgsql php${v}-sqlite3 php${v}-redis php${v}-mbstring php${v}-xml php${v}-bcmath php${v}-curl php${v}-zip php${v}-intl php${v}-gd
+echo "==> [3/3] Enabling php${v}-fpm systemd service..."
+systemctl enable --now php${v}-fpm || true
+php -v | head -1`,
+
+  composer: () => `# Install Composer 2 Dependency Manager
+echo "==> [1/2] Downloading official Composer installer..."
+export COMPOSER_ALLOW_SUPERUSER=1
+apt-get update -o DPkg::Lock::Timeout=60 && apt-get install $APT_FLAGS curl unzip php-cli
 curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
-composer --version`
-      },
-      {
-        id: 'nginx',
-        name: 'Nginx Web Server',
-        description: 'Web server & reverse proxy untuk memproses request ke PHP-FPM',
-        installScript: `# Pasang Nginx Web Server
-echo "==> Memasang Nginx..."
-apt-get update && apt-get install -y nginx
+chmod +x /usr/local/bin/composer
+echo "==> [2/2] Verifying Composer: $(COMPOSER_ALLOW_SUPERUSER=1 composer --version --no-ansi)"`,
+
+  python: () => `# Install Python 3, Pip, Venv & Build Toolchain
+echo "==> [1/2] Installing Python 3, pip, venv, and C/C++ build tools..."
+apt-get update -o DPkg::Lock::Timeout=60
+apt-get install $APT_FLAGS python3 python3-pip python3-venv python3-dev build-essential libpq-dev libssl-dev libffi-dev
+echo "==> [2/2] Verifying Python: $(python3 --version) | $(pip3 --version | awk '{print $1, $2}')"`,
+
+  go: (v = '1.23.3') => v === 'apt'
+    ? `# Install Go from Distribution Repository
+echo "==> Installing golang-go via APT..."
+apt-get update -o DPkg::Lock::Timeout=60 && apt-get install $APT_FLAGS golang-go
+go version`
+    : `# Install Official Go (Golang) v${v}
+echo "==> [1/3] Downloading official Go v${v} tarball..."
+apt-get update -o DPkg::Lock::Timeout=60 && apt-get install $APT_FLAGS curl tar
+ARCH=$(dpkg --print-architecture)
+curl -fsSL "https://go.dev/dl/go${v}.linux-\${ARCH}.tar.gz" -o /tmp/go.tar.gz
+echo "==> [2/3] Extracting to /usr/local/go and symlinking binary..."
+rm -rf /usr/local/go && tar -C /usr/local -xzf /tmp/go.tar.gz
+rm -f /tmp/go.tar.gz
+ln -sf /usr/local/go/bin/go /usr/local/bin/go
+ln -sf /usr/local/go/bin/gofmt /usr/local/bin/gofmt
+echo "==> [3/3] Verifying Go: $(/usr/local/bin/go version)"`,
+
+  rust: () => `# Install Rust & Cargo Toolchain (rustup)
+echo "==> [1/2] Installing build prerequisites and running rustup..."
+apt-get update -o DPkg::Lock::Timeout=60 && apt-get install $APT_FLAGS curl build-essential pkg-config libssl-dev
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ln -sf "$HOME/.cargo/bin/rustc" /usr/local/bin/rustc
+ln -sf "$HOME/.cargo/bin/cargo" /usr/local/bin/cargo
+echo "==> [2/2] Verifying Rust: $(/usr/local/bin/rustc --version)"`,
+
+  java: (v = '21') => `# Install OpenJDK ${v}
+echo "==> [1/2] Installing OpenJDK ${v} JRE & JDK..."
+apt-get update -o DPkg::Lock::Timeout=60
+apt-get install $APT_FLAGS openjdk-${v}-jdk-headless || apt-get install $APT_FLAGS default-jdk-headless
+echo "==> [2/2] Verifying Java:"
+java -version 2>&1 | head -2`,
+
+  nginx: () => `# Install Nginx Web Server & Reverse Proxy
+echo "==> [1/3] Installing Nginx via APT..."
+apt-get update -o DPkg::Lock::Timeout=60
+apt-get install $APT_FLAGS nginx
+echo "==> [2/3] Preparing /var/www/apps directory & enabling systemd..."
+mkdir -p /var/www/apps /etc/nginx/sites-available /etc/nginx/sites-enabled
 systemctl enable --now nginx
-echo -n "Nginx terpasang: " && nginx -v`
-      },
-      {
-        id: 'mysql',
-        name: 'Database Server',
-        description: 'Relational database management system (MySQL atau MariaDB)',
-        versions: [
-          { label: 'MySQL 8.0 (Oracle)', value: 'mysql' },
-          { label: 'MariaDB 10.11 (Community)', value: 'mariadb' }
-        ],
-        defaultVersion: 'mysql',
-        installScript: (v = 'mysql') => v === 'mariadb'
-          ? `# Pasang MariaDB Server
-echo "==> Memasang MariaDB Server..."
-apt-get update && apt-get install -y mariadb-server mariadb-client
-systemctl enable --now mariadb
-mariadb --version`
-          : `# Pasang MySQL Server
-echo "==> Memasang MySQL Server..."
-apt-get update && apt-get install -y mysql-server
+echo "==> [3/3] Verifying Nginx:"
+nginx -v 2>&1 && nginx -t 2>&1`,
+
+  apache: () => `# Install Apache HTTP Server (apache2)
+echo "==> [1/2] Installing Apache2 and proxy/rewrite modules..."
+apt-get update -o DPkg::Lock::Timeout=60
+apt-get install $APT_FLAGS apache2
+a2enmod rewrite proxy proxy_http ssl headers 2>/dev/null || true
+systemctl enable --now apache2
+echo "==> [2/2] Verifying Apache: $(apache2 -v | head -1)"`,
+
+  caddy: () => `# Install Caddy Web Server (Auto HTTPS)
+echo "==> [1/3] Adding official Caddy GPG key & repository..."
+apt-get update -o DPkg::Lock::Timeout=60
+apt-get install $APT_FLAGS debian-keyring debian-archive-keyring apt-transport-https curl gnupg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor --yes -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
+echo "==> [2/3] Installing Caddy package..."
+apt-get update -o DPkg::Lock::Timeout=60 && apt-get install $APT_FLAGS caddy
+systemctl enable --now caddy
+echo "==> [3/3] Verifying Caddy: $(caddy version)"`,
+
+  certbot: () => `# Install Certbot & Nginx Automation Plugin
+echo "==> [1/2] Installing Certbot and python3-certbot-nginx..."
+apt-get update -o DPkg::Lock::Timeout=60
+apt-get install $APT_FLAGS certbot python3-certbot-nginx
+echo "==> [2/2] Verifying Certbot: $(certbot --version 2>&1)"`,
+
+  cloudflared: () => `# Install Cloudflare Tunnel Daemon (cloudflared)
+echo "==> [1/2] Downloading official cloudflared binary..."
+apt-get update -o DPkg::Lock::Timeout=60 && apt-get install $APT_FLAGS curl
+ARCH=$(dpkg --print-architecture)
+curl -fsSL "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-\${ARCH}.deb" -o /tmp/cloudflared.deb
+dpkg -i /tmp/cloudflared.deb || apt-get install -f $APT_FLAGS
+rm -f /tmp/cloudflared.deb
+echo "==> [2/2] Verifying Cloudflared: $(cloudflared --version)"`,
+
+  haproxy: () => `# Install HAProxy Load Balancer
+echo "==> [1/2] Installing HAProxy via APT..."
+apt-get update -o DPkg::Lock::Timeout=60
+apt-get install $APT_FLAGS haproxy
+systemctl enable --now haproxy
+echo "==> [2/2] Verifying HAProxy: $(haproxy -v | head -1)"`,
+
+  mysql: () => `# Install MySQL Server 8.0
+echo "==> [1/2] Installing MySQL Server & Client..."
+apt-get update -o DPkg::Lock::Timeout=60
+apt-get install $APT_FLAGS mysql-server mysql-client
 systemctl enable --now mysql
-mysql --version`
-      }
-    ]
-  },
-  {
-    id: 'docker-host',
-    name: 'Docker Host',
-    category: 'container',
-    badge: 'Docker Engine · Docker Compose',
-    description: 'Jadikan VPS sebagai host container modern untuk menjalankan containerized apps, microservices, dan multi-container compose stacks.',
-    tools: [
-      {
-        id: 'docker',
-        name: 'Docker Engine',
-        description: 'Docker Community Edition container runtime dan daemon resmi',
-        installScript: `# Pasang Docker Engine resmi
-echo "==> Memasang Docker Engine resmi..."
-apt-get update
-apt-get install -y ca-certificates curl gnupg
+echo "==> [2/2] Verifying MySQL: $(mysql --version)"`,
+
+  mariadb: () => `# Install MariaDB Database Server
+echo "==> [1/2] Installing MariaDB Server & Client..."
+apt-get update -o DPkg::Lock::Timeout=60
+apt-get install $APT_FLAGS mariadb-server mariadb-client
+systemctl enable --now mariadb
+echo "==> [2/2] Verifying MariaDB: $(mariadb --version)"`,
+
+  postgres: () => `# Install PostgreSQL Server & Contrib
+echo "==> [1/2] Installing PostgreSQL and contrib extensions..."
+apt-get update -o DPkg::Lock::Timeout=60
+apt-get install $APT_FLAGS postgresql postgresql-contrib libpq-dev
+systemctl enable --now postgresql
+echo "==> [2/2] Verifying PostgreSQL: $(psql --version)"`,
+
+  redis: () => `# Install Redis In-Memory Store
+echo "==> [1/2] Installing Redis Server & enabling systemd..."
+apt-get update -o DPkg::Lock::Timeout=60
+apt-get install $APT_FLAGS redis-server
+sed -i 's/^supervised no/supervised systemd/' /etc/redis/redis.conf 2>/dev/null || true
+systemctl enable --now redis-server
+echo "==> [2/2] Verifying Redis: $(redis-server --version) | Ping: $(redis-cli ping 2>/dev/null || echo OK)"`,
+
+  mongodb: (v = '7.0') => `# Install MongoDB Community Server (${v})
+echo "==> [1/3] Adding MongoDB ${v} GPG key & repository..."
+apt-get update -o DPkg::Lock::Timeout=60 && apt-get install $APT_FLAGS curl gnupg lsb-release
+curl -fsSL "https://www.mongodb.org/static/pgp/server-${v}.asc" | gpg --dearmor --yes -o /usr/share/keyrings/mongodb-server-${v}.gpg
+CODENAME=$(lsb_release -sc)
+[ "$CODENAME" = "noble" ] && CODENAME="jammy"
+echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-${v}.gpg ] https://repo.mongodb.org/apt/ubuntu \${CODENAME}/mongodb-org/${v} multiverse" > /etc/apt/sources.list.d/mongodb-org-${v}.list
+echo "==> [2/3] Installing mongodb-org package..."
+apt-get update -o DPkg::Lock::Timeout=60 && apt-get install $APT_FLAGS mongodb-org
+systemctl enable --now mongod
+echo "==> [3/3] Verifying MongoDB: $(mongod --version | head -1)"`,
+
+  sqlite: () => `# Install SQLite 3 CLI & Dev Headers
+echo "==> Installing SQLite3..."
+apt-get update -o DPkg::Lock::Timeout=60
+apt-get install $APT_FLAGS sqlite3 libsqlite3-dev
+echo "Verifying SQLite: $(sqlite3 --version)"`,
+
+  meilisearch: () => `# Install Meilisearch Search Engine
+echo "==> [1/2] Downloading official Meilisearch binary..."
+apt-get update -o DPkg::Lock::Timeout=60 && apt-get install $APT_FLAGS curl
+curl -L https://install.meilisearch.com | sh
+mv ./meilisearch /usr/local/bin/meilisearch
+chmod +x /usr/local/bin/meilisearch
+echo "==> [2/2] Verifying Meilisearch: $(/usr/local/bin/meilisearch --version)"`,
+
+  docker: () => `# Install Docker Engine & Containerd
+echo "==> [1/3] Setting up official Docker GPG key and repository..."
+apt-get update -o DPkg::Lock::Timeout=60
+apt-get install $APT_FLAGS ca-certificates curl gnupg
 install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc 2>/dev/null || curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc 2>/dev/null
+. /etc/os-release
+DISTRO_ID="\${ID:-ubuntu}"
+curl -fsSL "https://download.docker.com/linux/\${DISTRO_ID}/gpg" -o /etc/apt/keyrings/docker.asc
 chmod a+r /etc/apt/keyrings/docker.asc
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/$(. /etc/os-release && echo "$ID") $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-apt-get update
-apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin || apt-get install -y docker.io docker-compose-v2
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/\${DISTRO_ID} \${VERSION_CODENAME} stable" > /etc/apt/sources.list.d/docker.list
+echo "==> [2/3] Installing Docker CE, CLI, Buildx, and Compose plugin..."
+apt-get update -o DPkg::Lock::Timeout=60
+apt-get install $APT_FLAGS docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin || apt-get install $APT_FLAGS docker.io docker-compose-v2
 systemctl enable --now docker
-docker --version`
-      },
-      {
-        id: 'compose',
-        name: 'Docker Compose',
-        description: 'Plugin orkestrasi multi-container untuk mendefinisikan & menjalankan aplikasi compose',
-        installScript: `# Pasang Docker Compose Plugin
-echo "==> Memasang Docker Compose plugin..."
-apt-get update && apt-get install -y docker-compose-plugin || apt-get install -y docker-compose
-docker compose version`
-      }
-    ]
-  },
-  {
-    id: 'hardening',
-    name: 'Hardening Dasar',
-    category: 'security',
-    badge: 'UFW · Fail2ban · Swap 2GB · Auto Updates',
-    description: 'Penguatan keamanan awal (baseline hardening): konfigurasi firewall, proteksi brute-force SSH, alokasi memori virtual swap, dan update keamanan otomatis.',
-    tools: [
-      {
-        id: 'ufw',
-        name: 'UFW Firewall',
-        description: 'Firewall paket Linux dengan proteksi port SSH, HTTP (80), dan HTTPS (443)',
-        installScript: `# Konfigurasi UFW Firewall
-echo "==> Mengonfigurasi UFW Firewall..."
-apt-get update && apt-get install -y ufw
+groupadd -f docker 2>/dev/null || true
+if [ -n "$SUDO_USER" ]; then
+  usermod -aG docker "$SUDO_USER" 2>/dev/null || true
+fi
+usermod -aG docker $(whoami) 2>/dev/null || true
+chmod 666 /var/run/docker.sock 2>/dev/null || true
+echo "==> [3/3] Verifying Docker: $(docker --version)"`,
+
+  compose: () => `# Install Docker Compose v2 Plugin
+echo "==> [1/2] Installing Docker Compose plugin..."
+apt-get update -o DPkg::Lock::Timeout=60
+apt-get install $APT_FLAGS docker-compose-plugin || apt-get install $APT_FLAGS docker-compose-v2 || apt-get install $APT_FLAGS docker-compose
+echo "==> [2/2] Verifying Compose: $(docker compose version)"`,
+
+  podman: () => `# Install Podman Rootless Container Engine
+echo "==> [1/2] Installing Podman via APT..."
+apt-get update -o DPkg::Lock::Timeout=60
+apt-get install $APT_FLAGS podman
+echo "==> [2/2] Verifying Podman: $(podman --version)"`,
+
+  lazydocker: () => `# Install Lazydocker Terminal UI
+echo "==> [1/2] Downloading latest Lazydocker release..."
+apt-get update -o DPkg::Lock::Timeout=60 && apt-get install $APT_FLAGS curl tar
+DIR=/usr/local/bin bash -c "$(curl -fsSL https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh)"
+echo "==> [2/2] Verifying Lazydocker: $(/usr/local/bin/lazydocker --version | head -1)"`,
+
+  pm2: () => `# Install PM2 Production Process Manager
+echo "==> [1/2] Installing PM2 globally via npm and configuring systemd..."
+npm install -g pm2
+pm2 startup systemd -u root --hp /root >/dev/null 2>&1 || true
+echo "==> [2/2] Verifying PM2: v$(pm2 -v)"`,
+
+  supervisor: () => `# Install Supervisor Process Manager
+echo "==> [1/2] Installing Supervisor process manager..."
+apt-get update -o DPkg::Lock::Timeout=60
+apt-get install $APT_FLAGS supervisor
+systemctl enable --now supervisor
+echo "==> [2/2] Verifying Supervisor: v$(supervisord -v)"`,
+
+  git: () => `# Install Git Version Control
+echo "==> Installing Git..."
+apt-get update -o DPkg::Lock::Timeout=60
+apt-get install $APT_FLAGS git
+git --version`,
+
+  gh: () => `# Install Official GitHub CLI (gh)
+echo "==> [1/2] Adding official GitHub CLI keyring and repository..."
+apt-get update -o DPkg::Lock::Timeout=60 && apt-get install $APT_FLAGS curl gnupg
+mkdir -p -m 755 /etc/apt/keyrings
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o /etc/apt/keyrings/githubcli-archive-keyring.gpg
+chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list
+apt-get update -o DPkg::Lock::Timeout=60 && apt-get install $APT_FLAGS gh
+echo "==> [2/2] Verifying GitHub CLI: $(gh --version | head -1)"`,
+
+  ffmpeg: () => `# Install FFmpeg Media Processing Engine
+echo "==> [1/2] Installing FFmpeg media tools..."
+apt-get update -o DPkg::Lock::Timeout=60
+apt-get install $APT_FLAGS ffmpeg
+echo "==> [2/2] Verifying FFmpeg: $(ffmpeg -version | head -1)"`,
+
+  rclone: () => `# Install Rclone Cloud Storage Sync
+echo "==> [1/2] Installing Rclone..."
+apt-get update -o DPkg::Lock::Timeout=60 && apt-get install $APT_FLAGS curl unzip
+curl -fsSL https://rclone.org/install.sh | bash || apt-get install $APT_FLAGS rclone
+echo "==> [2/2] Verifying Rclone: $(rclone --version | head -1)"`,
+
+  ufw: () => `# Configure UFW Firewall (Anti-Lockout SSH + HTTP/HTTPS)
+echo "==> [1/3] Installing UFW and detecting active SSH port..."
+apt-get update -o DPkg::Lock::Timeout=60
+apt-get install $APT_FLAGS ufw
 SSH_PORT=$(ss -tlnp 2>/dev/null | grep sshd | awk '{print $4}' | awk -F: '{print $NF}' | head -1)
 [ -z "$SSH_PORT" ] && SSH_PORT=22
+echo "==> [2/3] Applying firewall rules (SSH :$SSH_PORT, HTTP :80, HTTPS :443)..."
 ufw default deny incoming
 ufw default allow outgoing
-ufw allow "$SSH_PORT"/tcp comment 'SSH Port'
-ufw allow 80/tcp comment 'HTTP'
-ufw allow 443/tcp comment 'HTTPS'
+ufw allow "$SSH_PORT"/tcp comment 'SSH Management Port'
+ufw allow 80/tcp comment 'HTTP Web'
+ufw allow 443/tcp comment 'HTTPS SSL'
 echo "y" | ufw enable
 systemctl enable ufw
-ufw status verbose`
-      },
-      {
-        id: 'fail2ban',
-        name: 'Fail2ban',
-        description: 'Daemon mitigasi pencegah serangan brute-force SSH otomatis dengan ban IP',
-        installScript: `# Pasang & Aktifkan Fail2ban
-echo "==> Memasang Fail2ban..."
-apt-get update && apt-get install -y fail2ban
+echo "==> [3/3] UFW Status:"
+ufw status verbose`,
+
+  fail2ban: () => `# Install & Enable Fail2ban SSH Intrusion Prevention
+echo "==> [1/2] Installing Fail2ban and enabling sshd jail protection..."
+apt-get update -o DPkg::Lock::Timeout=60
+apt-get install $APT_FLAGS fail2ban
+cat << 'EOF_F2B' > /etc/fail2ban/jail.d/sshd-7server.local
+[sshd]
+enabled = true
+maxretry = 5
+findtime = 10m
+bantime = 1h
+EOF_F2B
 systemctl enable --now fail2ban
-fail2ban-client status`
-      },
-      {
-        id: 'swap',
-        name: 'Swap Memory (2 GB)',
-        description: 'Memori virtual cadangan 2 GB untuk mencegah crash Out-Of-Memory (OOM)',
-        installScript: `# Buat 2GB Swap Memory jika belum ada
-echo "==> Memeriksa & Mengalokasikan 2GB Swap Memory..."
-if [ $(free -m | awk '/^Swap:/{print $2}') -lt 1024 ]; then
-  fallocate -l 2G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=2048
+systemctl restart fail2ban
+echo "==> [2/2] Verifying Fail2ban: $(fail2ban-client --version | head -1)"`,
+
+  swap: (sizeGb = '2') => `# Virtual Swap Memory Allocation (${sizeGb} GB)
+echo "==> [1/3] Checking current Swap allocation..."
+SIZE_MB=$(( ${sizeGb} * 1024 ))
+if [ $(free -m | awk '/^Swap:/{print $2}') -ge "$SIZE_MB" ]; then
+  echo "Swap memory already available (>= ${sizeGb}GB), skipping reallocation."
+else
+  echo "==> [2/3] Allocating /swapfile of ${sizeGb} GB (\${SIZE_MB} MB)..."
+  swapoff /swapfile 2>/dev/null || true
+  rm -f /swapfile
+  dd if=/dev/zero of=/swapfile bs=1M count="$SIZE_MB" status=none
   chmod 600 /swapfile
   mkswap /swapfile
   swapon /swapfile
   if ! grep -q "/swapfile" /etc/fstab; then
     echo "/swapfile none swap sw 0 0" >> /etc/fstab
   fi
-  sysctl vm.swappiness=10
-  echo "vm.swappiness=10" >> /etc/sysctl.d/99-swappiness.conf
-  echo "Swap 2GB berhasil diaktifkan."
-else
-  echo "Swap memori sudah tersedia (>1GB), melewati pembuatan swap."
-fi`
+  sysctl vm.swappiness=10 >/dev/null 2>&1 || true
+  echo "vm.swappiness=10" > /etc/sysctl.d/99-swappiness.conf
+fi
+echo "==> [3/3] Memory & Swap Status:"
+free -h`,
+
+  tailscale: () => `# Install Tailscale Mesh VPN (Zero-Config Private Network)
+echo "==> [1/2] Downloading and installing official Tailscale..."
+apt-get update -o DPkg::Lock::Timeout=60 && apt-get install $APT_FLAGS curl
+curl -fsSL https://tailscale.com/install.sh | sh
+systemctl enable --now tailscaled
+echo "==> [2/2] Verifying Tailscale: $(tailscale version | head -1) (Run 'tailscale up' to authenticate)"`,
+
+  autoupdates: () => `# Enable Unattended Security Updates
+echo "==> [1/2] Installing unattended-upgrades..."
+apt-get update -o DPkg::Lock::Timeout=60
+apt-get install $APT_FLAGS unattended-upgrades update-notifier-common
+cat << 'EOF_AUTO' > /etc/apt/apt.conf.d/20auto-upgrades
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+EOF_AUTO
+systemctl enable --now unattended-upgrades || true
+echo "==> [2/2] Automatic security updates enabled."`
+};
+
+export const UNINSTALL_SCRIPTS: Record<string, () => string> = {
+  node: () => `# Uninstall Node.js, npm & Corepack
+echo "==> [1/3] Removing nodejs package..."
+apt-get purge $APT_FLAGS nodejs || true
+echo "==> [2/3] Cleaning up NodeSource repositories..."
+rm -f /etc/apt/sources.list.d/nodesource.list /etc/apt/keyrings/nodesource.gpg
+echo "==> [3/3] Removing global npm/corepack leftovers..."
+rm -rf /usr/local/lib/node_modules /usr/local/bin/corepack /usr/local/bin/node /usr/local/bin/npm /usr/local/bin/npx "$HOME/.npm" "$HOME/.node-gyp"
+apt-get autoremove $APT_FLAGS || true
+echo "==> Node.js successfully removed."`,
+
+  pnpm: () => `# Uninstall pnpm Package Manager
+echo "==> [1/2] Removing pnpm binary and cache..."
+rm -rf /usr/local/bin/pnpm "$HOME/.local/share/pnpm" "$HOME/.pnpm-state"
+if command -v npm >/dev/null 2>&1; then
+  npm uninstall -g pnpm 2>/dev/null || true
+fi
+echo "==> [2/2] pnpm successfully removed."`,
+
+  yarn: () => `# Uninstall Yarn Package Manager
+echo "==> [1/2] Removing yarn binary and cache..."
+rm -rf /usr/local/bin/yarn /usr/local/bin/yarnpkg "$HOME/.yarn" "$HOME/.cache/yarn"
+if command -v npm >/dev/null 2>&1; then
+  npm uninstall -g yarn 2>/dev/null || true
+fi
+echo "==> [2/2] Yarn successfully removed."`,
+
+  bun: () => `# Uninstall Bun Runtime
+echo "==> [1/2] Removing Bun binaries and cache..."
+rm -rf /usr/local/bin/bun /usr/local/bin/bunx "$HOME/.bun"
+echo "==> [2/2] Bun successfully removed."`,
+
+  deno: () => `# Uninstall Deno Runtime
+echo "==> [1/2] Removing Deno binary and cache..."
+rm -rf /usr/local/bin/deno "$HOME/.deno"
+echo "==> [2/2] Deno successfully removed."`,
+
+  php: () => `# Uninstall PHP, PHP-FPM & Extensions
+echo "==> [1/3] Stopping and disabling php-fpm services..."
+systemctl stop php*-fpm 2>/dev/null || true
+systemctl disable php*-fpm 2>/dev/null || true
+echo "==> [2/3] Purging PHP packages..."
+apt-get purge $APT_FLAGS 'php*' || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> [3/3] PHP and PHP-FPM successfully removed."`,
+
+  composer: () => `# Uninstall Composer
+echo "==> [1/2] Removing Composer executable and cache..."
+rm -rf /usr/local/bin/composer "$HOME/.composer"
+echo "==> [2/2] Composer successfully removed."`,
+
+  python: () => `# Clean Python Dev Headers & Virtualenv tools
+echo "==> Note: Core system python3 is preserved to ensure OS stability."
+echo "==> [1/2] Removing developer packages (pip, venv, dev headers)..."
+apt-get remove $APT_FLAGS python3-pip python3-venv python3-dev build-essential 2>/dev/null || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> [2/2] Python dev environment cleaned up."`,
+
+  go: () => `# Uninstall Go (Golang)
+echo "==> [1/2] Removing Go installation and symlinks..."
+rm -rf /usr/local/go /usr/local/bin/go /usr/local/bin/gofmt "$HOME/go"
+apt-get purge $APT_FLAGS golang-go 2>/dev/null || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> [2/2] Go successfully removed."`,
+
+  rust: () => `# Uninstall Rust & Cargo
+echo "==> [1/2] Running rustup self uninstall..."
+if command -v rustup >/dev/null 2>&1; then
+  rustup self uninstall -y 2>/dev/null || true
+fi
+rm -rf "$HOME/.cargo" "$HOME/.rustup" /usr/local/bin/rustc /usr/local/bin/cargo
+echo "==> [2/2] Rust toolchain successfully removed."`,
+
+  java: () => `# Uninstall Java (OpenJDK)
+echo "==> [1/2] Purging OpenJDK packages..."
+apt-get purge $APT_FLAGS 'openjdk*' 'default-jdk*' 'default-jre*' || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> [2/2] Java successfully removed."`,
+
+  nginx: () => `# Uninstall Nginx Web Server
+echo "==> [1/3] Stopping and disabling Nginx service..."
+systemctl stop nginx 2>/dev/null || true
+systemctl disable nginx 2>/dev/null || true
+echo "==> [2/3] Purging Nginx packages..."
+apt-get purge $APT_FLAGS nginx nginx-common nginx-core || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> [3/3] Nginx successfully removed."`,
+
+  apache: () => `# Uninstall Apache HTTP Server
+echo "==> [1/3] Stopping and disabling Apache2 service..."
+systemctl stop apache2 2>/dev/null || true
+systemctl disable apache2 2>/dev/null || true
+echo "==> [2/3] Purging Apache2 packages..."
+apt-get purge $APT_FLAGS apache2 apache2-utils apache2-bin apache2-data || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> [3/3] Apache2 successfully removed."`,
+
+  caddy: () => `# Uninstall Caddy Web Server
+echo "==> [1/3] Stopping and disabling Caddy service..."
+systemctl stop caddy 2>/dev/null || true
+systemctl disable caddy 2>/dev/null || true
+echo "==> [2/3] Purging Caddy package & repo..."
+apt-get purge $APT_FLAGS caddy || true
+rm -f /etc/apt/sources.list.d/caddy-stable.list /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+apt-get autoremove $APT_FLAGS || true
+echo "==> [3/3] Caddy successfully removed."`,
+
+  certbot: () => `# Uninstall Certbot
+echo "==> [1/2] Purging Certbot packages..."
+apt-get purge $APT_FLAGS certbot python3-certbot-nginx 2>/dev/null || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> [2/2] Certbot successfully removed."`,
+
+  cloudflared: () => `# Uninstall Cloudflare Tunnel (cloudflared)
+echo "==> [1/2] Stopping cloudflared service..."
+systemctl stop cloudflared 2>/dev/null || true
+systemctl disable cloudflared 2>/dev/null || true
+apt-get purge $APT_FLAGS cloudflared 2>/dev/null || true
+rm -f /usr/local/bin/cloudflared /usr/bin/cloudflared
+echo "==> [2/2] Cloudflared successfully removed."`,
+
+  haproxy: () => `# Uninstall HAProxy
+echo "==> [1/2] Stopping and disabling HAProxy service..."
+systemctl stop haproxy 2>/dev/null || true
+systemctl disable haproxy 2>/dev/null || true
+apt-get purge $APT_FLAGS haproxy || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> [2/2] HAProxy successfully removed."`,
+
+  mysql: () => `# Uninstall MySQL Server
+echo "==> [1/3] Stopping and disabling MySQL service..."
+systemctl stop mysql 2>/dev/null || true
+systemctl disable mysql 2>/dev/null || true
+echo "==> [2/3] Purging MySQL server & client packages..."
+apt-get purge $APT_FLAGS mysql-server mysql-client mysql-common || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> [3/3] MySQL successfully removed."`,
+
+  mariadb: () => `# Uninstall MariaDB Server
+echo "==> [1/3] Stopping and disabling MariaDB service..."
+systemctl stop mariadb 2>/dev/null || true
+systemctl disable mariadb 2>/dev/null || true
+echo "==> [2/3] Purging MariaDB packages..."
+apt-get purge $APT_FLAGS mariadb-server mariadb-client mariadb-common || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> [3/3] MariaDB successfully removed."`,
+
+  postgres: () => `# Uninstall PostgreSQL Server
+echo "==> [1/3] Stopping and disabling PostgreSQL service..."
+systemctl stop postgresql 2>/dev/null || true
+systemctl disable postgresql 2>/dev/null || true
+echo "==> [2/3] Purging PostgreSQL packages..."
+apt-get purge $APT_FLAGS 'postgresql*' libpq-dev || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> [3/3] PostgreSQL successfully removed."`,
+
+  redis: () => `# Uninstall Redis Server
+echo "==> [1/3] Stopping and disabling Redis service..."
+systemctl stop redis-server 2>/dev/null || true
+systemctl disable redis-server 2>/dev/null || true
+echo "==> [2/3] Purging Redis packages..."
+apt-get purge $APT_FLAGS redis-server redis-tools || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> [3/3] Redis successfully removed."`,
+
+  mongodb: () => `# Uninstall MongoDB Server
+echo "==> [1/3] Stopping and disabling MongoDB service..."
+systemctl stop mongod 2>/dev/null || true
+systemctl disable mongod 2>/dev/null || true
+echo "==> [2/3] Purging MongoDB packages..."
+apt-get purge $APT_FLAGS 'mongodb-org*' || true
+rm -f /etc/apt/sources.list.d/mongodb-org-*.list /usr/share/keyrings/mongodb-server-*.gpg
+apt-get autoremove $APT_FLAGS || true
+echo "==> [3/3] MongoDB successfully removed."`,
+
+  sqlite: () => `# Uninstall SQLite3
+echo "==> Purging SQLite packages..."
+apt-get purge $APT_FLAGS sqlite3 libsqlite3-dev || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> SQLite successfully removed."`,
+
+  meilisearch: () => `# Uninstall Meilisearch
+echo "==> [1/2] Stopping meilisearch service..."
+systemctl stop meilisearch 2>/dev/null || true
+systemctl disable meilisearch 2>/dev/null || true
+rm -f /usr/local/bin/meilisearch
+echo "==> [2/2] Meilisearch binary removed."`,
+
+  docker: () => `# Uninstall Docker Engine & Containerd
+echo "==> [1/3] Stopping Docker and containerd services..."
+systemctl stop docker containerd 2>/dev/null || true
+systemctl disable docker containerd 2>/dev/null || true
+echo "==> [2/3] Purging Docker CE and CLI packages..."
+apt-get purge $APT_FLAGS docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin docker.io docker-compose 2>/dev/null || true
+rm -f /etc/apt/sources.list.d/docker.list /etc/apt/keyrings/docker.asc
+apt-get autoremove $APT_FLAGS || true
+echo "==> [3/3] Docker successfully removed."`,
+
+  compose: () => `# Uninstall Docker Compose Plugin
+echo "==> Purging Docker Compose package..."
+apt-get purge $APT_FLAGS docker-compose-plugin docker-compose-v2 docker-compose 2>/dev/null || true
+echo "==> Docker Compose removed."`,
+
+  podman: () => `# Uninstall Podman
+echo "==> Purging Podman packages..."
+apt-get purge $APT_FLAGS podman || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> Podman successfully removed."`,
+
+  lazydocker: () => `# Uninstall Lazydocker
+echo "==> Removing Lazydocker binary..."
+rm -f /usr/local/bin/lazydocker
+echo "==> Lazydocker removed."`,
+
+  pm2: () => `# Uninstall PM2
+echo "==> [1/2] Stopping PM2 processes and unregistering systemd..."
+pm2 kill 2>/dev/null || true
+pm2 unstartup systemd 2>/dev/null || true
+echo "==> [2/2] Uninstalling PM2 from global npm..."
+if command -v npm >/dev/null 2>&1; then
+  npm uninstall -g pm2 2>/dev/null || true
+fi
+rm -rf "$HOME/.pm2"
+echo "==> PM2 successfully removed."`,
+
+  supervisor: () => `# Uninstall Supervisor
+echo "==> [1/2] Stopping supervisor service..."
+systemctl stop supervisor 2>/dev/null || true
+systemctl disable supervisor 2>/dev/null || true
+apt-get purge $APT_FLAGS supervisor || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> [2/2] Supervisor successfully removed."`,
+
+  git: () => `# Uninstall Git
+echo "==> Purging Git package..."
+apt-get purge $APT_FLAGS git || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> Git removed."`,
+
+  gh: () => `# Uninstall GitHub CLI (gh)
+echo "==> [1/2] Purging GitHub CLI package..."
+apt-get purge $APT_FLAGS gh || true
+rm -f /etc/apt/sources.list.d/github-cli.list /etc/apt/keyrings/githubcli-archive-keyring.gpg
+apt-get autoremove $APT_FLAGS || true
+echo "==> [2/2] GitHub CLI successfully removed."`,
+
+  ffmpeg: () => `# Uninstall FFmpeg
+echo "==> Purging FFmpeg packages..."
+apt-get purge $APT_FLAGS ffmpeg || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> FFmpeg successfully removed."`,
+
+  rclone: () => `# Uninstall Rclone
+echo "==> Removing Rclone binary..."
+rm -f /usr/local/bin/rclone /usr/bin/rclone /usr/local/share/man/man1/rclone.1
+apt-get purge $APT_FLAGS rclone 2>/dev/null || true
+echo "==> Rclone removed."`,
+
+  ufw: () => `# Disable and Uninstall UFW Firewall
+echo "==> [1/2] Disabling UFW..."
+ufw disable 2>/dev/null || true
+systemctl stop ufw 2>/dev/null || true
+systemctl disable ufw 2>/dev/null || true
+echo "==> [2/2] Purging UFW package..."
+apt-get purge $APT_FLAGS ufw || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> UFW removed."`,
+
+  fail2ban: () => `# Uninstall Fail2ban
+echo "==> [1/2] Stopping fail2ban service..."
+systemctl stop fail2ban 2>/dev/null || true
+systemctl disable fail2ban 2>/dev/null || true
+echo "==> [2/2] Purging fail2ban package..."
+apt-get purge $APT_FLAGS fail2ban || true
+rm -f /etc/fail2ban/jail.d/sshd-7server.local
+apt-get autoremove $APT_FLAGS || true
+echo "==> Fail2ban removed."`,
+
+  swap: () => `# Remove Swap Memory
+echo "==> [1/3] Disabling swap file..."
+swapoff /swapfile 2>/dev/null || true
+echo "==> [2/3] Removing swapfile entry from /etc/fstab..."
+sed -i '/\\/swapfile/d' /etc/fstab 2>/dev/null || true
+echo "==> [3/3] Deleting /swapfile on disk..."
+rm -f /swapfile
+echo "==> Swap memory removed. Current memory:"
+free -h`,
+
+  tailscale: () => `# Uninstall Tailscale VPN
+echo "==> [1/2] Stopping Tailscale service..."
+tailscale down 2>/dev/null || true
+systemctl stop tailscaled 2>/dev/null || true
+systemctl disable tailscaled 2>/dev/null || true
+echo "==> [2/2] Purging Tailscale package..."
+apt-get purge $APT_FLAGS tailscale || true
+apt-get autoremove $APT_FLAGS || true
+echo "==> Tailscale removed."`,
+
+  autoupdates: () => `# Uninstall Unattended Upgrades
+echo "==> [1/2] Stopping unattended-upgrades..."
+systemctl stop unattended-upgrades 2>/dev/null || true
+systemctl disable unattended-upgrades 2>/dev/null || true
+echo "==> [2/2] Purging packages & configs..."
+apt-get purge $APT_FLAGS unattended-upgrades || true
+rm -f /etc/apt/apt.conf.d/20auto-upgrades
+echo "==> Unattended upgrades removed."`
+};
+
+// ---------------------------------------------------------------------------
+// 10 Comprehensive Preset Stacks
+// ---------------------------------------------------------------------------
+
+export const TEMPLATE_PRESETS: TemplatePreset[] = [
+  {
+    id: 'node-app',
+    name: 'Node.js & Next.js Stack',
+    category: 'runtime',
+    badge: 'Node LTS · pnpm · PM2 · Nginx · SSL',
+    recommendedRam: '1 GB+',
+    estimatedTime: '~2 mins',
+    description: 'Production-ready stack for Node.js, Next.js SSR, NestJS, or Express apps with PM2 cluster daemon, pnpm, and Nginx reverse proxy SSL.',
+    tools: [
+      {
+        id: 'node',
+        name: 'Node.js Runtime',
+        description: 'JavaScript V8 server runtime with npm and corepack included',
+        versions: [
+          { label: 'Node.js 22 (Current LTS)', value: '22.x' },
+          { label: 'Node.js 20 (Active LTS - Recommended)', value: '20.x' },
+          { label: 'Node.js 18 (Maintenance LTS)', value: '18.x' }
+        ],
+        defaultVersion: '20.x',
+        steps: ['Configure NodeSource repository', 'Install nodejs & npm packages', 'Enable Corepack'],
+        installScript: SCRIPTS.node
+      },
+      {
+        id: 'pnpm',
+        name: 'pnpm Package Manager',
+        description: 'Fast, disk space efficient package manager for modern monorepos',
+        steps: ['Enable pnpm via Corepack or npm global'],
+        installScript: SCRIPTS.pnpm
+      },
+      {
+        id: 'pm2',
+        name: 'PM2 Process Manager',
+        description: 'Production process manager with auto-restart, RAM monitoring, and systemd startup',
+        steps: ['Install PM2 globally via npm', 'Register systemd startup service'],
+        installScript: SCRIPTS.pm2
+      },
+      {
+        id: 'nginx',
+        name: 'Nginx Web Server',
+        description: 'High-performance HTTP/2 reverse proxy routing domain traffic to internal Node.js port',
+        configPath: '/etc/nginx/sites-available',
+        defaultPort: '80 / 443',
+        steps: ['Install Nginx', 'Prepare /var/www/apps directory', 'Enable systemd service'],
+        installScript: SCRIPTS.nginx
+      },
+      {
+        id: 'certbot',
+        name: "Certbot (Let's Encrypt SSL)",
+        description: 'Automatic HTTPS certificate issuance and renewal for Nginx',
+        steps: ['Install Certbot & python3-certbot-nginx plugin'],
+        installScript: SCRIPTS.certbot
+      },
+      {
+        id: 'git',
+        name: 'Git CLI',
+        description: 'Version control system to clone and pull source code directly on the server',
+        steps: ['Install git package'],
+        installScript: SCRIPTS.git
+      }
+    ]
+  },
+  {
+    id: 'laravel-php',
+    name: 'Laravel / PHP LEMP Stack',
+    category: 'runtime',
+    badge: 'PHP-FPM · Composer · Nginx · MySQL · Redis',
+    recommendedRam: '2 GB+',
+    estimatedTime: '~3 mins',
+    description: 'Enterprise PHP stack for Laravel, Filament, Livewire, or WordPress with PHP-FPM, MySQL/MariaDB, Redis cache, and Supervisor queue worker.',
+    tools: [
+      {
+        id: 'php',
+        name: 'PHP & PHP-FPM',
+        description: 'PHP-FPM FastCGI processor with production extensions (mbstring, mysql, redis, xml, curl, zip, gd, intl)',
+        versions: [
+          { label: 'PHP 8.3 (Latest Stable - Recommended)', value: '8.3' },
+          { label: 'PHP 8.2 (Standard LTS)', value: '8.2' },
+          { label: 'PHP 8.1 (Legacy Support)', value: '8.1' }
+        ],
+        defaultVersion: '8.3',
+        configPath: '/etc/php/8.3/fpm',
+        steps: ['Configure Ondrej PPA / Sury Debian repo', 'Install PHP-FPM & 12 extensions', 'Enable php-fpm systemd'],
+        installScript: SCRIPTS.php
+      },
+      {
+        id: 'composer',
+        name: 'Composer 2',
+        description: 'Standard package dependency manager for the PHP ecosystem',
+        steps: ['Download official Composer binary to /usr/local/bin/composer'],
+        installScript: SCRIPTS.composer
+      },
+      {
+        id: 'nginx',
+        name: 'Nginx Web Server',
+        description: 'High-speed web server forwarding PHP requests to FastCGI socket',
+        configPath: '/etc/nginx/sites-available',
+        defaultPort: '80 / 443',
+        steps: ['Install Nginx & enable systemd service'],
+        installScript: SCRIPTS.nginx
+      },
+      {
+        id: 'mysql',
+        name: 'Relational Database (MySQL / MariaDB)',
+        description: 'Primary relational database server for application tables',
+        versions: [
+          { label: 'MySQL 8.0 Server', value: 'mysql' },
+          { label: 'MariaDB 10.11 Server', value: 'mariadb' }
+        ],
+        defaultVersion: 'mysql',
+        defaultPort: '3306',
+        steps: ['Install database server & client', 'Enable systemd daemon'],
+        installScript: (v = 'mysql') => (v === 'mariadb' ? SCRIPTS.mariadb() : SCRIPTS.mysql())
+      },
+      {
+        id: 'redis',
+        name: 'Redis Server',
+        description: 'In-memory store for Laravel Cache, Session, and Horizon Queue',
+        defaultPort: '6379',
+        steps: ['Install redis-server', 'Configure supervised systemd & start service'],
+        installScript: SCRIPTS.redis
+      },
+      {
+        id: 'supervisor',
+        name: 'Supervisor Process Control',
+        description: 'Keeps background workers (`php artisan queue:work`) running 24/7',
+        configPath: '/etc/supervisor/conf.d',
+        steps: ['Install supervisor & enable systemd'],
+        installScript: SCRIPTS.supervisor
+      },
+      {
+        id: 'certbot',
+        name: 'Certbot SSL',
+        description: "Let's Encrypt automated SSL for Laravel application domains",
+        steps: ['Install certbot & nginx plugin'],
+        installScript: SCRIPTS.certbot
+      }
+    ]
+  },
+  {
+    id: 'python-ai',
+    name: 'Python, FastAPI & AI Stack',
+    category: 'runtime',
+    badge: 'Python 3 · Pip/Venv · Postgres · Redis · Nginx',
+    recommendedRam: '2 GB+',
+    estimatedTime: '~2.5 mins',
+    description: 'Ready-to-use stack for Python backends (FastAPI, Django, Flask), AI/LLM microservices, and Celery workers with PostgreSQL & Redis.',
+    tools: [
+      {
+        id: 'python',
+        name: 'Python 3, Pip & Venv',
+        description: 'Python 3 runtime with virtualenv and C/C++ compilation headers for AI/data packages',
+        steps: ['Install python3, pip, venv, and build-essential'],
+        installScript: SCRIPTS.python
+      },
+      {
+        id: 'postgres',
+        name: 'PostgreSQL Database',
+        description: 'Enterprise relational database ideal for Django/FastAPI applications',
+        defaultPort: '5432',
+        steps: ['Install postgresql & postgresql-contrib', 'Enable systemd service'],
+        installScript: SCRIPTS.postgres
+      },
+      {
+        id: 'redis',
+        name: 'Redis Broker & Cache',
+        description: 'Message broker for Celery / RQ background jobs and API caching',
+        defaultPort: '6379',
+        steps: ['Install & enable redis-server'],
+        installScript: SCRIPTS.redis
+      },
+      {
+        id: 'supervisor',
+        name: 'Supervisor Daemon',
+        description: 'Process supervisor for running Gunicorn / Uvicorn and Celery workers',
+        steps: ['Install supervisor daemon'],
+        installScript: SCRIPTS.supervisor
+      },
+      {
+        id: 'nginx',
+        name: 'Nginx Reverse Proxy',
+        description: 'Reverse proxy in front of Uvicorn/Gunicorn with request buffering & SSL',
+        steps: ['Install Nginx web server'],
+        installScript: SCRIPTS.nginx
+      },
+      {
+        id: 'certbot',
+        name: 'Certbot SSL',
+        description: 'Automated SSL/TLS certificates for Python API endpoints',
+        steps: ['Install Certbot Nginx'],
+        installScript: SCRIPTS.certbot
+      }
+    ]
+  },
+  {
+    id: 'go-microservice',
+    name: 'Go (Golang) High-Perf Stack',
+    category: 'runtime',
+    badge: 'Go Compiler · Postgres · Redis · Nginx · SSL',
+    recommendedRam: '1 GB+',
+    estimatedTime: '~2 mins',
+    description: 'High-performance Go microservice build & runtime environment with PostgreSQL, Redis, and Nginx reverse proxy.',
+    tools: [
+      {
+        id: 'go',
+        name: 'Go (Golang) Toolchain',
+        description: 'Official Go compiler for compiling native binaries directly on the server',
+        versions: [
+          { label: 'Go 1.23.3 (Latest Official)', value: '1.23.3' },
+          { label: 'Go 1.22.9 (Stable Release)', value: '1.22.9' },
+          { label: 'Go Distro Default (APT)', value: 'apt' }
+        ],
+        defaultVersion: '1.23.3',
+        steps: ['Download official go.dev tarball', 'Extract to /usr/local/go & symlink binary'],
+        installScript: SCRIPTS.go
+      },
+      {
+        id: 'postgres',
+        name: 'PostgreSQL',
+        description: 'Primary relational database for Go services',
+        defaultPort: '5432',
+        installScript: SCRIPTS.postgres
+      },
+      {
+        id: 'redis',
+        name: 'Redis Server',
+        description: 'In-memory rate limiter and pub/sub cache',
+        defaultPort: '6379',
+        installScript: SCRIPTS.redis
+      },
+      {
+        id: 'nginx',
+        name: 'Nginx Reverse Proxy',
+        description: 'Ingress proxy routing web traffic to the Go binary port',
+        installScript: SCRIPTS.nginx
+      },
+      {
+        id: 'certbot',
+        name: 'Certbot SSL',
+        description: 'Automated HTTPS from Let’s Encrypt',
+        installScript: SCRIPTS.certbot
+      },
+      {
+        id: 'git',
+        name: 'Git CLI',
+        description: 'Clone repositories and fetch Go modules',
+        installScript: SCRIPTS.git
+      }
+    ]
+  },
+  {
+    id: 'bun-modern',
+    name: 'Bun & Caddy Modern Stack',
+    category: 'runtime',
+    badge: 'Bun · Node · Caddy Auto-SSL · Postgres · Redis',
+    recommendedRam: '1 GB+',
+    estimatedTime: '~2 mins',
+    description: 'Modern, ultra-fast stack: Bun runtime for Hono/Elysia/Next, Caddy with automatic HTTPS, and PostgreSQL.',
+    tools: [
+      {
+        id: 'bun',
+        name: 'Bun Runtime',
+        description: 'Ultra-fast JavaScript/TypeScript runtime with built-in bundler & package manager',
+        steps: ['Download official installer from bun.sh', 'Symlink binary to /usr/local/bin/bun'],
+        installScript: SCRIPTS.bun
+      },
+      {
+        id: 'node',
+        name: 'Node.js LTS',
+        description: 'Full compatibility for Node tooling and ecosystem packages',
+        defaultVersion: '20.x',
+        installScript: SCRIPTS.node
+      },
+      {
+        id: 'pm2',
+        name: 'PM2 Process Manager',
+        description: 'Runs Bun/Node background processes with auto-restart',
+        installScript: SCRIPTS.pm2
+      },
+      {
+        id: 'caddy',
+        name: 'Caddy Web Server',
+        description: 'Modern reverse proxy with automatic SSL and HTTP/3 support',
+        configPath: '/etc/caddy/Caddyfile',
+        installScript: SCRIPTS.caddy
+      },
+      {
+        id: 'postgres',
+        name: 'PostgreSQL',
+        description: 'Modern relational database for Drizzle / Prisma ORM',
+        installScript: SCRIPTS.postgres
+      },
+      {
+        id: 'redis',
+        name: 'Redis Server',
+        description: 'High-speed cache & session store',
+        installScript: SCRIPTS.redis
+      }
+    ]
+  },
+  {
+    id: 'docker-host',
+    name: 'Docker & Container Cloud Host',
+    category: 'container',
+    badge: 'Docker CE · Compose v2 · Lazydocker · UFW · Fail2ban',
+    recommendedRam: '2 GB+',
+    estimatedTime: '~2.5 mins',
+    description: 'Sets up the VPS as a production container host with official Docker Engine, Compose v2, Lazydocker TUI, and security hardening.',
+    tools: [
+      {
+        id: 'docker',
+        name: 'Docker Engine (CE)',
+        description: 'Container runtime and daemon from download.docker.com repository',
+        steps: ['Install official Docker GPG key', 'Install docker-ce, containerd & buildx', 'Enable systemd service'],
+        installScript: SCRIPTS.docker
+      },
+      {
+        id: 'compose',
+        name: 'Docker Compose v2',
+        description: 'Multi-container orchestration via `docker compose up -d`',
+        steps: ['Install docker-compose-plugin'],
+        installScript: SCRIPTS.compose
+      },
+      {
+        id: 'lazydocker',
+        name: 'Lazydocker TUI',
+        description: 'Terminal UI for monitoring containers, images, volumes, and logs',
+        steps: ['Download lazydocker binary to /usr/local/bin'],
+        installScript: SCRIPTS.lazydocker
+      },
+      {
+        id: 'ufw',
+        name: 'UFW Firewall',
+        description: 'Protects inbound ports (SSH, 80, and 443 opened)',
+        installScript: SCRIPTS.ufw
+      },
+      {
+        id: 'fail2ban',
+        name: 'Fail2ban SSH Guard',
+        description: 'Prevents brute-force SSH attacks on the container host',
+        installScript: SCRIPTS.fail2ban
+      }
+    ]
+  },
+  {
+    id: 'database-cluster',
+    name: 'Database, Cache & Search Node',
+    category: 'database',
+    badge: 'PostgreSQL · MySQL · Redis · Meilisearch · Rclone',
+    recommendedRam: '2 GB+',
+    estimatedTime: '~3 mins',
+    description: 'Dedicated database & caching server with Meilisearch full-text search engine and Rclone cloud backup sync.',
+    tools: [
+      {
+        id: 'postgres',
+        name: 'PostgreSQL Server',
+        description: 'Primary relational and JSONB database engine',
+        defaultPort: '5432',
+        installScript: SCRIPTS.postgres
+      },
+      {
+        id: 'mysql',
+        name: 'MySQL / MariaDB Server',
+        description: 'Relational database compatible with MySQL standard protocol',
+        versions: [
+          { label: 'MySQL 8.0 Server', value: 'mysql' },
+          { label: 'MariaDB 10.11 Server', value: 'mariadb' }
+        ],
+        defaultVersion: 'mysql',
+        defaultPort: '3306',
+        installScript: (v = 'mysql') => (v === 'mariadb' ? SCRIPTS.mariadb() : SCRIPTS.mysql())
+      },
+      {
+        id: 'redis',
+        name: 'Redis Server',
+        description: 'In-memory key-value database & cache',
+        defaultPort: '6379',
+        installScript: SCRIPTS.redis
+      },
+      {
+        id: 'meilisearch',
+        name: 'Meilisearch Engine',
+        description: 'Lightning-fast full-text search engine with typo-tolerance',
+        defaultPort: '7700',
+        installScript: SCRIPTS.meilisearch
+      },
+      {
+        id: 'rclone',
+        name: 'Rclone Cloud Backup',
+        description: 'Syncs database dumps to AWS S3, Cloudflare R2, or Google Drive',
+        installScript: SCRIPTS.rclone
+      }
+    ]
+  },
+  {
+    id: 'edge-proxy',
+    name: 'Edge Proxy, SSL & Cloudflare Tunnel',
+    category: 'web',
+    badge: 'Nginx · Caddy · Certbot · Cloudflared · UFW',
+    recommendedRam: '512 MB+',
+    estimatedTime: '~1.5 mins',
+    description: 'Ingress reverse proxy gateway or exposes internal services securely to Cloudflare Zero Trust without public open ports.',
+    tools: [
+      {
+        id: 'nginx',
+        name: 'Nginx Reverse Proxy',
+        description: 'Primary reverse proxy for multi-domain virtual hosts',
+        installScript: SCRIPTS.nginx
+      },
+      {
+        id: 'certbot',
+        name: 'Certbot Let’s Encrypt',
+        description: 'Free automated SSL certificates for all Nginx domains',
+        installScript: SCRIPTS.certbot
+      },
+      {
+        id: 'cloudflared',
+        name: 'Cloudflare Tunnel (cloudflared)',
+        description: 'Connects internal servers to Cloudflare without opening public ports',
+        installScript: SCRIPTS.cloudflared
+      },
+      {
+        id: 'ufw',
+        name: 'UFW Firewall',
+        description: 'Restricts inbound network traffic to authorized ports',
+        installScript: SCRIPTS.ufw
+      }
+    ]
+  },
+  {
+    id: 'hardening',
+    name: 'Security Hardening & Stability',
+    category: 'security',
+    badge: 'UFW · Fail2ban · Swap Memory · Tailscale · Auto-Patch',
+    recommendedRam: 'All Servers',
+    estimatedTime: '~1.5 mins',
+    description: 'Baseline security for every VPS: firewall rules, SSH anti-brute force, Swap memory against OOM crashes, Tailscale VPN, and automatic patches.',
+    tools: [
+      {
+        id: 'ufw',
+        name: 'UFW Firewall',
+        description: 'Linux packet firewall with automatic SSH port detection to prevent lockouts',
+        steps: ['Detect active sshd port', 'Allow SSH, HTTP (80), HTTPS (443)', 'Enable UFW firewall'],
+        installScript: SCRIPTS.ufw
+      },
+      {
+        id: 'fail2ban',
+        name: 'Fail2ban SSH Protection',
+        description: 'Automatically bans IP addresses after 5 failed SSH attempts within 10 minutes',
+        steps: ['Install fail2ban', 'Configure sshd-7server.local jail rule', 'Restart fail2ban service'],
+        installScript: SCRIPTS.fail2ban
+      },
+      {
+        id: 'swap',
+        name: 'Virtual Swap Memory',
+        description: 'Virtual memory file on disk preventing database and build crashes from out-of-memory (OOM)',
+        versions: [
+          { label: '1 GB Swap (Small VPS)', value: '1' },
+          { label: '2 GB Swap (Recommended)', value: '2' },
+          { label: '4 GB Swap (Heavy Builds / Docker)', value: '4' },
+          { label: '8 GB Swap (Large Workloads)', value: '8' }
+        ],
+        defaultVersion: '2',
+        steps: ['Allocate /swapfile', 'Set 0600 permissions & mkswap', 'Persist to /etc/fstab with swappiness=10'],
+        installScript: SCRIPTS.swap
+      },
+      {
+        id: 'tailscale',
+        name: 'Tailscale Private VPN',
+        description: 'Encrypted WireGuard mesh network for server-to-server communication without public IPs',
+        installScript: SCRIPTS.tailscale
       },
       {
         id: 'autoupdates',
-        name: 'Pembaruan Keamanan Otomatis',
-        description: 'Layanan unattended-upgrades untuk mengunduh & memasang patch keamanan Linux otomatis',
-        installScript: `# Aktifkan Unattended Security Upgrades
-echo "==> Mengaktifkan Pembaruan Keamanan Otomatis..."
-apt-get update && apt-get install -y unattended-upgrades update-notifier-common
-echo 'APT::Periodic::Update-Package-Lists "1";' > /etc/apt/apt.conf.d/20auto-upgrades
-echo 'APT::Periodic::Unattended-Upgrade "1";' >> /etc/apt/apt.conf.d/20auto-upgrades
-systemctl enable --now unattended-upgrades || true
-echo "Pembaruan otomatis aktif."`
+        name: 'Auto Security Updates',
+        description: 'Downloads and applies distro security patches automatically in the background',
+        installScript: SCRIPTS.autoupdates
+      }
+    ]
+  },
+  {
+    id: 'devops-media',
+    name: 'DevOps, CLI & Media Toolkit',
+    category: 'tooling',
+    badge: 'Git · GitHub CLI · FFmpeg · Rclone · SQLite',
+    recommendedRam: '1 GB+',
+    estimatedTime: '~1.5 mins',
+    description: 'Essential developer tools for CI/CD automation, video/audio transcoding (FFmpeg), and cloud storage syncing.',
+    tools: [
+      {
+        id: 'git',
+        name: 'Git Version Control',
+        description: 'Standard version control system for source code repositories',
+        installScript: SCRIPTS.git
+      },
+      {
+        id: 'gh',
+        name: 'GitHub CLI (gh)',
+        description: 'Official GitHub CLI for token auth, cloning private repos, and PR management',
+        installScript: SCRIPTS.gh
+      },
+      {
+        id: 'ffmpeg',
+        name: 'FFmpeg Media Engine',
+        description: 'Transcoding, compression, and media processing engine for audio/video apps',
+        installScript: SCRIPTS.ffmpeg
+      },
+      {
+        id: 'rclone',
+        name: 'Rclone Cloud Sync',
+        description: 'File sync and backup tool supporting 40+ cloud storage providers',
+        installScript: SCRIPTS.rclone
+      },
+      {
+        id: 'sqlite',
+        name: 'SQLite 3 Engine',
+        description: 'Lightweight, self-contained SQL database engine requiring zero daemon setup',
+        installScript: SCRIPTS.sqlite
       }
     ]
   }
 ];
 
 // ---------------------------------------------------------------------------
-// Marketplace Individual Tools Catalog (~22 Tools Populer)
+// Marketplace Individual Tools Catalog (39 Curated Tools)
 // ---------------------------------------------------------------------------
 
 export const MARKETPLACE_CATALOG: MarketplaceTool[] = [
-  // Runtime
+  // --- RUNTIMES & PACKAGE MANAGERS (11) ---
   {
     id: 'node',
     name: 'Node.js & npm',
     category: 'runtime',
-    description: 'JavaScript runtime lingkungan produksi berbasis V8 engine dari Google',
+    description: 'Production JavaScript runtime based on Google V8 engine with npm & Corepack.',
+    defaultPort: '3000',
+    verifyCmd: 'node -v && npm -v',
+    steps: ['Configure NodeSource repo', 'Install nodejs & npm packages', 'Enable Corepack'],
     versions: [
-      { label: 'Node 22 (Current)', value: '22.x' },
-      { label: 'Node 20 (LTS)', value: '20.x' },
+      { label: 'Node 22 (Current LTS)', value: '22.x' },
+      { label: 'Node 20 (Active LTS)', value: '20.x' },
       { label: 'Node 18 (Maintenance)', value: '18.x' }
     ],
     defaultVersion: '20.x',
-    getInstallScript: (v = '20.x') => `echo "==> Memasang Node.js ${v}..."
-curl -fsSL https://deb.nodesource.com/setup_${v} | bash -
-apt-get install -y nodejs
-node -v && npm -v`
+    getInstallScript: SCRIPTS.node
+  },
+  {
+    id: 'pnpm',
+    name: 'pnpm',
+    category: 'runtime',
+    description: 'Ultra-fast, disk space efficient package manager with hardlink content-addressable storage.',
+    verifyCmd: 'pnpm -v',
+    steps: ['Enable pnpm via Corepack or npm global'],
+    getInstallScript: SCRIPTS.pnpm
+  },
+  {
+    id: 'yarn',
+    name: 'Yarn Package Manager',
+    category: 'runtime',
+    description: 'Stable JavaScript package manager optimized for workspaces and monorepos.',
+    verifyCmd: 'yarn -v',
+    steps: ['Enable Yarn via Corepack or npm global'],
+    getInstallScript: SCRIPTS.yarn
   },
   {
     id: 'bun',
     name: 'Bun Runtime',
     category: 'runtime',
-    description: 'All-in-one JavaScript & TypeScript toolkit dan runtime super cepat',
-    getInstallScript: () => `echo "==> Memasang Bun..."
-curl -fsSL https://bun.sh/install | bash
-ln -sf /root/.bun/bin/bun /usr/local/bin/bun
-bun --version`
+    description: 'All-in-one JavaScript & TypeScript runtime, bundler, test runner, and package manager.',
+    verifyCmd: 'bun --version',
+    steps: ['Download official installer from bun.sh', 'Symlink binary to /usr/local/bin/bun'],
+    getInstallScript: SCRIPTS.bun
+  },
+  {
+    id: 'deno',
+    name: 'Deno Runtime',
+    category: 'runtime',
+    description: 'Secure-by-default runtime for JavaScript, TypeScript, and WebAssembly by the creator of Node.js.',
+    verifyCmd: 'deno --version',
+    steps: ['Download official installer from deno.land to /usr/local/bin'],
+    getInstallScript: SCRIPTS.deno
   },
   {
     id: 'php',
     name: 'PHP & PHP-FPM',
     category: 'runtime',
-    description: 'FastCGI process manager untuk aplikasi web PHP modern',
+    description: 'FastCGI process manager with 12 production extensions (mysql, pgsql, redis, mbstring, gd, zip, intl).',
+    configPath: '/etc/php',
+    verifyCmd: 'php -v',
+    steps: ['Configure PPA / Sury repository', 'Install PHP-FPM & extensions', 'Enable systemd service'],
     versions: [
-      { label: 'PHP 8.3 (Latest)', value: '8.3' },
+      { label: 'PHP 8.3 (Latest Stable)', value: '8.3' },
       { label: 'PHP 8.2 (LTS)', value: '8.2' },
       { label: 'PHP 8.1', value: '8.1' }
     ],
-    defaultVersion: '8.2',
-    getInstallScript: (v = '8.2') => `echo "==> Memasang PHP ${v}..."
-apt-get update && apt-get install -y software-properties-common
-add-apt-repository -y ppa:ondrej/php 2>/dev/null || true
-apt-get update
-apt-get install -y php${v}-fpm php${v}-cli php${v}-mysql php${v}-mbstring php${v}-xml php${v}-bcmath php${v}-curl php${v}-zip php${v}-gd php${v}-sqlite3
-systemctl enable --now php${v}-fpm || true
-php -v`
+    defaultVersion: '8.3',
+    getInstallScript: SCRIPTS.php
   },
   {
     id: 'composer',
-    name: 'Composer',
+    name: 'Composer 2',
     category: 'runtime',
-    description: 'Package manager resmi untuk dependency ekosistem PHP',
-    getInstallScript: () => `echo "==> Memasang Composer..."
-curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
-composer --version`
+    description: 'Official dependency manager for PHP and Laravel ecosystem libraries.',
+    verifyCmd: 'composer --version',
+    steps: ['Download installer from getcomposer.org', 'Install to /usr/local/bin/composer'],
+    getInstallScript: SCRIPTS.composer
   },
   {
     id: 'python',
-    name: 'Python 3 & venv',
+    name: 'Python 3, Pip & Venv',
     category: 'runtime',
-    description: 'Lingkungan Python 3 lengkap dengan pip package manager dan virtualenv',
-    getInstallScript: () => `echo "==> Memasang Python 3 & Pip..."
-apt-get update && apt-get install -y python3 python3-pip python3-venv build-essential
-python3 --version && pip3 --version`
+    description: 'Python 3 runtime environment with pip, virtualenv, and C/C++ compilation headers.',
+    verifyCmd: 'python3 --version && pip3 --version',
+    steps: ['Install python3, python3-pip, python3-venv, and build-essential'],
+    getInstallScript: SCRIPTS.python
   },
   {
     id: 'go',
     name: 'Go (Golang)',
     category: 'runtime',
-    description: 'Compiler bahasa pemrograman Go resmi Google untuk performa tinggi',
-    getInstallScript: () => `echo "==> Memasang Go..."
-apt-get update && apt-get install -y golang-go
-go version`
+    description: 'Official Go compiler from go.dev for building high-performance concurrent applications.',
+    verifyCmd: 'go version',
+    steps: ['Download official go.dev tarball', 'Extract to /usr/local/go and symlink to /usr/local/bin/go'],
+    versions: [
+      { label: 'Go 1.23.3 (Latest Official)', value: '1.23.3' },
+      { label: 'Go 1.22.9 (Stable)', value: '1.22.9' },
+      { label: 'Go APT Distro', value: 'apt' }
+    ],
+    defaultVersion: '1.23.3',
+    getInstallScript: SCRIPTS.go
+  },
+  {
+    id: 'rust',
+    name: 'Rust & Cargo (rustup)',
+    category: 'runtime',
+    description: 'Rust compiler (`rustc`) and `cargo` package manager via official rustup installer.',
+    verifyCmd: 'rustc --version && cargo --version',
+    steps: ['Install build-essential & libssl-dev', 'Run automatic rustup-init', 'Symlink rustc & cargo'],
+    getInstallScript: SCRIPTS.rust
+  },
+  {
+    id: 'java',
+    name: 'Java (OpenJDK)',
+    category: 'runtime',
+    description: 'OpenJDK Java Runtime & Development Kit for Spring Boot, Kafka, or JVM workloads.',
+    verifyCmd: 'java -version',
+    versions: [
+      { label: 'OpenJDK 21 (LTS)', value: '21' },
+      { label: 'OpenJDK 17 (LTS)', value: '17' }
+    ],
+    defaultVersion: '21',
+    steps: ['Install openjdk-jdk-headless package via APT'],
+    getInstallScript: SCRIPTS.java
   },
 
-  // Web Servers
+  // --- WEB SERVERS, PROXIES & TUNNELS (6) ---
   {
     id: 'nginx',
-    name: 'Nginx',
+    name: 'Nginx Web Server',
     category: 'web',
-    description: 'HTTP web server, reverse proxy, dan load balancer berperforma tinggi',
-    getInstallScript: () => `echo "==> Memasang Nginx..."
-apt-get update && apt-get install -y nginx
-systemctl enable --now nginx
-nginx -v`
+    description: 'Industry-standard HTTP web server, reverse proxy, and load balancer with low memory usage.',
+    configPath: '/etc/nginx/sites-available',
+    defaultPort: '80 / 443',
+    verifyCmd: 'nginx -v',
+    steps: ['Install nginx package', 'Prepare /var/www/apps directory', 'Enable Nginx systemd service'],
+    getInstallScript: SCRIPTS.nginx
   },
   {
     id: 'caddy',
-    name: 'Caddy Server',
+    name: 'Caddy Web Server',
     category: 'web',
-    description: 'Web server modern dengan sertifikat HTTPS (SSL) otomatis bawaan',
-    getInstallScript: () => `echo "==> Memasang Caddy Server..."
-apt-get install -y debian-keyring debian-archive-keyring apt-transport-https curl
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
-apt-get update && apt-get install -y caddy
-systemctl enable --now caddy
-caddy version`
+    description: 'Modern web server and reverse proxy featuring built-in automatic HTTPS (SSL).',
+    configPath: '/etc/caddy/Caddyfile',
+    defaultPort: '80 / 443',
+    verifyCmd: 'caddy version',
+    steps: ['Add official Cloudsmith Caddy repository', 'Install caddy package & enable systemd'],
+    getInstallScript: SCRIPTS.caddy
+  },
+  {
+    id: 'apache',
+    name: 'Apache HTTP Server',
+    category: 'web',
+    description: 'Modular web server with full `.htaccess` and mod_rewrite support.',
+    configPath: '/etc/apache2/sites-available',
+    defaultPort: '80 / 443',
+    verifyCmd: 'apache2 -v',
+    steps: ['Install apache2', 'Enable rewrite, proxy, and ssl modules'],
+    getInstallScript: SCRIPTS.apache
   },
   {
     id: 'certbot',
-    name: 'Certbot SSL',
+    name: 'Certbot (Let’s Encrypt)',
     category: 'web',
-    description: "Client otomatis untuk menerbitkan sertifikat Let's Encrypt SSL/TLS",
-    getInstallScript: () => `echo "==> Memasang Certbot..."
-apt-get update && apt-get install -y certbot python3-certbot-nginx
-certbot --version`
+    description: 'Automated client for issuing and renewing free SSL/TLS certificates from Let’s Encrypt.',
+    verifyCmd: 'certbot --version',
+    steps: ['Install certbot and python3-certbot-nginx'],
+    getInstallScript: SCRIPTS.certbot
+  },
+  {
+    id: 'cloudflared',
+    name: 'Cloudflare Tunnel',
+    category: 'web',
+    description: 'Zero-Trust daemon connecting local services to Cloudflare without opening public firewall ports.',
+    verifyCmd: 'cloudflared --version',
+    steps: ['Download official .deb package according to architecture', 'Install cloudflared binary'],
+    getInstallScript: SCRIPTS.cloudflared
+  },
+  {
+    id: 'haproxy',
+    name: 'HAProxy Load Balancer',
+    category: 'web',
+    description: 'High-performance TCP/HTTP load balancer for distributing high-concurrency traffic.',
+    configPath: '/etc/haproxy/haproxy.cfg',
+    verifyCmd: 'haproxy -v',
+    steps: ['Install haproxy & enable systemd service'],
+    getInstallScript: SCRIPTS.haproxy
   },
 
-  // Database & Cache
+  // --- DATABASES, CACHE & SEARCH (7) ---
+  {
+    id: 'postgres',
+    name: 'PostgreSQL',
+    category: 'database',
+    description: 'Enterprise object-relational database with JSONB, advanced indexing, and contrib extensions.',
+    configPath: '/etc/postgresql',
+    defaultPort: '5432',
+    verifyCmd: 'psql --version',
+    steps: ['Install postgresql, postgresql-contrib & libpq-dev', 'Enable postgresql service'],
+    getInstallScript: SCRIPTS.postgres
+  },
   {
     id: 'mysql',
     name: 'MySQL Server 8.0',
     category: 'database',
-    description: 'Sistem manajemen basis data relasional paling populer di dunia',
-    getInstallScript: () => `echo "==> Memasang MySQL Server..."
-apt-get update && apt-get install -y mysql-server
-systemctl enable --now mysql
-mysql --version`
+    description: 'Widely deployed relational database system for web applications of any scale.',
+    configPath: '/etc/mysql',
+    defaultPort: '3306',
+    verifyCmd: 'mysql --version',
+    steps: ['Install mysql-server & mysql-client', 'Enable mysql systemd service'],
+    getInstallScript: SCRIPTS.mysql
   },
   {
     id: 'mariadb',
     name: 'MariaDB Server',
     category: 'database',
-    description: 'Drop-in replacement open-source yang cepat dan andal untuk MySQL',
-    getInstallScript: () => `echo "==> Memasang MariaDB Server..."
-apt-get update && apt-get install -y mariadb-server mariadb-client
-systemctl enable --now mariadb
-mariadb --version`
-  },
-  {
-    id: 'postgres',
-    name: 'PostgreSQL',
-    category: 'database',
-    description: 'Object-relational database enterprise-grade dengan fitur SQL tercanggih',
-    getInstallScript: () => `echo "==> Memasang PostgreSQL..."
-apt-get update && apt-get install -y postgresql postgresql-contrib
-systemctl enable --now postgresql
-psql --version`
+    description: 'Fast, reliable, and drop-in open-source replacement for MySQL Server.',
+    configPath: '/etc/mysql/mariadb.conf.d',
+    defaultPort: '3306',
+    verifyCmd: 'mariadb --version',
+    steps: ['Install mariadb-server & mariadb-client', 'Enable mariadb systemd service'],
+    getInstallScript: SCRIPTS.mariadb
   },
   {
     id: 'redis',
     name: 'Redis Server',
     category: 'database',
-    description: 'In-memory key-value data store untuk caching, sessions, dan message broker',
-    getInstallScript: () => `echo "==> Memasang Redis..."
-apt-get update && apt-get install -y redis-server
-systemctl enable --now redis-server
-redis-server --version`
+    description: 'In-memory key-value data structure store for caching, sessions, and BullMQ/Horizon queues.',
+    configPath: '/etc/redis/redis.conf',
+    defaultPort: '6379',
+    verifyCmd: 'redis-server --version',
+    steps: ['Install redis-server', 'Configure supervised systemd & start service'],
+    getInstallScript: SCRIPTS.redis
+  },
+  {
+    id: 'mongodb',
+    name: 'MongoDB Community',
+    category: 'database',
+    description: 'Modern document-oriented NoSQL database for flexible schemas and horizontal scalability.',
+    configPath: '/etc/mongod.conf',
+    defaultPort: '27017',
+    verifyCmd: 'mongod --version',
+    versions: [
+      { label: 'MongoDB 7.0 (Stable)', value: '7.0' },
+      { label: 'MongoDB 6.0', value: '6.0' }
+    ],
+    defaultVersion: '7.0',
+    steps: ['Add official MongoDB GPG key & repo', 'Install mongodb-org & start mongod service'],
+    getInstallScript: SCRIPTS.mongodb
+  },
+  {
+    id: 'sqlite',
+    name: 'SQLite 3',
+    category: 'database',
+    description: 'Lightweight, single-file embedded SQL engine requiring no standalone daemon.',
+    verifyCmd: 'sqlite3 --version',
+    steps: ['Install sqlite3 & libsqlite3-dev'],
+    getInstallScript: SCRIPTS.sqlite
+  },
+  {
+    id: 'meilisearch',
+    name: 'Meilisearch',
+    category: 'database',
+    description: 'Rust-based lightning-fast full-text search engine with out-of-the-box typo-tolerance.',
+    defaultPort: '7700',
+    verifyCmd: 'meilisearch --version',
+    steps: ['Download official Meilisearch binary to /usr/local/bin/meilisearch'],
+    getInstallScript: SCRIPTS.meilisearch
   },
 
-  // Tooling & Queue
+  // --- CONTAINERS & ORCHESTRATION (4) ---
+  {
+    id: 'docker',
+    name: 'Docker Engine (CE)',
+    category: 'container',
+    description: 'Official containerization platform including Docker CLI, Containerd, Buildx, and Compose plugin.',
+    configPath: '/etc/docker/daemon.json',
+    verifyCmd: 'docker --version',
+    steps: ['Setup download.docker.com GPG key & repo', 'Install docker-ce & containerd', 'Enable Docker systemd'],
+    getInstallScript: SCRIPTS.docker
+  },
+  {
+    id: 'compose',
+    name: 'Docker Compose v2',
+    category: 'container',
+    description: 'Multi-container orchestration tool defining application stacks in `docker-compose.yml`.',
+    verifyCmd: 'docker compose version',
+    steps: ['Install docker-compose-plugin package'],
+    getInstallScript: SCRIPTS.compose
+  },
+  {
+    id: 'podman',
+    name: 'Podman Engine',
+    category: 'container',
+    description: 'Daemonless, rootless container engine fully CLI-compatible with Docker.',
+    verifyCmd: 'podman --version',
+    steps: ['Install podman package via APT'],
+    getInstallScript: SCRIPTS.podman
+  },
+  {
+    id: 'lazydocker',
+    name: 'Lazydocker TUI',
+    category: 'container',
+    description: 'Visual terminal UI for managing Docker containers, images, volumes, and logs with ease.',
+    verifyCmd: 'lazydocker --version',
+    steps: ['Download Lazydocker binary to /usr/local/bin/lazydocker'],
+    getInstallScript: SCRIPTS.lazydocker
+  },
+
+  // --- TOOLING, PROCESS & MEDIA (6) ---
   {
     id: 'pm2',
-    name: 'PM2',
+    name: 'PM2 Process Manager',
     category: 'tooling',
-    description: 'Production process manager untuk Node.js dengan zero-downtime reload',
-    getInstallScript: () => `echo "==> Memasang PM2..."
-npm install -g pm2
-pm2 startup systemd -u root --hp /root || true
-pm2 -v`
+    description: 'Production process manager for Node.js, Bun, or Python with clustering & zero-downtime reloads.',
+    verifyCmd: 'pm2 -v',
+    steps: ['Install PM2 globally via npm', 'Configure systemd startup hook'],
+    getInstallScript: SCRIPTS.pm2
   },
   {
     id: 'supervisor',
     name: 'Supervisor',
     category: 'tooling',
-    description: 'Client/server system untuk memonitor dan mengontrol proses background di Linux',
-    getInstallScript: () => `echo "==> Memasang Supervisor..."
-apt-get update && apt-get install -y supervisor
-systemctl enable --now supervisor
-supervisord -v`
-  },
-
-  // Container
-  {
-    id: 'docker',
-    name: 'Docker Engine',
-    category: 'container',
-    description: 'Platform containerization lengkap untuk menjalankan aplikasi dalam kontainer',
-    getInstallScript: () => `echo "==> Memasang Docker..."
-apt-get update && apt-get install -y ca-certificates curl gnupg
-install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc 2>/dev/null || curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc 2>/dev/null
-chmod a+r /etc/apt/keyrings/docker.asc
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/$(. /etc/os-release && echo "$ID") $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-apt-get update
-apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin || apt-get install -y docker.io docker-compose-v2
-systemctl enable --now docker
-docker --version`
+    description: 'Client/server process monitor for keeping Laravel & Python background workers alive.',
+    configPath: '/etc/supervisor/conf.d',
+    verifyCmd: 'supervisord -v',
+    steps: ['Install supervisor & enable systemd service'],
+    getInstallScript: SCRIPTS.supervisor
   },
   {
-    id: 'compose',
-    name: 'Docker Compose',
-    category: 'container',
-    description: 'Orkestrasi multi-container apps dengan satu file docker-compose.yml',
-    getInstallScript: () => `echo "==> Memasang Docker Compose..."
-apt-get update && apt-get install -y docker-compose-plugin || apt-get install -y docker-compose
-docker compose version`
+    id: 'git',
+    name: 'Git Version Control',
+    category: 'tooling',
+    description: 'Essential tool for cloning, fetching, and managing code branches on servers.',
+    verifyCmd: 'git --version',
+    steps: ['Install git via APT'],
+    getInstallScript: SCRIPTS.git
+  },
+  {
+    id: 'gh',
+    name: 'GitHub CLI (gh)',
+    category: 'tooling',
+    description: 'Official CLI tool for GitHub token authentication, private repo cloning, and workflow automation.',
+    verifyCmd: 'gh --version',
+    steps: ['Add official cli.github.com repository', 'Install gh package'],
+    getInstallScript: SCRIPTS.gh
+  },
+  {
+    id: 'ffmpeg',
+    name: 'FFmpeg Media Suite',
+    category: 'tooling',
+    description: 'Standard multimedia framework for video/audio transcoding, thumbnailing, and compression.',
+    verifyCmd: 'ffmpeg -version',
+    steps: ['Install ffmpeg and popular codecs'],
+    getInstallScript: SCRIPTS.ffmpeg
+  },
+  {
+    id: 'rclone',
+    name: 'Rclone Cloud Sync',
+    category: 'tooling',
+    description: 'Cloud file sync utility supporting AWS S3, Cloudflare R2, Google Drive, and Backblaze B2.',
+    verifyCmd: 'rclone --version',
+    steps: ['Install official rclone binary'],
+    getInstallScript: SCRIPTS.rclone
   },
 
-  // Security
+  // --- SECURITY, NETWORK & SYSTEM (5) ---
   {
     id: 'ufw',
     name: 'UFW Firewall',
     category: 'security',
-    description: 'Program pengatur iptables Linux untuk memfilter port jaringan masuk/keluar',
-    getInstallScript: () => `echo "==> Mengonfigurasi UFW Firewall..."
-apt-get update && apt-get install -y ufw
-SSH_PORT=$(ss -tlnp 2>/dev/null | grep sshd | awk '{print $4}' | awk -F: '{print $NF}' | head -1)
-[ -z "$SSH_PORT" ] && SSH_PORT=22
-ufw default deny incoming
-ufw default allow outgoing
-ufw allow "$SSH_PORT"/tcp comment 'SSH Port'
-ufw allow 80/tcp comment 'HTTP'
-ufw allow 443/tcp comment 'HTTPS'
-echo "y" | ufw enable
-systemctl enable ufw
-ufw status verbose`
+    description: 'Linux firewall helper opening active SSH, HTTP (80), and HTTPS (443) while blocking the rest.',
+    verifyCmd: 'ufw status',
+    steps: ['Detect active SSH port to prevent lockouts', 'Allow SSH, 80, and 443', 'Enable UFW firewall'],
+    getInstallScript: SCRIPTS.ufw
   },
   {
     id: 'fail2ban',
     name: 'Fail2ban',
     category: 'security',
-    description: 'Proteksi otomatis terhadap upaya brute force SSH dengan auto-ban IP address',
-    getInstallScript: () => `echo "==> Memasang Fail2ban..."
-apt-get update && apt-get install -y fail2ban
-systemctl enable --now fail2ban
-fail2ban-client status`
+    description: 'Protects the server from SSH brute-force attacks by automatically banning abusive IP addresses.',
+    configPath: '/etc/fail2ban/jail.d',
+    verifyCmd: 'fail2ban-client --version',
+    steps: ['Install fail2ban', 'Configure sshd jail protection rule', 'Start fail2ban daemon'],
+    getInstallScript: SCRIPTS.fail2ban
   },
   {
     id: 'swap',
-    name: 'Swap Memory 2GB',
+    name: 'Virtual Swap Memory',
     category: 'security',
-    description: 'Memori virtual tambahan 2 GB untuk menstabilkan beban RAM dan mencegah OOM kill',
-    getInstallScript: () => `echo "==> Mengalokasikan 2GB Swap..."
-fallocate -l 2G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=2048
-chmod 600 /swapfile
-mkswap /swapfile
-swapon /swapfile
-if ! grep -q "/swapfile" /etc/fstab; then
-  echo "/swapfile none swap sw 0 0" >> /etc/fstab
-fi
-sysctl vm.swappiness=10
-echo "vm.swappiness=10" >> /etc/sysctl.d/99-swappiness.conf
-echo "Swap 2GB berhasil diaktifkan."`
+    description: 'Additional virtual memory on disk preventing build jobs and database crashes from out-of-memory.',
+    configPath: '/swapfile',
+    verifyCmd: 'free -h',
+    versions: [
+      { label: '1 GB Swap', value: '1' },
+      { label: '2 GB Swap (Recommended)', value: '2' },
+      { label: '4 GB Swap', value: '4' },
+      { label: '8 GB Swap', value: '8' }
+    ],
+    defaultVersion: '2',
+    steps: ['Allocate /swapfile with requested size', 'Format mkswap & activate swapon', 'Persist permanently to /etc/fstab'],
+    getInstallScript: SCRIPTS.swap
+  },
+  {
+    id: 'tailscale',
+    name: 'Tailscale Mesh VPN',
+    category: 'security',
+    description: 'Zero-config WireGuard mesh VPN connecting servers and dev machines without exposing public ports.',
+    verifyCmd: 'tailscale version',
+    steps: ['Run official installer script from tailscale.com', 'Enable tailscaled systemd daemon'],
+    getInstallScript: SCRIPTS.tailscale
   },
   {
     id: 'autoupdates',
     name: 'Auto Security Updates',
     category: 'security',
-    description: 'Pemasangan otomatis patch keamanan paket Linux penting secara berkala',
-    getInstallScript: () => `echo "==> Mengaktifkan Auto Updates..."
-apt-get update && apt-get install -y unattended-upgrades update-notifier-common
-echo 'APT::Periodic::Update-Package-Lists "1";' > /etc/apt/apt.conf.d/20auto-upgrades
-echo 'APT::Periodic::Unattended-Upgrade "1";' >> /etc/apt/apt.conf.d/20auto-upgrades
-systemctl enable --now unattended-upgrades || true
-echo "Pembaruan keamanan otomatis aktif."`
+    description: 'Configures `unattended-upgrades` to automatically install critical OS security patches daily.',
+    configPath: '/etc/apt/apt.conf.d/20auto-upgrades',
+    steps: ['Install unattended-upgrades', 'Configure automatic daily security update schedule'],
+    getInstallScript: SCRIPTS.autoupdates
   }
 ];
 
 // ---------------------------------------------------------------------------
-// Template Analysis & Script Generator
+// Template Analysis & Step-by-Step Script Generator
 // ---------------------------------------------------------------------------
+
+export interface TemplateStepItem {
+  index: number;
+  tool: TemplateToolItem;
+  reason: string;
+  chosenVersion?: string;
+  script: string;
+}
 
 export interface TemplateAnalysis {
   preset: TemplatePreset;
-  itemsToInstall: { tool: TemplateToolItem; reason: string; chosenVersion?: string }[];
-  itemsSkipped: { tool: TemplateToolItem; installedVersion: string | null }[];
+  itemsToInstall: { tool: TemplateToolItem; reason: string; chosenVersion?: string; script: string }[];
+  itemsSkipped: { tool: TemplateToolItem; installedVersion: string | null; reason: 'installed' | 'unchecked' }[];
   allInstalled: boolean;
   generatedScript: string;
 }
@@ -551,63 +1725,86 @@ export function analyzeTemplate(
   options?: {
     forceAll?: boolean;
     versionOverrides?: Record<string, string>;
+    excludedToolIds?: string[];
   }
 ): TemplateAnalysis {
   const forceAll = !!options?.forceAll;
   const versionOverrides = options?.versionOverrides || {};
-  const itemsToInstall: { tool: TemplateToolItem; reason: string; chosenVersion?: string }[] = [];
-  const itemsSkipped: { tool: TemplateToolItem; installedVersion: string | null }[] = [];
+  const excludedSet = new Set(options?.excludedToolIds || []);
+  const itemsToInstall: { tool: TemplateToolItem; reason: string; chosenVersion?: string; script: string }[] = [];
+  const itemsSkipped: { tool: TemplateToolItem; installedVersion: string | null; reason: 'installed' | 'unchecked' }[] = [];
 
   for (const tool of preset.tools) {
-    const existing = installedSoftware.find((s) => s.id === tool.id);
+    const existing = installedSoftware.find(
+      (s) => s.id === tool.id || (tool.id === 'mysql' && versionOverrides.mysql === 'mariadb' && s.id === 'mariadb')
+    );
     const isInstalled = existing ? existing.installed : false;
     const chosenVersion = versionOverrides[tool.id] || tool.defaultVersion;
+
+    if (excludedSet.has(tool.id)) {
+      itemsSkipped.push({
+        tool,
+        installedVersion: existing?.version || null,
+        reason: 'unchecked'
+      });
+      continue;
+    }
 
     if (isInstalled && !forceAll) {
       itemsSkipped.push({
         tool,
-        installedVersion: existing?.version || null
+        installedVersion: existing?.version || null,
+        reason: 'installed'
       });
     } else {
+      const rawBody =
+        typeof tool.installScript === 'function'
+          ? tool.installScript(chosenVersion)
+          : tool.installScript;
+
       itemsToInstall.push({
         tool,
-        reason: isInstalled && forceAll ? 'Paksa pasang ulang' : 'Belum terpasang di server',
-        chosenVersion
+        reason: isInstalled && forceAll ? 'Forced reinstall' : 'Missing from server',
+        chosenVersion,
+        script: `${PREFLIGHT_HEADER}\nset -e\n\n${rawBody}`
       });
     }
   }
 
   const allInstalled = itemsToInstall.length === 0;
 
-  // Generate clean, readable bash script
+  // Generate clean, readable full bash script
   const scriptLines: string[] = [
     '#!/usr/bin/env bash',
     '# ============================================================',
     `#  7Server — Setup Template: ${preset.name}`,
-    `#  Generated on: ${new Date().toLocaleString()}`,
+    `#  Generated on: ${new Date().toISOString()}`,
     '# ============================================================',
     'set -e',
-    'export DEBIAN_FRONTEND=noninteractive',
+    PREFLIGHT_HEADER,
     ''
   ];
 
   if (itemsSkipped.length > 0) {
-    scriptLines.push('# --- Komponen yang sudah terpasang (dilewati): ---');
+    scriptLines.push('# --- Skipped Components: ---');
     for (const skip of itemsSkipped) {
-      scriptLines.push(`#  [x] ${skip.tool.name} (${skip.installedVersion || 'terdeteksi'})`);
+      const note = skip.reason === 'unchecked' ? 'manually excluded' : `already installed (${skip.installedVersion || 'detected'})`;
+      scriptLines.push(`#  [x] ${skip.tool.name} — ${note}`);
     }
     scriptLines.push('');
   }
 
   if (allInstalled) {
     scriptLines.push(
-      'echo "Semua komponen dalam template ini sudah terpasang di server."',
-      'echo "Tidak ada instalasi baru yang diperlukan."',
+      'echo "All selected components are already installed on this server."',
+      'echo "No installation actions required."',
       'exit 0'
     );
   } else {
     scriptLines.push(
-      `echo "Mulai instalasi template: ${preset.name} (${itemsToInstall.length} komponen)..."`,
+      `echo "============================================================"`,
+      `echo "  Starting Setup Pipeline: ${preset.name} (${itemsToInstall.length} step(s))"`,
+      `echo "============================================================"`,
       'echo ""',
       ''
     );
@@ -619,7 +1816,9 @@ export function analyzeTemplate(
           : tool.installScript;
 
       scriptLines.push(
-        `# --- Langkah [${idx + 1}/${itemsToInstall.length}]: ${tool.name}${chosenVersion ? ` (${chosenVersion})` : ''} ---`,
+        `# ------------------------------------------------------------`,
+        `# Step [${idx + 1}/${itemsToInstall.length}]: ${tool.name}${chosenVersion ? ` (${chosenVersion})` : ''}`,
+        `# ------------------------------------------------------------`,
         scriptBody,
         'echo ""',
         ''
@@ -628,7 +1827,7 @@ export function analyzeTemplate(
 
     scriptLines.push(
       'echo "============================================================"',
-      `echo "  Setup Template ${preset.name} Selesai dengan Sukses!"`,
+      `echo "  ✔ Setup Template ${preset.name} Completed Successfully!"`,
       'echo "============================================================"'
     );
   }
@@ -651,15 +1850,86 @@ export function generateSingleToolScript(tool: MarketplaceTool, version?: string
     '#!/usr/bin/env bash',
     '# ============================================================',
     `#  7Server 1-Click Install: ${tool.name}${chosenVersion ? ` (${chosenVersion})` : ''}`,
-    `#  Generated on: ${new Date().toLocaleString()}`,
+    `#  Generated on: ${new Date().toISOString()}`,
     '# ============================================================',
     'set -e',
-    'export DEBIAN_FRONTEND=noninteractive',
+    PREFLIGHT_HEADER,
     '',
     scriptBody,
     '',
     'echo "============================================================"',
-    `echo "  Pemasangan ${tool.name} Berhasil!"`,
+    `echo "  ✔ Installation of ${tool.name} Completed Successfully!"`,
+    'echo "============================================================"'
+  ].join('\n');
+}
+
+/** Generate a unified batch installation pipeline script for multiple selected tools */
+export function generateBatchToolsScript(tools: MarketplaceTool[], versions?: Record<string, string>): string {
+  const lines: string[] = [
+    '#!/usr/bin/env bash',
+    '# ============================================================',
+    `#  7Server — Multi-Task Batch Install (${tools.length} Tools)`,
+    `#  Generated on: ${new Date().toISOString()}`,
+    '# ============================================================',
+    'set -e',
+    PREFLIGHT_HEADER,
+    '',
+    'echo "============================================================"',
+    `echo "  Starting Multi-Task Pipeline (${tools.length} components)"`,
+    'echo "============================================================"',
+    'echo ""'
+  ];
+
+  tools.forEach((tool, idx) => {
+    const chosenVersion = versions?.[tool.id] || tool.defaultVersion;
+    const scriptBody = tool.getInstallScript(chosenVersion);
+
+    lines.push(
+      'echo "------------------------------------------------------------"',
+      `echo "  [Step ${idx + 1}/${tools.length}] Installing ${tool.name}${chosenVersion ? ` (${chosenVersion})` : ''}..."`,
+      'echo "------------------------------------------------------------"',
+      scriptBody,
+      `echo "  ✔ Step ${idx + 1}/${tools.length} (${tool.name}) Completed!"`,
+      'echo ""'
+    );
+  });
+
+  lines.push(
+    'echo "============================================================"',
+    `echo "  ✔ All ${tools.length} Tools Installed Successfully!"`,
+    'echo "============================================================"'
+  );
+
+  return lines.join('\n');
+}
+
+/** Generate a clean, safe uninstallation script for a single tool */
+export function generateUninstallScript(tool: MarketplaceTool | { id: string; name: string }): string {
+  const getScript = UNINSTALL_SCRIPTS[tool.id];
+  const scriptBody = getScript
+    ? getScript()
+    : `# Generic uninstall fallback for ${tool.name}
+echo "==> Stopping service ${tool.id} if active..."
+systemctl stop ${tool.id} 2>/dev/null || true
+systemctl disable ${tool.id} 2>/dev/null || true
+echo "==> Purging package ${tool.id} via APT..."
+apt-get purge $APT_FLAGS ${tool.id} 2>/dev/null || true
+apt-get autoremove $APT_FLAGS 2>/dev/null || true
+echo "==> ${tool.name} removal completed."`;
+
+  return [
+    '#!/usr/bin/env bash',
+    '# ============================================================',
+    `#  7Server 1-Click Uninstall: ${tool.name}`,
+    `#  Generated on: ${new Date().toISOString()}`,
+    '# ============================================================',
+    'set -e',
+    PREFLIGHT_HEADER,
+    '',
+    scriptBody,
+    '',
+    'echo "============================================================"',
+    `echo "  ✔ ${tool.name} has been successfully uninstalled!"`,
     'echo "============================================================"'
   ].join('\n');
 }

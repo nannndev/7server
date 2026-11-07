@@ -1,6 +1,8 @@
 {
   "name": "7server-root",
   "version": "1.0.0",
+  "license": "MIT",
+  "author": "Nandang Eka Prasetya (nannndev)",
   "type": "module",
   "private": true,
   "scripts": {
@@ -8,6 +10,8 @@
     "dev:client": "cd client && npm run dev",
     "dev:landing": "cd landing && npm run dev",
     "build:landing": "cd landing && npm run build",
+    "dev:docs": "cd docs && npm run dev",
+    "build:docs": "cd docs && npm run build",
     "dev:all": "node start.js --all",
     "start": "node start.js",
     "dev": "node start.js",

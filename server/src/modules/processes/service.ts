@@ -104,6 +104,34 @@ export async function manageService(serverConfig: ServerCredentials, serviceName
   return await executeCommand(serverConfig, cmd, 10000);
 }
 
+function parsePm2Json(raw: string, now: number): Pm2ProcessInfo[] {
+  const jsonStart = raw.indexOf('[');
+  const jsonEnd = raw.lastIndexOf(']');
+  if (jsonStart === -1 || jsonEnd === -1 || jsonEnd < jsonStart) return [];
+  try {
+    const parsed = JSON.parse(raw.slice(jsonStart, jsonEnd + 1));
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((item) => {
+      const env = item.pm2_env || {};
+      const monit = item.monit || {};
+      return {
+        pm_id: item.pm_id ?? 0,
+        name: item.name || env.name || `app-${item.pm_id}`,
+        status: env.status || 'unknown',
+        cpu: Number(monit.cpu || 0),
+        memoryMB: Math.round(((monit.memory || 0) / (1024 * 1024)) * 10) / 10,
+        restarts: Number(env.restart_time || 0),
+        uptimeMs: env.pm_uptime && env.status === 'online' ? Math.max(0, now - Number(env.pm_uptime)) : 0,
+        mode: env.exec_mode === 'cluster_mode' ? 'cluster' : 'fork',
+        pid: Number(item.pid || 0),
+        cwd: env.pm_cwd || ''
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchPm2AndSupervisor(serverConfig: ServerCredentials): Promise<{
   pm2: Pm2ProcessInfo[];
   supervisor: SupervisorProcessInfo[];
@@ -114,57 +142,51 @@ export async function fetchPm2AndSupervisor(serverConfig: ServerCredentials): Pr
       NVM_LATEST=$(ls -1 "$HOME/.nvm/versions/node" 2>/dev/null | tail -n 1)
       [ -n "$NVM_LATEST" ] && export PATH="$HOME/.nvm/versions/node/$NVM_LATEST/bin:$PATH"
     fi
-    echo "===PM2_START==="
-    if command -v pm2 >/dev/null 2>&1; then
-      pm2 jlist 2>/dev/null || echo "[]"
+    echo "===USER_PM2==="
+    pm2 jlist 2>/dev/null || echo "[]"
+    echo "===ROOT_PM2==="
+    if [ "$(id -u)" -eq 0 ]; then
+      echo "[]"
+    elif [ -n "$HAS_SUDO_PASS" ]; then
+      sudo -k -S -p '' pm2 jlist 2>/dev/null || echo "[]"
+    elif sudo -n true 2>/dev/null; then
+      sudo -n pm2 jlist 2>/dev/null || echo "[]"
     else
       echo "[]"
     fi
-    echo "===PM2_END==="
     echo "===SUPERVISOR_START==="
     if command -v supervisorctl >/dev/null 2>&1; then
-      supervisorctl status 2>/dev/null || true
+      if [ "$(id -u)" -eq 0 ]; then
+        supervisorctl status 2>/dev/null || true
+      elif [ -n "$HAS_SUDO_PASS" ]; then
+        sudo -k -S -p '' supervisorctl status 2>/dev/null || supervisorctl status 2>/dev/null || true
+      elif sudo -n true 2>/dev/null; then
+        sudo -n supervisorctl status 2>/dev/null || supervisorctl status 2>/dev/null || true
+      else
+        supervisorctl status 2>/dev/null || true
+      fi
     fi
     echo "===SUPERVISOR_END==="
   `;
-  const { stdout } = await executeCommand(serverConfig, cmd, 10000);
+  const pass = serverConfig.sudoPassword || (serverConfig.authType === 'password' ? serverConfig.password : undefined);
+  const { stdout } = await executeCommand(serverConfig, `export HAS_SUDO_PASS=${pass ? '1' : ''}\n${cmd}`, 12000, pass ? { stdin: `${pass}\n` } : {});
 
-  const pm2: Pm2ProcessInfo[] = [];
-  const supervisor: SupervisorProcessInfo[] = [];
+  const now = Date.now();
+  const userMatch = stdout.match(/===USER_PM2===([\s\S]*?)===ROOT_PM2===/);
+  const rootMatch = stdout.match(/===ROOT_PM2===([\s\S]*?)===SUPERVISOR_START===/);
+  const userProcs = userMatch ? parsePm2Json(userMatch[1], now) : [];
+  const rootProcs = rootMatch ? parsePm2Json(rootMatch[1], now) : [];
 
-  const pm2Match = stdout.match(/===PM2_START===([\s\S]*?)===PM2_END===/);
-  if (pm2Match && pm2Match[1]) {
-    const rawJson = pm2Match[1].trim();
-    const jsonStart = rawJson.indexOf('[');
-    const jsonEnd = rawJson.lastIndexOf(']');
-    if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd >= jsonStart) {
-      try {
-        const parsed = JSON.parse(rawJson.slice(jsonStart, jsonEnd + 1));
-        if (Array.isArray(parsed)) {
-          const now = Date.now();
-          for (const item of parsed) {
-            const env = item.pm2_env || {};
-            const monit = item.monit || {};
-            pm2.push({
-              pm_id: item.pm_id ?? 0,
-              name: item.name || env.name || `app-${item.pm_id}`,
-              status: env.status || 'unknown',
-              cpu: Number(monit.cpu || 0),
-              memoryMB: Math.round(((monit.memory || 0) / (1024 * 1024)) * 10) / 10,
-              restarts: Number(env.restart_time || 0),
-              uptimeMs: env.pm_uptime && env.status === 'online' ? Math.max(0, now - Number(env.pm_uptime)) : 0,
-              mode: env.exec_mode === 'cluster_mode' ? 'cluster' : 'fork',
-              pid: Number(item.pid || 0),
-              cwd: env.pm_cwd || ''
-            });
-          }
-        }
-      } catch {
-        // ignore invalid JSON
-      }
+  const seen = new Set(userProcs.map((p) => p.name));
+  const pm2: Pm2ProcessInfo[] = [...userProcs];
+  for (const rp of rootProcs) {
+    if (!seen.has(rp.name)) {
+      seen.add(rp.name);
+      pm2.push(rp);
     }
   }
 
+  const supervisor: SupervisorProcessInfo[] = [];
   const supMatch = stdout.match(/===SUPERVISOR_START===([\s\S]*?)===SUPERVISOR_END===/);
   if (supMatch && supMatch[1]) {
     const lines = supMatch[1].trim().split('\n');
@@ -198,15 +220,27 @@ export async function managePm2Process(
   const allowed = ['restart', 'stop', 'start', 'reload', 'flush'];
   if (!allowed.includes(action)) throw badRequest('Invalid PM2 action');
   const cleanTarget = String(target).replace(/[^a-zA-Z0-9_\-.]/g, '');
+  const pass = serverConfig.sudoPassword || (serverConfig.authType === 'password' ? serverConfig.password : undefined);
   const cmd = `
     export PATH=$PATH:/usr/local/bin:/usr/bin:/bin
     if [ -d "$HOME/.nvm/versions/node" ]; then
       NVM_LATEST=$(ls -1 "$HOME/.nvm/versions/node" 2>/dev/null | tail -n 1)
       [ -n "$NVM_LATEST" ] && export PATH="$HOME/.nvm/versions/node/$NVM_LATEST/bin:$PATH"
     fi
-    pm2 ${action} ${cleanTarget}
+    # If the process is in user's pm2, control it directly; otherwise use sudo
+    if pm2 describe ${cleanTarget} >/dev/null 2>&1; then
+      pm2 ${action} ${cleanTarget}
+    elif [ "$(id -u)" -eq 0 ]; then
+      pm2 ${action} ${cleanTarget}
+    elif [ -n "$HAS_SUDO_PASS" ]; then
+      sudo -k -S -p '' pm2 ${action} ${cleanTarget}
+    elif sudo -n true 2>/dev/null; then
+      sudo -n pm2 ${action} ${cleanTarget}
+    else
+      pm2 ${action} ${cleanTarget}
+    fi
   `;
-  return await executeCommand(serverConfig, cmd, 12000);
+  return await executeCommand(serverConfig, `export HAS_SUDO_PASS=${pass ? '1' : ''}\n${cmd}`, 15000, pass ? { stdin: `${pass}\n` } : {});
 }
 
 export async function manageSupervisorProcess(
@@ -217,5 +251,17 @@ export async function manageSupervisorProcess(
   const allowed = ['restart', 'stop', 'start'];
   if (!allowed.includes(action)) throw badRequest('Invalid Supervisor action');
   const cleanTarget = String(target).replace(/[^a-zA-Z0-9_\-:*]/g, '');
-  return await executeCommand(serverConfig, `supervisorctl ${action} ${cleanTarget}`, 12000);
+  const pass = serverConfig.sudoPassword || (serverConfig.authType === 'password' ? serverConfig.password : undefined);
+  const cmd = `
+    if [ "$(id -u)" -eq 0 ]; then
+      supervisorctl ${action} ${cleanTarget}
+    elif [ -n "$HAS_SUDO_PASS" ]; then
+      sudo -k -S -p '' supervisorctl ${action} ${cleanTarget}
+    elif sudo -n true 2>/dev/null; then
+      sudo -n supervisorctl ${action} ${cleanTarget}
+    else
+      supervisorctl ${action} ${cleanTarget}
+    fi
+  `;
+  return await executeCommand(serverConfig, `export HAS_SUDO_PASS=${pass ? '1' : ''}\n${cmd}`, 15000, pass ? { stdin: `${pass}\n` } : {});
 }

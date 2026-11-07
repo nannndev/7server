@@ -31,6 +31,15 @@ then fill the AI gateway history and the audit log:
 VPSHUB_DATA_DIR=/tmp/7s-demo/data npx --prefix server tsx scripts/demo/seed.ts   # refuses any dir outside /tmp
 ```
 
-Restart the demo server so it reads the seeded data. Screenshots in `docs/screenshots` are 1440×900, dark theme.
+Restart the demo server so it reads the seeded data, sign in once in the `7s-shots` agent-browser session, then capture
+every page in dark and light (1440×900, `<page>-dark.png` / `<page>-light.png` in `docs/screenshots`):
+
+```bash
+SERVER_ID=<prod-web-01 id> API_SERVER_ID=<prod-api-01 id> scripts/demo/screenshots.sh
+```
+
+For a fuller Apps tab, put a few folders in `/var/www` on prod-web-01 first (a git checkout with `package.json`, a
+Laravel folder with `artisan`, a `dist/index.html`). The deploy wizard is only captured at its first step: the next
+steps need a real GitHub token, which should never go into demo data.
 
 Clean up: `docker rm -f $(docker ps -aq --filter name=7sd-) && docker network rm 7s-demo && rm -rf /tmp/7s-demo`.

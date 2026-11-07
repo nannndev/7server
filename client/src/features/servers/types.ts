@@ -60,4 +60,5 @@ export interface ServerItem {
   createdAt: string;
   hasPassword?: boolean;
   hasPrivateKey?: boolean;
+  hasSudoPassword?: boolean;
 }

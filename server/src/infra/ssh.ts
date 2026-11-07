@@ -130,6 +130,64 @@ export async function executeCommand(
   });
 }
 
+/**
+ * Execute command with real-time streaming chunks for long operations (docker pull, apt install, etc.).
+ */
+export async function executeCommandStream(
+  serverConfig: ServerCredentials,
+  command: string,
+  onChunk: (chunk: string, isStderr: boolean) => void,
+  timeoutMs = 180000,
+  opts: { stdin?: string } = {}
+): Promise<CommandResult> {
+  const conn = await createSSHClient(serverConfig);
+
+  return new Promise((resolve, reject) => {
+    let stdout = '';
+    let stderr = '';
+    let isDone = false;
+
+    const timeout = setTimeout(() => {
+      if (!isDone) {
+        isDone = true;
+        try { conn.end(); } catch (e) {}
+        reject(new Error(`Command timed out after ${timeoutMs / 1000}s`));
+      }
+    }, timeoutMs);
+
+    conn.exec(command, (err, stream) => {
+      if (err) {
+        clearTimeout(timeout);
+        conn.end();
+        return reject(err);
+      }
+
+      stream.on('close', (code: number, signal: string) => {
+        if (!isDone) {
+          isDone = true;
+          clearTimeout(timeout);
+          conn.end();
+          resolve({ stdout, stderr, code: code !== undefined ? code : 0, signal });
+        }
+      });
+
+      stream.on('data', (data: Buffer) => {
+        const text = data.toString('utf-8');
+        stdout += text;
+        try { onChunk(text, false); } catch {}
+      });
+
+      stream.stderr.on('data', (data: Buffer) => {
+        const text = data.toString('utf-8');
+        stderr += text;
+        try { onChunk(text, true); } catch {}
+      });
+
+      if (opts.stdin !== undefined) stream.end(opts.stdin);
+    });
+  });
+}
+
 export async function attachTerminal(ws: WebSocket, serverConfig: ServerCredentials, initialCols = 80, initialRows = 24): Promise<void> {
   let conn: Client;
   try {

@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { createServer, deleteServer, getAllServers, getServerById, updateServer } from './store.js';
+import { createServer, deleteServer, getAllServers, getServerById, updateServer, reorderServers } from './store.js';
 import { need } from '../../http/auth.js';
 import { isServerAllowed } from '../../http/handlers.js';
 
@@ -44,6 +44,15 @@ serversRoutes.post('/servers', need('server.manage'), (req: Request, res: Respon
     description
   });
   res.status(201).json({ success: true, data: created });
+});
+
+serversRoutes.put('/servers/reorder', need('server.manage'), (req: Request, res: Response) => {
+  const { serverIds } = req.body;
+  if (!Array.isArray(serverIds)) {
+    return res.status(400).json({ success: false, error: 'serverIds array is required' });
+  }
+  const updated = reorderServers(serverIds);
+  res.json({ success: true, data: updated });
 });
 
 serversRoutes.put('/servers/:id', need('server.manage'), (req: Request, res: Response) => {

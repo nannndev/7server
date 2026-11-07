@@ -29,6 +29,26 @@ export const fetchSoftwareUpgrades = async (id: string) =>
     'Failed to fetch software upgrades'
   );
 
+export const controlSoftwareService = async (
+  id: string,
+  toolId: string,
+  action: 'start' | 'stop' | 'restart' | 'reload'
+) =>
+  unwrap<{ ok: boolean; unit: string; state: string; output: string }>(
+    await apiFetch(`${API_BASE}/servers/${id}/software/service`, jsonPost({ toolId, action })),
+    `Failed to ${action} service`
+  );
+
+export const executeSoftwareScript = async (
+  id: string,
+  script: string,
+  sudoPassword?: string
+) =>
+  unwrap<{ ok: boolean; exitCode: number; output: string; durationMs: number; sudoRequired?: boolean }>(
+    await apiFetch(`${API_BASE}/servers/${id}/software/execute`, jsonPost({ script, sudoPassword })),
+    'Failed to execute setup script'
+  );
+
 export const exportServers = () => downloadBlob(`${API_BASE}/export`, '7server-servers.json');
 export async function importServers(items: unknown): Promise<number> {
   const res = await apiFetch(`${API_BASE}/import`, jsonPost(items));
@@ -55,7 +75,7 @@ export async function createServer(payload: Partial<ServerItem> & { password?: s
   return data.data;
 }
 
-export async function updateServer(id: string, payload: Partial<ServerItem> & { password?: string; privateKey?: string; passphrase?: string }): Promise<ServerItem> {
+export async function updateServer(id: string, payload: Partial<ServerItem> & { password?: string; privateKey?: string; passphrase?: string; sudoPassword?: string }): Promise<ServerItem> {
   const res = await apiFetch(`${API_BASE}/servers/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -63,6 +83,17 @@ export async function updateServer(id: string, payload: Partial<ServerItem> & { 
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to update server');
+  return data.data;
+}
+
+export async function reorderServers(serverIds: string[]): Promise<ServerItem[]> {
+  const res = await apiFetch(`${API_BASE}/servers/reorder`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ serverIds })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to reorder servers');
   return data.data;
 }
 
@@ -379,3 +410,48 @@ export const deleteFirewallRule = async (serverId: string, ruleNumber: number): 
 
 export const toggleFirewall = async (serverId: string, enable: boolean): Promise<FirewallStatus> =>
   unwrap<FirewallStatus>(await apiFetch(`${API_BASE}/servers/${serverId}/firewall/toggle`, jsonPost({ enable })), 'Failed to toggle firewall');
+
+// ---------------- System Tuning & Swap ----------------
+export interface SwapStatus {
+  totalMB: number;
+  usedMB: number;
+  freeMB: number;
+  swappiness: number;
+  vfsCachePressure: number;
+  swapFileExists: boolean;
+  swapFilePath: string;
+  diskFreeMB: number;
+  activeSwaps: { filename: string; type: string; sizeKB: number; usedKB: number; priority: number }[];
+}
+
+export interface SystemTuningStatus {
+  swap: SwapStatus;
+  hostname: string;
+  timezone: string;
+  bbrEnabled: boolean;
+  fileMax: number;
+  somaxconn: number;
+}
+
+export interface ConfigureSwapPayload {
+  sizeMB: number;
+  swappiness?: number;
+  vfsCachePressure?: number;
+}
+
+export interface ConfigureSystemPayload {
+  hostname?: string;
+  timezone?: string;
+  bbr?: boolean;
+  optimizeLimits?: boolean;
+}
+
+export const fetchSystemTuning = async (serverId: string): Promise<SystemTuningStatus> =>
+  unwrap<SystemTuningStatus>(await apiFetch(`${API_BASE}/servers/${serverId}/system/tuning`), 'Failed to fetch system tuning');
+
+export const configureSwap = async (serverId: string, payload: ConfigureSwapPayload): Promise<{ message: string; output: string }> =>
+  unwrap<{ message: string; output: string }>(await apiFetch(`${API_BASE}/servers/${serverId}/system/swap`, jsonPost(payload)), 'Failed to configure swap');
+
+export const configureSystem = async (serverId: string, payload: ConfigureSystemPayload): Promise<{ message: string; output: string }> =>
+  unwrap<{ message: string; output: string }>(await apiFetch(`${API_BASE}/servers/${serverId}/system/tuning`, jsonPost(payload)), 'Failed to configure system');
+

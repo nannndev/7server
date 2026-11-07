@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ServerItem, ServerMetrics } from '@/features/servers/types';
-import { fetchServers, fetchServerMetrics, fetchHistory, type HistoryPoint } from '@/features/servers/api';
+import { fetchServers, fetchServerMetrics, fetchHistory, reorderServers, type HistoryPoint } from '@/features/servers/api';
 
 const REFRESH_KEY = 'vps_hub_refresh';
 const readRefresh = () => {
@@ -70,5 +70,27 @@ export function useServers() {
     loadHistory([id]);
   };
 
-  return { servers, loading, history, reload, refreshAll, isRefreshingAll, refreshSec, setRefreshSec, onMetricsUpdated };
+  const reorder = async (orderedIds: string[]) => {
+    const idMap = new Map(servers.map((s) => [s.id, s]));
+    const next: ServerItem[] = [];
+    for (const id of orderedIds) {
+      const s = idMap.get(id);
+      if (s) {
+        next.push(s);
+        idMap.delete(id);
+      }
+    }
+    for (const remaining of idMap.values()) {
+      next.push(remaining);
+    }
+    setServers(next);
+    try {
+      await reorderServers(orderedIds);
+    } catch (err) {
+      console.error('Failed to persist server order:', err);
+      reload();
+    }
+  };
+
+  return { servers, loading, history, reload, refreshAll, isRefreshingAll, refreshSec, setRefreshSec, onMetricsUpdated, reorder };
 }

@@ -15,7 +15,7 @@
   <a href="https://github.com/nannndev/7server/pkgs/container/7server"><img src="https://img.shields.io/badge/docker-ghcr.io-blue" alt="Docker image"></a>
 </p>
 
-![Fleet overview](docs/screenshots/fleet-grid.png)
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/fleet-grid-dark.png"><img alt="Fleet overview" src="docs/screenshots/fleet-grid-light.png"></picture>
 
 ## What it does
 
@@ -30,15 +30,19 @@
 
 ## Screenshots
 
+Every page comes in dark and light; GitHub shows the one matching your theme.
+
 | | |
 |---|---|
-| ![Server overview](docs/screenshots/server-overview.png) | ![Terminal](docs/screenshots/terminal.png) |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/server-overview-dark.png"><img alt="Server overview" src="docs/screenshots/server-overview-light.png"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/terminal-dark.png"><img alt="Browser terminal" src="docs/screenshots/terminal-light.png"></picture> |
 | Server overview | Browser terminal |
-| ![Docker](docs/screenshots/docker.png) | ![Rack view](docs/screenshots/fleet-rack.png) |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/apps-dark.png"><img alt="Apps in /var/www" src="docs/screenshots/apps-light.png"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/deploy-dark.png"><img alt="Deploy from GitHub" src="docs/screenshots/deploy-light.png"></picture> |
+| Apps in /var/www | Deploy from GitHub |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/docker-dark.png"><img alt="Docker" src="docs/screenshots/docker-light.png"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/fleet-rack-dark.png"><img alt="Rack view" src="docs/screenshots/fleet-rack-light.png"></picture> |
 | Docker | Rack view |
-| ![AI gateway](docs/screenshots/ai-gateway.png) | ![Copilot](docs/screenshots/copilot.png) |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/ai-gateway-dark.png"><img alt="AI gateway" src="docs/screenshots/ai-gateway-light.png"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/copilot-dark.png"><img alt="Copilot" src="docs/screenshots/copilot-light.png"></picture> |
 | AI gateway | Copilot |
-| ![Monitoring](docs/screenshots/monitoring.png) | ![Users](docs/screenshots/users.png) |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/monitoring-dark.png"><img alt="Monitoring" src="docs/screenshots/monitoring-light.png"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/users-dark.png"><img alt="Users and roles" src="docs/screenshots/users-light.png"></picture> |
 | Monitoring | Users and roles |
 
 <details>
@@ -46,16 +50,26 @@
 
 | | |
 |---|---|
-| ![Topology](docs/screenshots/fleet-topology.png) | ![Matrix](docs/screenshots/fleet-matrix.png) |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/fleet-topology-dark.png"><img alt="Fleet topology" src="docs/screenshots/fleet-topology-light.png"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/fleet-matrix-dark.png"><img alt="Resource matrix" src="docs/screenshots/fleet-matrix-light.png"></picture> |
 | Fleet topology | Resource matrix |
-| ![Server topology](docs/screenshots/server-topology.png) | ![Services](docs/screenshots/services.png) |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/server-topology-dark.png"><img alt="Server architecture" src="docs/screenshots/server-topology-light.png"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/services-dark.png"><img alt="Services and processes" src="docs/screenshots/services-light.png"></picture> |
 | Server architecture | Services and processes |
-| ![PM2](docs/screenshots/pm2.png) | ![Nginx](docs/screenshots/nginx.png) |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/templates-dark.png"><img alt="Template setup" src="docs/screenshots/templates-light.png"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/databases-dark.png"><img alt="Databases" src="docs/screenshots/databases-light.png"></picture> |
+| Template setup | Databases |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/pm2-dark.png"><img alt="PM2" src="docs/screenshots/pm2-light.png"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/nginx-dark.png"><img alt="Nginx sites" src="docs/screenshots/nginx-light.png"></picture> |
 | PM2 | Nginx sites |
-| ![Cron](docs/screenshots/cron.png) | ![AI gateway logs](docs/screenshots/ai-usage.png) |
-| Scheduled tasks | AI gateway request logs |
-| ![Audit log](docs/screenshots/audit.png) | ![Roles](docs/screenshots/roles.png) |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/ssl-dark.png"><img alt="SSL certificates" src="docs/screenshots/ssl-light.png"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/ports-dark.png"><img alt="Ports and firewall" src="docs/screenshots/ports-light.png"></picture> |
+| SSL certificates | Ports and firewall |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/security-dark.png"><img alt="SSH and security" src="docs/screenshots/security-light.png"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/backups-dark.png"><img alt="Backups" src="docs/screenshots/backups-light.png"></picture> |
+| SSH and security | Backups |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/cron-dark.png"><img alt="Scheduled tasks" src="docs/screenshots/cron-light.png"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/uptime-dark.png"><img alt="Uptime" src="docs/screenshots/uptime-light.png"></picture> |
+| Scheduled tasks | Uptime |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/ai-keys-dark.png"><img alt="AI gateway API keys" src="docs/screenshots/ai-keys-light.png"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/ai-usage-dark.png"><img alt="AI gateway request logs" src="docs/screenshots/ai-usage-light.png"></picture> |
+| AI gateway API keys | AI gateway request logs |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/audit-dark.png"><img alt="Audit log" src="docs/screenshots/audit-light.png"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/roles-dark.png"><img alt="Roles and permissions" src="docs/screenshots/roles-light.png"></picture> |
 | Audit log | Roles and permissions |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/integrations-dark.png"><img alt="Git integrations" src="docs/screenshots/integrations-light.png"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/fleet-grid-dark.png"><img alt="Fleet grid" src="docs/screenshots/fleet-grid-light.png"></picture> |
+| Git integrations | Fleet grid |
 
 </details>
 

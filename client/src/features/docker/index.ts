@@ -1,1 +1,2 @@
-export { controlDocker } from './api';
+export * from './api';
+export { default as DockerPanel } from './components/DockerPanel';

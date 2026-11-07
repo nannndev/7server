@@ -31,7 +31,7 @@ import {
   HardDrive
 } from 'lucide-react';
 import { ServerItem } from '@/features/servers/types';
-import { WebAppInfo, ListeningPortInfo, fetchWebApps, fetchListeningPorts } from '@/features/webapps';
+import { WebAppInfo, ListeningPortInfo, fetchWebApps, fetchListeningPorts } from '@/features/deployments';
 import { Pm2ProcessInfo, SupervisorProcessInfo, fetchPm2AndSupervisor } from '@/features/processes';
 import { fetchDocker, DockerContainer } from '@/features/docker/api';
 import { fetchCertificates, CertificateItem } from '@/features/servers/api';

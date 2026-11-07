@@ -16,7 +16,9 @@ import ServerPage from '@/pages/ServerPage';
 import AiGatewayPage from '@/pages/AiGatewayPage';
 import AiCopilotDrawer from '@/features/copilot/components/AiCopilotDrawer';
 import AiCopilotTrigger from '@/features/copilot/components/AiCopilotTrigger';
+import { BackgroundTasksWidget } from '@/shared/tasks/BackgroundTasksWidget';
 import UsersPage from '@/pages/UsersPage';
+import IntegrationsPage from '@/pages/IntegrationsPage';
 import ChangePasswordModal from '@/features/users/components/ChangePasswordModal';
 import { useAuth, useCan } from '@/features/auth/AuthContext';
 import { useTheme } from '@/shared/hooks/useTheme';
@@ -36,7 +38,7 @@ const readView = (): FleetView => {
 };
 
 export default function AppShell({ onLogout }: { onLogout: () => void }) {
-  const { servers, loading, history, reload, refreshAll, isRefreshingAll, refreshSec, setRefreshSec, onMetricsUpdated } = useServers();
+  const { servers, loading, history, reload, refreshAll, isRefreshingAll, refreshSec, setRefreshSec, onMetricsUpdated, reorder } = useServers();
   const monitor = useMonitorSettings(servers);
   const { theme, toggleTheme } = useTheme();
   const t = useT();
@@ -120,9 +122,11 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
         onOpenPalette={() => { setPaletteSignal((n) => n + 1); setMobileNavOpen(false); }}
         mobileOpen={mobileNavOpen}
         onMobileClose={() => setMobileNavOpen(false)}
+        onReorder={reorder}
+        onEditServer={openEdit}
       />
 
-      <div className="flex-1 min-w-0 flex flex-col">
+      <div className="flex-1 min-w-0 flex flex-col carbon-bg">
         <TopBar
           route={route}
           navigate={navigate}
@@ -163,6 +167,8 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
               onTabChange={(t) => navigate({ page: 'users', tab: t })}
               servers={servers}
             />
+          ) : route.page === 'integrations' ? (
+            <IntegrationsPage />
           ) : route.page === 'server' ? (
             managedServer ? (
               <ServerPage
@@ -174,6 +180,7 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
                 thresholds={monitor.thresholds}
                 onEdit={openEdit}
                 onMetricsUpdated={onMetricsUpdated}
+                onServerUpdated={reload}
               />
             ) : loading ? (
               <div role="status" aria-label={t('fleet.loading')} className="space-y-4">
@@ -208,6 +215,7 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
               setTerminalServer={setTerminalServer}
               setProcessServer={setProcessServer}
               setFilesServer={setFilesServer}
+              onReorder={reorder}
             />
           )}
         </main>
@@ -265,6 +273,7 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
         open={copilotOpen}
         onClick={() => setCopilotOpen(true)}
       />
+      <BackgroundTasksWidget />
     </div>
   );
 }

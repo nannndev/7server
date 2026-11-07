@@ -33,12 +33,25 @@ if (process.argv.includes('--all') || process.argv.includes('--landing')) {
   });
 }
 
+let docsProcess = null;
+if (process.argv.includes('--all') || process.argv.includes('--docs')) {
+  console.log('\x1b[1;34m  📚 Starting 7Server Documentation on port 3002...  \x1b[0m\n');
+  docsProcess = spawn('npm run dev', [], {
+    cwd: path.join(__dirname, 'docs'),
+    stdio: 'inherit',
+    shell: true
+  });
+}
+
 function cleanup() {
   console.log('\n\x1b[33mShutting down 7Server...\x1b[0m');
   try { serverProcess.kill(); } catch (e) {}
   try { clientProcess.kill(); } catch (e) {}
   if (landingProcess) {
     try { landingProcess.kill(); } catch (e) {}
+  }
+  if (docsProcess) {
+    try { docsProcess.kill(); } catch (e) {}
   }
   process.exit();
 }

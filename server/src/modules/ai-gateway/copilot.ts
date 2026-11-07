@@ -4,6 +4,7 @@ import type { AiProviderId } from './types.js';
 import { isConnected } from './accounts.js';
 import { subscriptionChat, resolveModel } from './subscription.js';
 import type { OAuthProviderId } from './oauth.js';
+import { skillsSection } from './skills.js';
 
 // Default model per subscription account for the dashboard copilot (first connected one wins).
 const COPILOT_SUBSCRIPTION_MODELS: [OAuthProviderId, string][] = [
@@ -102,7 +103,7 @@ function preferencesSection(p?: AgentPreferences): string {
   return out;
 }
 
-function buildSystemPrompt(context?: CopilotContext, model?: string): string {
+function buildSystemPrompt(context?: CopilotContext, model?: string, lastUserMessage = ''): string {
   let prompt = `You are 7Server AI Copilot, an elite Site Reliability Engineer (SRE) and DevOps Assistant embedded directly inside the 7Server VPS Management Dashboard.
 You assist system administrators and developers with server troubleshooting, Linux automation, Docker orchestration, Nginx tuning, database management, and system security.
 
@@ -127,6 +128,8 @@ Never print, upload or send secrets (passwords, tokens, private keys, .env conte
     if (context.os) prompt += `\nOperating System: ${context.os}`;
     if (context.tab) prompt += `\nCurrent Dashboard View: ${context.tab}`;
   }
+
+  prompt += skillsSection(context?.tab, lastUserMessage);
 
   if (context?.errorSnippet) {
     // Logs are attacker-influenced: fence them like command output so they stay data.
@@ -159,6 +162,8 @@ export async function handleCopilotChat(req: Request, res: Response): Promise<vo
     return;
   }
 
+  const lastUser = [...messages].reverse().find((m) => m.role === 'user')?.content.slice(0, 2000) || '';
+
   res.writeHead(200, {
     'Content-Type': 'text/event-stream; charset=utf-8',
     'Cache-Control': 'no-cache, no-transform',
@@ -180,7 +185,7 @@ export async function handleCopilotChat(req: Request, res: Response): Promise<vo
   const sub: [OAuthProviderId, string] | undefined =
     picked && isConnected(picked.provider) ? [picked.provider, picked.model] : COPILOT_SUBSCRIPTION_MODELS.find(([prov]) => isConnected(prov));
   if (sub) {
-    await copilotViaSubscription(req, res, sub[0], sub[1], buildSystemPrompt(context, `${sub[0]}/${sub[1]}`), messages);
+    await copilotViaSubscription(req, res, sub[0], sub[1], buildSystemPrompt(context, `${sub[0]}/${sub[1]}`, lastUser), messages);
     return;
   }
 
@@ -218,7 +223,7 @@ export async function handleCopilotChat(req: Request, res: Response): Promise<vo
     return;
   }
 
-  const systemPrompt = buildSystemPrompt(context);
+  const systemPrompt = buildSystemPrompt(context, undefined, lastUser);
   const provider = cfg.providers[activeProviderId]!;
   const startTime = Date.now();
   let accumulatedOutput = '';

@@ -233,7 +233,7 @@ export default function SslTab() {
                       </div>
 
                       <div className="min-w-0">
-                        <h4 className="text-sm font-semibold text-[var(--foreground)] truncate">
+                        <h4 className="text-sm font-semibold text-[var(--foreground)] truncate sensitive">
                           {cert.name}
                         </h4>
                         <span className="text-[11px] font-mono text-[var(--muted-foreground)] flex items-center gap-1">
@@ -260,20 +260,20 @@ export default function SslTab() {
                     {cert.domains.map((dom) => (
                       <span
                         key={dom}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-mono bg-[var(--muted)] text-[var(--foreground)] border border-[var(--border)]"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-mono bg-[var(--muted)] text-[var(--foreground)] border border-[var(--border)] sensitive"
                       >
                         <Globe className="w-3 h-3 text-[var(--primary)]" />
-                        {dom}
+                        <span className="sensitive">{dom}</span>
                       </span>
                     ))}
                   </div>
 
                   {/* Paths */}
                   <div className="space-y-1 text-[11px] font-mono text-[var(--muted-foreground)] bg-zinc-950 p-2.5 rounded-lg border border-zinc-800/80">
-                    <div className="truncate" title={cert.certPath}>
+                    <div className="truncate sensitive" title={cert.certPath}>
                       <span className="text-zinc-500">cert:</span> {cert.certPath}
                     </div>
-                    <div className="truncate" title={cert.keyPath}>
+                    <div className="truncate sensitive" title={cert.keyPath}>
                       <span className="text-zinc-500">key:</span> {cert.keyPath}
                     </div>
                   </div>
@@ -326,10 +326,10 @@ export default function SslTab() {
                   value={issueDomain}
                   onChange={(e) => setIssueDomain(e.target.value)}
                   placeholder={t('ssl.domainPlaceholder')}
-                  className="font-mono text-xs"
+                  className="font-mono text-xs sensitive"
                   required
                 />
-                <span className="text-[10px] text-[var(--muted-foreground)]">
+                <span className="text-[10px] text-[var(--muted-foreground)] sensitive">
                   {t('ssl.domainHint', { host: server.host })}
                 </span>
               </div>
