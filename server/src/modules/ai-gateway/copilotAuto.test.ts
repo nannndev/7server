@@ -37,14 +37,16 @@ async function ask(model?: string) {
 let text = await ask(undefined);
 assert.deepEqual(hits, ['codex', 'kimi']);
 assert.match(text, /hello from kimi/);
-assert.doesNotMatch(text, /❌/, 'a handed-over failure is not shown as an error');
+assert.doesNotMatch(text, /"error"/, 'a handed-over failure is not shown as an error');
 assert.equal(text.match(/\[DONE\]/g)?.length, 1, 'exactly one end of stream');
 
 // Picked model: used as-is, and its own error is shown (no silent switch to another account).
 hits.length = 0;
 text = await ask('cx/gpt-6.1-sol');
 assert.deepEqual(hits, ['codex']);
-assert.match(text, /❌ codex/);
+const ev = JSON.parse(text.split('\n\n').find((l) => l.includes('"error"'))!.slice(6));
+assert.equal(ev.error.items[0].provider, 'codex');
+assert.doesNotMatch(text, /"delta":"[^"]*❌/, 'errors are a separate event, not chat text the model would see again');
 
 // Picking the Kimi model goes straight to Kimi.
 hits.length = 0;
@@ -59,10 +61,11 @@ globalThis.fetch = (async (url: any) => {
   return new Response('not stubbed', { status: 599 });
 }) as any;
 text = await ask(undefined);
-assert.match(text, /No connected account could answer/);
-assert.match(text, /codex: model not in your plan/);
-assert.match(text, /kimi: no active subscription/);
-assert.equal(text.match(/❌/g)?.length, 1, 'one error block, not one per account');
+const all = text.split('\n\n').filter((l) => l.includes('"error"')).map((l) => JSON.parse(l.slice(6)).error);
+assert.equal(all.length, 1, 'one error event, not one per account');
+assert.equal(all[0].title, 'No connected account could answer');
+assert.deepEqual(all[0].items.map((i: any) => [i.provider, i.reason]), [['codex', 'model not in your plan'], ['kimi', 'no active subscription']]);
+assert.ok(all[0].items[0].detail, 'raw provider message kept for the details toggle');
 
 // Reasons and catalog filters.
 const { accountProblem } = await import('./copilot.js');

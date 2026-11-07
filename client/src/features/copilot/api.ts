@@ -6,7 +6,8 @@ export async function streamCopilotChat(
   context: CopilotContext | undefined,
   onDelta: (text: string) => void,
   signal?: AbortSignal,
-  model?: string
+  model?: string,
+  onError?: (error: import('./types').CopilotError) => void
 ): Promise<void> {
   const token = getToken();
   const res = await fetch(`${API_BASE}/ai-copilot/chat`, {
@@ -16,7 +17,11 @@ export async function streamCopilotChat(
       ...(token ? { Authorization: `Bearer ${token}` } : {})
     },
     body: JSON.stringify({
-      messages: messages.map((m) => ({ role: m.role, content: m.content })),
+      // Failures are not conversation: drop error-only turns and error lines saved by older versions ("❌ …").
+      messages: messages
+        .map((m) => ({ ...m, content: m.role === 'assistant' ? m.content.replace(/(^|\n)\s*❌[^\n]*(\n(?!\n)[^\n]*)*/g, '').replace(/^_[^\n]*trying the next account…_\s*/gm, '').trim() : m.content }))
+        .filter((m) => m.content.trim() || m.role === 'user')
+        .map((m) => ({ role: m.role, content: m.content })),
       context,
       model
     }),
@@ -61,6 +66,8 @@ export async function streamCopilotChat(
             const data = JSON.parse(jsonStr);
             if (data.delta) {
               onDelta(data.delta);
+            } else if (data.error && onError) {
+              onError(data.error);
             }
           } catch {
             // Ignore parse failures on partial lines

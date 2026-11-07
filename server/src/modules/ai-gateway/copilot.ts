@@ -20,6 +20,10 @@ const COPILOT_SUBSCRIPTION_MODELS: [OAuthProviderId, string][] = [
 ];
 
 /** Streams the reply from a logged-in subscription account, re-emitting OpenAI chunks as copilot `{delta}` events. */
+/** `{error}` SSE event: shown as an error card in the drawer, kept out of the chat history sent to the model. */
+const errorEvent = (title: string, items: { provider: string; reason: string; detail?: string }[] = [], hint?: string) =>
+  `data: ${JSON.stringify({ error: { title, items, hint } })}\n\n`;
+
 /** Short reason for an account error the user can act on (no plan, no credits, model not in plan). */
 export function accountProblem(msg: string): string {
   if (/402|credits required|balance|usage_limit/i.test(msg)) return 'no credits';
@@ -55,10 +59,10 @@ async function copilotViaSubscription(req: Request, res: Response, provider: OAu
     ok = false; status = e.status || 502; error = e.message;
     if (failures && !wrote) {
       // Auto mode: collect the reason and hand over; one summary is written when every account failed.
-      failures.push(`${provider}: ${accountProblem(e.message)}`);
-      if (last) res.write(`data: ${JSON.stringify({ delta: `❌ No connected account could answer:\n${failures.map((f) => `- ${f}`).join('\n')}\n\nConnect an account with an active plan, or an API-key provider, in AI Gateway.` })}\n\n`);
+      failures.push(JSON.stringify({ provider, reason: accountProblem(e.message), detail: String(e.message).slice(0, 300) }));
+      if (last) res.write(errorEvent('No connected account could answer', failures.map((f) => JSON.parse(f)), 'Connect an account with an active plan, a free model, or an API-key provider in AI Gateway.'));
     } else {
-      res.write(`data: ${JSON.stringify({ delta: `\n\n❌ ${provider}: ${e.message}` })}\n\n`);
+      res.write(errorEvent(`${provider}/${model} failed`, [{ provider, reason: accountProblem(e.message), detail: String(e.message).slice(0, 300) }]));
     }
   }
   if (ok || last || wrote) { res.write('data: [DONE]\n\n'); res.end(); }

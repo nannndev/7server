@@ -91,6 +91,43 @@ function saveChats(chats: SavedChat[]) {
   try { localStorage.setItem(CHATS_KEY, JSON.stringify(chats)); } catch { /* quota / private mode: keep in memory */ }
 }
 
+/** A failed request: short reason per account, raw provider message tucked behind "details". */
+function ErrorCard({ error }: { error: import('../types').CopilotError }) {
+  const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+  return (
+    <div role="alert" className="mt-1 rounded-xl border border-red-500/30 bg-red-500/[0.06] p-3 text-[12px] space-y-2">
+      <div className="flex items-center gap-2 font-semibold text-red-600 dark:text-red-400">
+        <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> {error.title}
+      </div>
+      {error.items.length > 0 && (
+        <ul className="space-y-1">
+          {error.items.map((it, i) => (
+            <li key={i} className="flex items-center justify-between gap-3">
+              <span className="font-mono text-[11px] text-[var(--foreground)]">{it.provider}</span>
+              <span className="text-[11px] text-[var(--muted-foreground)]">{it.reason}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {error.hint && <p className="text-[11px] text-[var(--muted-foreground)]">{error.hint}</p>}
+      <div className="flex items-center gap-3 text-[11px]">
+        <a href="#/ai-gateway" className="font-medium text-[var(--foreground)] underline underline-offset-2">{t('copilot.errOpenGateway')}</a>
+        {error.items.some((it) => it.detail) && (
+          <button type="button" onClick={() => setOpen((v) => !v)} className="text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
+            {open ? t('copilot.errHideDetails') : t('copilot.errShowDetails')}
+          </button>
+        )}
+      </div>
+      {open && (
+        <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-[var(--background)] border border-[var(--border)] p-2 text-[10px] text-[var(--muted-foreground)]">
+          {error.items.filter((it) => it.detail).map((it) => `${it.provider}: ${it.detail}`).join('\n\n')}
+        </pre>
+      )}
+    </div>
+  );
+}
+
 function ChipSelect({ icon, label, value, onChange, options, mono }: {
   icon: React.ReactNode; label: string; value: string; onChange: (v: string) => void;
   options: { value: string; label: string; hint?: string }[]; mono?: boolean;
@@ -291,11 +328,13 @@ export default function AiCopilotDrawer({
           setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + delta } : m)));
         },
         controller.signal,
-        modelOptions.includes(model) ? model : undefined
+        modelOptions.includes(model) ? model : undefined,
+        (error) => setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, error } : m)))
       );
     } catch (err: any) {
       if (err.name !== 'AbortError') {
-        setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, content: m.content ? `${m.content}\n\n❌ ${err.message}` : `❌ ${err.message}` } : m)));
+        const error = { title: t('copilot.errRequest'), items: [], hint: err.message };
+        setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, error } : m)));
       }
     } finally {
       setIsStreaming(false);
@@ -656,7 +695,9 @@ export default function AiCopilotDrawer({
                       : 'bg-[var(--muted)]/50 border border-[var(--border)] text-[var(--foreground)] rounded-tl-sm'
                   }`}
                 >
-                  {msg.role === 'user' ? <div className="whitespace-pre-wrap text-[13px] leading-relaxed">{msg.content}</div> : msg.content ? renderMessageContent(msg) : <TypingDots />}
+                  {msg.role === 'user'
+                    ? <div className="whitespace-pre-wrap text-[13px] leading-relaxed">{msg.content}</div>
+                    : <>{msg.content ? renderMessageContent(msg) : !msg.error && <TypingDots />}{msg.error && <ErrorCard error={msg.error} />}</>}
                 </div>
               </div>
             ))

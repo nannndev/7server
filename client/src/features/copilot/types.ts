@@ -10,6 +10,12 @@ export interface CommandRun {
   durationMs?: number;
 }
 
+export interface CopilotError {
+  title: string;
+  items: { provider: string; reason: string; detail?: string }[];
+  hint?: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -23,6 +29,8 @@ export interface ChatMessage {
   step?: number;
   /** outputs already sent back to the AI (loop guard) */
   fed?: boolean;
+  /** request failure: rendered as an error card, never sent back to the model */
+  error?: CopilotError;
 }
 
 export interface CopilotContext {
