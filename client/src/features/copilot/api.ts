@@ -7,7 +7,8 @@ export async function streamCopilotChat(
   onDelta: (text: string) => void,
   signal?: AbortSignal,
   model?: string,
-  onError?: (error: import('./types').CopilotError) => void
+  onError?: (error: import('./types').CopilotError) => void,
+  onModel?: (model: string) => void
 ): Promise<void> {
   const token = getToken();
   const res = await fetch(`${API_BASE}/ai-copilot/chat`, {
@@ -17,9 +18,19 @@ export async function streamCopilotChat(
       ...(token ? { Authorization: `Bearer ${token}` } : {})
     },
     body: JSON.stringify({
-      // Failures are not conversation: drop error-only turns and error lines saved by older versions ("❌ …").
+      // Failures are not conversation: drop error-only turns and error lines saved by older versions ("❌ …") or internal "<final_answer>" tags.
       messages: messages
-        .map((m) => ({ ...m, content: m.role === 'assistant' ? m.content.replace(/(^|\n)\s*❌[^\n]*(\n(?!\n)[^\n]*)*/g, '').replace(/^_[^\n]*trying the next account…_\s*/gm, '').trim() : m.content }))
+        .map((m) => ({
+          ...m,
+          content:
+            m.role === 'assistant'
+              ? m.content
+                  .replace(/(^|\n)\s*❌[^\n]*(\n(?!\n)[^\n]*)*/g, '')
+                  .replace(/^_[^\n]*trying the next account…_\s*/gm, '')
+                  .replace(/<final_answer>[\s\S]*?<\/final_answer>/gi, '')
+                  .trim()
+              : m.content
+        }))
         .filter((m) => m.content.trim() || m.role === 'user')
         .map((m) => ({ role: m.role, content: m.content })),
       context,
@@ -66,6 +77,8 @@ export async function streamCopilotChat(
             const data = JSON.parse(jsonStr);
             if (data.delta) {
               onDelta(data.delta);
+            } else if (data.model && onModel) {
+              onModel(data.model);
             } else if (data.error && onError) {
               onError(data.error);
             }

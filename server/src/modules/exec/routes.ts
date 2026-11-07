@@ -8,6 +8,11 @@ import { isServerAllowed } from '../../http/handlers.js';
 
 export const execRoutes = Router();
 
+/** True when a command line invokes sudo itself (not "pseudo", not inside a word). */
+export const callsSudo = (cmd: string) => /(^|[\s;&|(])sudo\s/.test(cmd);
+/** Drops `sudo [-flags]` so the whole command can run under one root shell instead of nesting sudo. */
+export const withoutSudo = (cmd: string) => cmd.replace(/(^|[\s;&|(])sudo\s+(-[A-Za-z]+\s+)*/g, '$1');
+
 execRoutes.post('/servers/:id/exec', need('terminal.open'), async (req: Request, res: Response) => {
   const serverId = req.params.id as string;
   if (req.user && !isServerAllowed(req.user.servers, serverId)) {
@@ -21,10 +26,18 @@ execRoutes.post('/servers/:id/exec', need('terminal.open'), async (req: Request,
   if (!target) return res.status(404).json({ success: false, error: 'Server not found' });
 
   // sudo: run as root with the saved sudo password (nginx -t, reload, drop_caches need it on non-root SSH users).
+  // A command that itself calls `sudo` (copilot fixes) gets the same treatment: over a non-interactive SSH exec,
+  // sudo cannot prompt and fails with "a terminal is required". Running the whole command as root is
+  // equivalent, and it only happens after the user approved that exact command.
+  const usesSudo = sudo === true || callsSudo(String(command));
   const pass = target.sudoPassword || (target.authType === 'password' ? target.password : undefined);
-  const result = sudo === true
-    ? await executeCommand(target, `if [ "$(id -u)" -eq 0 ]; then sh -c ${sq(command)}; else sudo ${pass ? "-k -S -p ''" : '-n'} sh -c ${sq(command)}; fi`, 30000, pass ? { stdin: `${pass}\n` } : {})
+  const asRoot = withoutSudo(String(command));
+  const result = usesSudo
+    ? await executeCommand(target, `if [ "$(id -u)" -eq 0 ]; then sh -c ${sq(asRoot)}; else sudo ${pass ? "-k -S -p ''" : '-n'} sh -c ${sq(asRoot)}; fi`, 30000, pass ? { stdin: `${pass}\n` } : {})
     : await executeCommand(target, command, 30000);
+  if (usesSudo && result.code !== 0 && /a password is required|terminal is required/i.test(`${result.stderr}${result.stdout}`)) {
+    result.stderr = `${result.stderr}\nNo sudo password is saved for this server: add it in Edit server → Sudo password, then run the command again.`.trim();
+  }
   res.json({ success: true, data: result });
 });
 

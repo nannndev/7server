@@ -224,9 +224,18 @@ export async function subscriptionChat(req: Request, res: Response, body: ChatRe
   return { inTok, outTok, status: 200 };
 }
 
-/** Copilot: only chat models this account's policy enables (others answer "model not supported"). */
+/** Copilot: only chat models this account's policy enables (others answer "model not supported"), excluding internal search/IDE sub-agents and /responses-only models. */
 export const copilotChatModels = (data: any[]) =>
-  data.filter((m) => m?.capabilities?.type === 'chat' && (!m.policy || m.policy.state === 'enabled')).map((m) => String(m.id));
+  data
+    .filter(
+      (m) =>
+        m?.capabilities?.type === 'chat' &&
+        (!m.policy || m.policy.state === 'enabled') &&
+        (!Array.isArray(m.supported_endpoints) || m.supported_endpoints.includes('/chat/completions')) &&
+        m?.capabilities?.family !== 'search-agent' &&
+        !/^(copilot-|mai-code-)/i.test(String(m?.id || ''))
+    )
+    .map((m) => String(m.id));
 /** Kilo: free models (price 0) first, so an account without credits still has something that works. */
 export const kiloFreeModels = (data: any[]) =>
   data.filter((m) => m?.pricing?.prompt === '0' && m?.pricing?.completion === '0').map((m) => String(m.id));

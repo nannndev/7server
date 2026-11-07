@@ -83,7 +83,7 @@ interface ProviderMeta {
   docsUrl: string;
 }
 
-const PROVIDERS_META: ProviderMeta[] = [
+export const PROVIDERS_META: ProviderMeta[] = [
   {
     id: 'anthropic',
     name: 'Anthropic Claude',
@@ -341,6 +341,10 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
   // Usage tab filters
   const [usageSearch, setUsageSearch] = useState('');
   const [providerFilter, setProviderFilter] = useState<string>('all');
+
+  // Providers tab search & filter
+  const [apiSearch, setApiSearch] = useState('');
+  const [apiFilter, setApiFilter] = useState<'all' | 'connected' | 'native' | 'compat'>('all');
 
   const loadData = async () => {
     try {
@@ -637,141 +641,215 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
 
       {/* ----------------- TAB 1: PROVIDERS & ACCOUNTS (9ROUTER STYLE) ----------------- */}
       {currentTab === 'providers' && (
-        <div className="space-y-6">
-          {/* Workflow callout */}
-          <div className="p-4 rounded-xl bg-[var(--foreground)]/[0.03] border border-[var(--rim)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-[var(--foreground)]/[0.06] text-[var(--foreground)] flex items-center justify-center shrink-0 mt-0.5">
-                <Zap className="w-4 h-4" />
+        <div className="space-y-5">
+          {/* Compact Workflow Callout */}
+          <div className="px-3.5 py-2.5 rounded-xl bg-[var(--foreground)]/[0.03] border border-[var(--rim)] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-[var(--foreground)]/[0.06] text-[var(--foreground)] flex items-center justify-center shrink-0">
+                <Zap className="w-3.5 h-3.5" />
               </div>
-              <div className="space-y-0.5">
-                <div className="text-xs font-semibold text-[var(--foreground)]">
+              <div className="min-w-0">
+                <div className="text-xs font-semibold text-[var(--foreground)] truncate">
                   {t('aiGw.step1Title')}
                 </div>
-                <div className="text-[11px] text-[var(--muted-foreground)]">
+                <div className="text-[11px] text-[var(--muted-foreground)] truncate">
                   {t('aiGw.step1Desc')}
                 </div>
               </div>
             </div>
             {connectedCount > 0 ? (
-              <Button size="sm" onClick={() => onTabChange('keys')} className="btn-metal shrink-0">
+              <Button size="sm" onClick={() => onTabChange('keys')} className="btn-metal h-7 text-xs shrink-0">
                 {t('aiGw.step1Next')}
               </Button>
             ) : null}
           </div>
 
-          <div className="space-y-1">
-            <h3 className="text-sm font-semibold text-[var(--foreground)]">{t('aiGw.subsTitle')}</h3>
-            <p className="text-[11px] text-[var(--muted-foreground)]">{t('aiGw.subsDesc')} <code className="font-mono">alias/model</code> · <code className="font-mono">cc/claude-sonnet-5</code> · <code className="font-mono">/v1/chat/completions</code></p>
+          <div className="space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
+              <h3 className="text-sm font-semibold text-[var(--foreground)]">{t('aiGw.subsTitle')}</h3>
+              <p className="text-[11px] text-[var(--muted-foreground)]">
+                {t('aiGw.subsDesc')} <code className="font-mono">alias/model</code> · <code className="font-mono">cc/claude-sonnet-4-6</code> · <code className="font-mono">/v1/chat/completions</code>
+              </p>
+            </div>
+            <SubscriptionAccounts />
           </div>
-          <SubscriptionAccounts />
+
           <Combos />
 
-          <h3 className="text-sm font-semibold text-[var(--foreground)] pt-2">{t('aiGw.apiKeyTitle')}</h3>
-          {/* Providers Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {PROVIDERS_META.map((p) => {
-              const provConfig = config?.providers?.[p.id];
-              const isConnected = provConfig?.connected === true && (provConfig?.apiKey || p.id === 'ollama' || p.id === 'custom');
+          {/* API-Key Providers Section with Search & Filter Pills */}
+          <div className="space-y-3 pt-1">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-[var(--foreground)]">{t('aiGw.apiKeyTitle')}</h3>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--muted)] text-[var(--muted-foreground)]">
+                  {connectedCount}/{PROVIDERS_META.length}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-[var(--muted-foreground)] absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={apiSearch}
+                    onChange={(e) => setApiSearch(e.target.value)}
+                    placeholder="Filter providers or models…"
+                    className="h-7 pl-7 pr-2.5 rounded-lg border border-[var(--border)] bg-[var(--background)] text-xs text-[var(--foreground)] placeholder-[var(--muted-foreground)] outline-none focus:border-[var(--rim)] w-44 sm:w-52"
+                  />
+                </div>
+                {([
+                  { id: 'all', label: 'All' },
+                  { id: 'connected', label: `Connected (${connectedCount})` },
+                  { id: 'native', label: 'Core (6)' },
+                  { id: 'compat', label: 'OpenAI-Compat (13)' }
+                ] as const).map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setApiFilter(f.id)}
+                    className={`h-7 px-2.5 rounded-lg text-[11px] font-medium transition-colors border ${
+                      apiFilter === f.id
+                        ? 'bg-[var(--foreground)] text-[var(--background)] border-transparent'
+                        : 'border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]/50'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-              return (
-                <Card
-                  key={p.id}
-                  className={`p-4 bg-[var(--card)] border transition-all duration-200 flex flex-col justify-between ${
-                    isConnected
-                      ? 'border-emerald-500/40 shadow-sm'
-                      : 'border-[var(--border)] hover:border-[var(--border)]/80'
-                  }`}
-                >
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
-                        <div className={`w-9 h-9 rounded-xl border flex items-center justify-center font-bold text-sm shadow-sm bg-gradient-to-br ${p.color}`}>
-                          <BrandIcon name={p.id} className="w-[18px] h-[18px]" fallback={p.name.slice(0, 1)} />
+            {/* Compact High-Density Providers Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {[...PROVIDERS_META]
+                .filter((p) => {
+                  const provConfig = config?.providers?.[p.id];
+                  const isConnected = provConfig?.connected === true && (provConfig?.apiKey || p.id === 'ollama' || p.id === 'custom');
+                  const isNative = ['anthropic', 'openai', 'deepseek', 'openrouter', 'gemini', 'ollama'].includes(p.id);
+                  if (apiFilter === 'connected' && !isConnected) return false;
+                  if (apiFilter === 'native' && !isNative) return false;
+                  if (apiFilter === 'compat' && isNative) return false;
+                  if (!apiSearch.trim()) return true;
+                  const q = apiSearch.toLowerCase();
+                  return (
+                    p.name.toLowerCase().includes(q) ||
+                    p.id.toLowerCase().includes(q) ||
+                    p.models.some((m) => m.toLowerCase().includes(q))
+                  );
+                })
+                .sort((a, b) => {
+                  const aConn = config?.providers?.[a.id]?.connected ? 1 : 0;
+                  const bConn = config?.providers?.[b.id]?.connected ? 1 : 0;
+                  return bConn - aConn;
+                })
+                .map((p) => {
+                  const provConfig = config?.providers?.[p.id];
+                  const isConnected = provConfig?.connected === true && (provConfig?.apiKey || p.id === 'ollama' || p.id === 'custom');
+
+                  return (
+                    <Card
+                      key={p.id}
+                      className={`p-3 bg-[var(--card)] border transition-all duration-150 flex flex-col justify-between gap-2.5 ${
+                        isConnected
+                          ? 'border-emerald-500/40 shadow-sm'
+                          : 'border-[var(--border)] hover:border-[var(--rim)]'
+                      }`}
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className={`w-8 h-8 rounded-lg border flex items-center justify-center font-bold text-xs shadow-sm shrink-0 bg-gradient-to-br ${p.color}`}>
+                              <BrandIcon name={p.id} className="w-4 h-4" fallback={p.name.slice(0, 1)} />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-semibold text-xs text-[var(--foreground)] truncate">{p.name}</div>
+                              <div className="text-[10px] text-[var(--muted-foreground)] font-mono truncate">{t(p.badge)}</div>
+                            </div>
+                          </div>
+
+                          {isConnected ? (
+                            <span
+                              title={provConfig?.latencyMs ? `${provConfig.latencyMs}ms` : t('aiGw.connected')}
+                              className="text-[9.5px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 flex items-center gap-1 font-mono shrink-0"
+                            >
+                              <CheckCircle2 className="w-2.5 h-2.5 text-emerald-500" />
+                              {provConfig?.latencyMs ? `${provConfig.latencyMs}ms` : t('aiGw.connected')}
+                            </span>
+                          ) : (
+                            <span className="w-2 h-2 rounded-full bg-[var(--muted)] mt-1.5 shrink-0" title={t('aiGw.disconnected')} />
+                          )}
                         </div>
-                        <div>
-                          <div className="font-semibold text-xs text-[var(--foreground)]">{p.name}</div>
-                          <div className="text-[10px] text-[var(--muted-foreground)] font-mono">{t(p.badge)}</div>
+
+                        <p className="text-[11px] text-[var(--muted-foreground)] line-clamp-1" title={t(p.tagline)}>
+                          {t(p.tagline)}
+                        </p>
+
+                        <div className="flex flex-wrap gap-1">
+                          {p.models.slice(0, 2).map((m) => {
+                            const fullModel = m.includes('/') ? m : `${p.id}/${m}`;
+                            return (
+                              <button
+                                key={m}
+                                type="button"
+                                onClick={() => copyToClipboard(m, `model-${m}`)}
+                                title={`Click to copy ${fullModel}`}
+                                className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--muted)]/80 hover:bg-[var(--muted)] text-[var(--foreground)] truncate max-w-[165px] transition-colors"
+                              >
+                                {m}
+                              </button>
+                            );
+                          })}
+                          {p.models.length > 2 && (
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--muted)]/50 text-[var(--muted-foreground)]">
+                              +{p.models.length - 2}
+                            </span>
+                          )}
                         </div>
                       </div>
 
-                      {isConnected ? (
-                        <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-500 border-emerald-500/30 flex items-center gap-1 font-mono">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                          {t('aiGw.connected')}
-                          {provConfig?.latencyMs ? ` (${provConfig.latencyMs}ms)` : ''}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-[10px] text-[var(--muted-foreground)] bg-[var(--muted)]/50">
-                          {t('aiGw.disconnected')}
-                        </Badge>
-                      )}
-                    </div>
-
-                    <p className="text-[11px] text-[var(--muted-foreground)] line-clamp-2 min-h-[32px]">
-                      {t(p.tagline)}
-                    </p>
-
-                    <div className="space-y-1 pt-1">
-                      <div className="text-[10px] font-medium text-[var(--muted-foreground)] uppercase">{t('aiGw.supportedModels')}</div>
-                      <div className="flex flex-wrap gap-1">
-                        {p.models.slice(0, 2).map((m) => (
-                          <span key={m} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--muted)] text-[var(--foreground)]">
-                            {m}
-                          </span>
-                        ))}
-                        {p.models.length > 2 && (
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--muted)] text-[var(--muted-foreground)]">
-                            {t('aiGw.nMore', { n: p.models.length - 2 })}
-                          </span>
+                      <div className="pt-2 border-t border-[var(--border)]/60 flex items-center justify-between gap-2">
+                        {isConnected ? (
+                          <>
+                            <button
+                              onClick={() => handleDisconnect(p.id)}
+                              className="text-[10.5px] text-red-500 hover:text-red-400 transition-colors flex items-center gap-1"
+                            >
+                              <Unplug className="w-3 h-3" />
+                              {t('aiGw.disconnect')}
+                            </button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openConnectModal(p)}
+                              className="h-6 px-2.5 text-[11px] border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10"
+                            >
+                              {t('aiGw.configure')}
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <a
+                              href={p.docsUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[10.5px] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors flex items-center gap-1"
+                            >
+                              {t('aiGw.getKey')} <ExternalLink className="w-2.5 h-2.5" />
+                            </a>
+                            <Button
+                              size="sm"
+                              onClick={() => openConnectModal(p)}
+                              className="h-6 px-2.5 text-[11px] btn-metal"
+                            >
+                              <Plug className="w-2.5 h-2.5 mr-1" />
+                              {t('aiGw.connect')}
+                            </Button>
+                          </>
                         )}
                       </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t border-[var(--border)] mt-4 flex items-center justify-between gap-2">
-                    {isConnected ? (
-                      <>
-                        <button
-                          onClick={() => handleDisconnect(p.id)}
-                          className="text-[11px] text-red-500 hover:text-red-600 transition-colors flex items-center gap-1"
-                        >
-                          <Unplug className="w-3 h-3" />
-                          {t('aiGw.disconnect')}
-                        </button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openConnectModal(p)}
-                          className="h-7 text-xs border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10"
-                        >
-                          {t('aiGw.configure')}
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <a
-                          href={p.docsUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-[11px] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors flex items-center gap-1"
-                        >
-                          {t('aiGw.getKey')} <ExternalLink className="w-2.5 h-2.5" />
-                        </a>
-                        <Button
-                          size="sm"
-                          onClick={() => openConnectModal(p)}
-                          className="h-7 text-xs btn-metal"
-                        >
-                          <Plug className="w-3 h-3 mr-1" />
-                          {t('aiGw.connect')}
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </Card>
-              );
-            })}
+                    </Card>
+                  );
+                })}
+            </div>
           </div>
         </div>
       )}

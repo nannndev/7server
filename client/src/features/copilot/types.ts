@@ -31,6 +31,8 @@ export interface ChatMessage {
   fed?: boolean;
   /** request failure: rendered as an error card, never sent back to the model */
   error?: CopilotError;
+  /** resolved model that generated this assistant reply (e.g. "cc/claude-sonnet-4-6" or "groq/llama-3.3-70b-versatile") */
+  model?: string;
 }
 
 export interface CopilotContext {

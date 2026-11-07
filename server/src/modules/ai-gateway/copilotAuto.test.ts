@@ -73,11 +73,13 @@ const { copilotChatModels, kiloFreeModels } = await import('./subscription.js');
 assert.equal(accountProblem('kilocode 402: {"error":{"title":"Paid Model - Credits Required"}}'), 'no credits');
 assert.equal(accountProblem('copilot 400: The requested model is not available for integrator'), 'model not in your plan');
 assert.deepEqual(copilotChatModels([
+  { id: 'copilot-search-a', capabilities: { type: 'chat', family: 'search-agent' }, supported_endpoints: ['/chat/completions'] },
+  { id: 'gpt-5.6-luna', capabilities: { type: 'chat' }, policy: { state: 'enabled' }, supported_endpoints: ['/responses'] },
   { id: 'gpt-5-mini', capabilities: { type: 'chat' }, policy: { state: 'enabled' } },
   { id: 'claude-opus', capabilities: { type: 'chat' }, policy: { state: 'disabled' } },
   { id: 'text-embedding', capabilities: { type: 'embeddings' } },
   { id: 'gpt-4.1', capabilities: { type: 'chat' } }
-]), ['gpt-5-mini', 'gpt-4.1'], 'disabled-by-policy and embedding models are hidden');
+]), ['gpt-5-mini', 'gpt-4.1'], 'disabled-by-policy, search-agent, /responses-only, and embedding models are hidden');
 assert.deepEqual(kiloFreeModels([
   { id: 'cohere/north:free', pricing: { prompt: '0', completion: '0' } },
   { id: 'anthropic/claude-sonnet-4', pricing: { prompt: '0.000003', completion: '0.000015' } }
