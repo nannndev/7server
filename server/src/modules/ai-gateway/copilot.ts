@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import { getInternalConfig, addUsageLog } from './store.js';
 import type { AiProviderId } from './types.js';
 import { isConnected } from './accounts.js';
-import { subscriptionChat, resolveModel } from './subscription.js';
+import { subscriptionChat, resolveModel, accountModels } from './subscription.js';
 import type { OAuthProviderId } from './oauth.js';
 import { skillsSection } from './skills.js';
 
@@ -20,7 +20,17 @@ const COPILOT_SUBSCRIPTION_MODELS: [OAuthProviderId, string][] = [
 ];
 
 /** Streams the reply from a logged-in subscription account, re-emitting OpenAI chunks as copilot `{delta}` events. */
-async function copilotViaSubscription(req: Request, res: Response, provider: OAuthProviderId, model: string, system: string, messages: CopilotChatMessage[], last = true): Promise<boolean> {
+/** Short reason for an account error the user can act on (no plan, no credits, model not in plan). */
+export function accountProblem(msg: string): string {
+  if (/402|credits required|balance|usage_limit/i.test(msg)) return 'no credits';
+  if (/subscription|upgrade your plan|permission_denied|not have access/i.test(msg)) return 'no active subscription';
+  if (/not supported|not available|model_not_found|model_not/i.test(msg)) return 'model not in your plan';
+  if (/429|rate.?limit|quota/i.test(msg)) return 'rate limited';
+  if (/401|403|unauthor|expired|login/i.test(msg)) return 'login expired';
+  return msg.slice(0, 120);
+}
+
+async function copilotViaSubscription(req: Request, res: Response, provider: OAuthProviderId, model: string, system: string, messages: CopilotChatMessage[], last = true, failures?: string[]): Promise<boolean> {
   const started = Date.now();
   // subscriptionChat writes OpenAI SSE; this shim forwards only the text deltas (headers were already sent).
   const shim: any = {
@@ -43,9 +53,10 @@ async function copilotViaSubscription(req: Request, res: Response, provider: OAu
     ({ inTok, outTok } = await subscriptionChat(req, shim, { model, stream: true, messages: [{ role: 'system', content: system }, ...messages] }, { provider, model }));
   } catch (e: any) {
     ok = false; status = e.status || 502; error = e.message;
-    // Auto mode: an account that fails before answering hands over to the next one silently.
-    if (!last && !wrote) {
-      res.write(`data: ${JSON.stringify({ delta: `_${provider}/${model} unavailable, trying the next account…_\n\n` })}\n\n`);
+    if (failures && !wrote) {
+      // Auto mode: collect the reason and hand over; one summary is written when every account failed.
+      failures.push(`${provider}: ${accountProblem(e.message)}`);
+      if (last) res.write(`data: ${JSON.stringify({ delta: `❌ No connected account could answer:\n${failures.map((f) => `- ${f}`).join('\n')}\n\nConnect an account with an active plan, or an API-key provider, in AI Gateway.` })}\n\n`);
     } else {
       res.write(`data: ${JSON.stringify({ delta: `\n\n❌ ${provider}: ${e.message}` })}\n\n`);
     }
@@ -195,12 +206,18 @@ export async function handleCopilotChat(req: Request, res: Response): Promise<vo
   // Logged-in subscription accounts take priority over API-key providers.
   // A model picked in the chat is used as-is (its own error is shown). "Auto" walks the connected accounts.
   const picked = resolveModel(requestedModel);
-  const chain: [OAuthProviderId, string][] = picked && isConnected(picked.provider)
-    ? [[picked.provider, picked.model]]
-    : COPILOT_SUBSCRIPTION_MODELS.filter(([prov]) => isConnected(prov));
+  let chain: [OAuthProviderId, string][] = [];
+  if (picked && isConnected(picked.provider)) chain = [[picked.provider, picked.model]];
+  else {
+    // Prefer a model the account's live catalog lists (Copilot policy, Kilo free models) over the static default.
+    const live = await accountModels();
+    chain = COPILOT_SUBSCRIPTION_MODELS.filter(([prov]) => isConnected(prov))
+      .map(([prov, def]) => [prov, live[prov]?.includes(def) ? def : live[prov]?.[0] || def] as [OAuthProviderId, string]);
+  }
+  const failures = picked ? undefined : [] as string[];
   for (let i = 0; i < chain.length; i++) {
     const [prov, mdl] = chain[i];
-    if (await copilotViaSubscription(req, res, prov, mdl, buildSystemPrompt(context, `${prov}/${mdl}`, lastUser), messages, i === chain.length - 1)) return;
+    if (await copilotViaSubscription(req, res, prov, mdl, buildSystemPrompt(context, `${prov}/${mdl}`, lastUser), messages, i === chain.length - 1, failures)) return;
   }
   if (chain.length) return;
 

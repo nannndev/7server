@@ -51,4 +51,32 @@ hits.length = 0;
 text = await ask('km/kimi-for-coding');
 assert.deepEqual(hits, ['kimi']);
 assert.match(text, /hello from kimi/);
+// Every account fails → one short summary with an actionable reason per account, not a stack of raw errors.
+globalThis.fetch = (async (url: any) => {
+  const u = String(url);
+  if (u.includes('chatgpt.com/backend-api/codex')) return new Response('{"detail":"The model is not supported when using Codex with a ChatGPT account."}', { status: 400 });
+  if (u === KIMI.chatUrl) return new Response('{"error":{"message":"Your current subscription does not have access to Kimi Code right now.","type":"permission_denied_error"}}', { status: 403 });
+  return new Response('not stubbed', { status: 599 });
+}) as any;
+text = await ask(undefined);
+assert.match(text, /No connected account could answer/);
+assert.match(text, /codex: model not in your plan/);
+assert.match(text, /kimi: no active subscription/);
+assert.equal(text.match(/❌/g)?.length, 1, 'one error block, not one per account');
+
+// Reasons and catalog filters.
+const { accountProblem } = await import('./copilot.js');
+const { copilotChatModels, kiloFreeModels } = await import('./subscription.js');
+assert.equal(accountProblem('kilocode 402: {"error":{"title":"Paid Model - Credits Required"}}'), 'no credits');
+assert.equal(accountProblem('copilot 400: The requested model is not available for integrator'), 'model not in your plan');
+assert.deepEqual(copilotChatModels([
+  { id: 'gpt-5-mini', capabilities: { type: 'chat' }, policy: { state: 'enabled' } },
+  { id: 'claude-opus', capabilities: { type: 'chat' }, policy: { state: 'disabled' } },
+  { id: 'text-embedding', capabilities: { type: 'embeddings' } },
+  { id: 'gpt-4.1', capabilities: { type: 'chat' } }
+]), ['gpt-5-mini', 'gpt-4.1'], 'disabled-by-policy and embedding models are hidden');
+assert.deepEqual(kiloFreeModels([
+  { id: 'cohere/north:free', pricing: { prompt: '0', completion: '0' } },
+  { id: 'anthropic/claude-sonnet-4', pricing: { prompt: '0.000003', completion: '0.000015' } }
+]), ['cohere/north:free']);
 console.log('copilot auto ok');

@@ -224,25 +224,50 @@ export async function subscriptionChat(req: Request, res: Response, body: ChatRe
   return { inTok, outTok, status: 200 };
 }
 
-/** Models of every connected account, in `alias/model` form. Copilot uses its live catalog when reachable. */
+/** Copilot: only chat models this account's policy enables (others answer "model not supported"). */
+export const copilotChatModels = (data: any[]) =>
+  data.filter((m) => m?.capabilities?.type === 'chat' && (!m.policy || m.policy.state === 'enabled')).map((m) => String(m.id));
+/** Kilo: free models (price 0) first, so an account without credits still has something that works. */
+export const kiloFreeModels = (data: any[]) =>
+  data.filter((m) => m?.pricing?.prompt === '0' && m?.pricing?.completion === '0').map((m) => String(m.id));
+
+// shortcut: one cached catalog per provider for 5 minutes; per-account caching only matters with multiple logins of one provider.
+const liveCache = new Map<OAuthProviderId, { at: number; ids: string[] }>();
+async function liveModels(provider: OAuthProviderId): Promise<string[] | null> {
+  const hit = liveCache.get(provider);
+  if (hit && Date.now() - hit.at < 5 * 60_000) return hit.ids;
+  let ids: string[] = [];
+  try {
+    if (provider === 'copilot') {
+      const cred = await getCredential('copilot');
+      const r = await fetch('https://api.githubcopilot.com/models', {
+        headers: { Authorization: `Bearer ${cred.apiToken}`, 'copilot-integration-id': 'vscode-chat', 'editor-version': 'vscode/1.110.0', 'user-agent': COPILOT.headers['User-Agent'] },
+        signal: AbortSignal.timeout(10000)
+      });
+      if (r.ok) ids = copilotChatModels((await r.json()).data || []);
+    } else if (provider === 'kilocode') {
+      const r = await fetch(`${KILOCODE.apiBaseUrl}/api/gateway/models`, { signal: AbortSignal.timeout(10000) });
+      if (r.ok) { const free = kiloFreeModels((await r.json()).data || []); ids = [...free, ...MODELS.kilocode.filter((m) => !free.includes(m))]; }
+    } else return null;
+  } catch { return null; }
+  if (!ids.length) return null;
+  liveCache.set(provider, { at: Date.now(), ids });
+  return ids;
+}
+
+/** Model ids of each connected account (live catalog when the provider has one, else the seed list). */
+export async function accountModels(): Promise<Partial<Record<OAuthProviderId, string[]>>> {
+  const out: Partial<Record<OAuthProviderId, string[]>> = {};
+  for (const provider of Object.keys(MODELS) as OAuthProviderId[]) {
+    if (isConnected(provider)) out[provider] = (await liveModels(provider)) || MODELS[provider];
+  }
+  return out;
+}
+
+/** Models of every connected account, in `alias/model` form. */
 export async function subscriptionModels(): Promise<{ id: string; object: 'model'; owned_by: string }[]> {
   const out: { id: string; object: 'model'; owned_by: string }[] = [];
-  for (const provider of Object.keys(MODELS) as OAuthProviderId[]) {
-    if (!isConnected(provider)) continue;
-    let ids = MODELS[provider];
-    if (provider === 'copilot') {
-      try {
-        const cred = await getCredential('copilot');
-        const r = await fetch('https://api.githubcopilot.com/models', {
-          headers: { Authorization: `Bearer ${cred.apiToken}`, 'copilot-integration-id': 'vscode-chat', 'editor-version': 'vscode/1.110.0', 'user-agent': COPILOT.headers['User-Agent'] },
-          signal: AbortSignal.timeout(10000)
-        });
-        if (r.ok) {
-          const live = ((await r.json()).data || []).filter((m: any) => m?.capabilities?.type !== 'embeddings' && m?.model_picker_enabled !== false).map((m: any) => m.id);
-          if (live.length) ids = live;
-        }
-      } catch { /* fall back to seed list */ }
-    }
+  for (const [provider, ids] of Object.entries(await accountModels()) as [OAuthProviderId, string[]][]) {
     for (const id of ids) out.push({ id: `${ALIAS_OF[provider]}/${id}`, object: 'model', owned_by: provider });
   }
   return out;
