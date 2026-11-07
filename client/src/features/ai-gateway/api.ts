@@ -131,7 +131,7 @@ async function body<T>(res: Response, fallback: string): Promise<T> {
 }
 
 export const fetchAccounts = async () =>
-  body<{ accounts: SubscriptionAccount[]; models: Record<OAuthProviderId, string[]> }>(await apiFetch(`${API_BASE}/ai-gateway/accounts`), 'Failed to fetch accounts');
+  body<{ accounts: SubscriptionAccount[]; models: Record<OAuthProviderId, string[]>; aliases?: Partial<Record<OAuthProviderId, string>> }>(await apiFetch(`${API_BASE}/ai-gateway/accounts`), 'Failed to fetch accounts');
 export const startAccountLogin = async (p: OAuthProviderId) => body<LoginStart>(await apiFetch(acct(p, 'start'), jsonPost({})), 'Failed to start login');
 export const completeAccountLogin = async (p: OAuthProviderId, sessionId: string, callback: string) =>
   (await body<{ accounts: SubscriptionAccount[] }>(await apiFetch(acct(p, 'complete'), jsonPost({ sessionId, callback })), 'Login failed')).accounts;

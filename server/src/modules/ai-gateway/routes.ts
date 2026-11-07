@@ -9,7 +9,7 @@ import { verifyProviderConnection } from './verifier.js';
 import { internalOnly } from './internalOnly.js';
 import { startLogin, completeLogin, pollDeviceLogin, isOAuthProvider } from './oauth.js';
 import { listAccounts, saveAccount, removeAccount, getCredential } from './accounts.js';
-import { MODELS, resolveModel } from './subscription.js';
+import { ALIAS_OF, MODELS, resolveModel } from './subscription.js';
 import { usageOf } from './usage.js';
 import { listenForCallback } from './callbackServer.js';
 import {
@@ -162,7 +162,7 @@ const oauthProvider = (req: Request, res: Response) => {
 };
 
 aiGatewayManagementRoutes.get('/ai-gateway/accounts', (_req: Request, res: Response) => {
-  res.json({ accounts: listAccounts(), models: MODELS });
+  res.json({ accounts: listAccounts(), models: MODELS, aliases: ALIAS_OF });
 });
 
 aiGatewayManagementRoutes.post('/ai-gateway/accounts/:provider/start', async (req: Request, res: Response) => {

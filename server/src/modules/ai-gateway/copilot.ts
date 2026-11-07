@@ -7,15 +7,20 @@ import type { OAuthProviderId } from './oauth.js';
 import { skillsSection } from './skills.js';
 
 // Default model per subscription account for the dashboard copilot (first connected one wins).
+// Plan-safe defaults: what most plans of that account can use (ChatGPT Plus rejects the newest Codex ids).
 const COPILOT_SUBSCRIPTION_MODELS: [OAuthProviderId, string][] = [
   ['claude', 'claude-sonnet-5-5'],
-  ['codex', 'gpt-6.1-sol'],
   ['copilot', 'gpt-5.5'],
-  ['gemini-cli', 'gemini-2.5-flash']
+  ['codex', 'gpt-5.6-sol'],
+  ['kimi', 'kimi-for-coding'],
+  ['gemini-cli', 'gemini-2.5-flash'],
+  ['kilocode', 'anthropic/claude-sonnet-4-20250514'],
+  ['muse', 'muse-spark-1.3'],
+  ['nous', 'meituan/longcat-2.0:free']
 ];
 
 /** Streams the reply from a logged-in subscription account, re-emitting OpenAI chunks as copilot `{delta}` events. */
-async function copilotViaSubscription(req: Request, res: Response, provider: OAuthProviderId, model: string, system: string, messages: CopilotChatMessage[]) {
+async function copilotViaSubscription(req: Request, res: Response, provider: OAuthProviderId, model: string, system: string, messages: CopilotChatMessage[], last = true): Promise<boolean> {
   const started = Date.now();
   // subscriptionChat writes OpenAI SSE; this shim forwards only the text deltas (headers were already sent).
   const shim: any = {
@@ -31,20 +36,27 @@ async function copilotViaSubscription(req: Request, res: Response, provider: OAu
     on: (ev: string, fn: () => void) => { res.on(ev, fn); return shim; },
     get writableFinished() { return res.writableFinished; }
   };
-  let ok = true, status = 200, error: string | undefined, inTok = 0, outTok = 0;
+  let ok = true, status = 200, error: string | undefined, inTok = 0, outTok = 0, wrote = false;
+  const write0 = shim.write;
+  shim.write = (s: string) => { wrote = true; return write0(s); };
   try {
     ({ inTok, outTok } = await subscriptionChat(req, shim, { model, stream: true, messages: [{ role: 'system', content: system }, ...messages] }, { provider, model }));
   } catch (e: any) {
     ok = false; status = e.status || 502; error = e.message;
-    res.write(`data: ${JSON.stringify({ delta: `\n\n❌ ${provider}: ${e.message}` })}\n\n`);
+    // Auto mode: an account that fails before answering hands over to the next one silently.
+    if (!last && !wrote) {
+      res.write(`data: ${JSON.stringify({ delta: `_${provider}/${model} unavailable, trying the next account…_\n\n` })}\n\n`);
+    } else {
+      res.write(`data: ${JSON.stringify({ delta: `\n\n❌ ${provider}: ${e.message}` })}\n\n`);
+    }
   }
-  res.write('data: [DONE]\n\n');
-  res.end();
+  if (ok || last || wrote) { res.write('data: [DONE]\n\n'); res.end(); }
   addUsageLog({
     keyId: 'copilot-internal', keyName: '7Server In-Dashboard Copilot', provider, model,
     inputTokens: inTok, outputTokens: outTok, durationMs: Date.now() - started,
     status: ok ? 'success' : 'error', statusCode: status, error, streaming: true
   });
+  return ok || wrote;
 }
 
 interface CopilotChatMessage {
@@ -181,13 +193,16 @@ export async function handleCopilotChat(req: Request, res: Response): Promise<vo
   };
 
   // Logged-in subscription accounts take priority over API-key providers.
+  // A model picked in the chat is used as-is (its own error is shown). "Auto" walks the connected accounts.
   const picked = resolveModel(requestedModel);
-  const sub: [OAuthProviderId, string] | undefined =
-    picked && isConnected(picked.provider) ? [picked.provider, picked.model] : COPILOT_SUBSCRIPTION_MODELS.find(([prov]) => isConnected(prov));
-  if (sub) {
-    await copilotViaSubscription(req, res, sub[0], sub[1], buildSystemPrompt(context, `${sub[0]}/${sub[1]}`, lastUser), messages);
-    return;
+  const chain: [OAuthProviderId, string][] = picked && isConnected(picked.provider)
+    ? [[picked.provider, picked.model]]
+    : COPILOT_SUBSCRIPTION_MODELS.filter(([prov]) => isConnected(prov));
+  for (let i = 0; i < chain.length; i++) {
+    const [prov, mdl] = chain[i];
+    if (await copilotViaSubscription(req, res, prov, mdl, buildSystemPrompt(context, `${prov}/${mdl}`, lastUser), messages, i === chain.length - 1)) return;
   }
+  if (chain.length) return;
 
   const cfg = getInternalConfig();
   const p = cfg.providers;

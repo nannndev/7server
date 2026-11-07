@@ -9,7 +9,7 @@ import { toast } from '@/shared/ui/toast';
 import { useI18n } from '@/shared/i18n';
 import { deleteCombo, fetchAccounts, fetchCombos, saveCombo } from './api';
 
-const ALIAS: Record<string, string> = { claude: 'cc', codex: 'cx', copilot: 'gh', 'gemini-cli': 'gc', kimi: 'km' };
+const ALIAS: Record<string, string> = { claude: 'cc', codex: 'cx', copilot: 'gh', 'gemini-cli': 'gc', kimi: 'km', kilocode: 'kc', muse: 'mu', nous: 'ns' };
 
 export function Combos() {
   const { t } = useI18n();

@@ -8,11 +8,11 @@
 //  - authorization code + PKCE (claude, codex) and authorization code (gemini): the browser logs in,
 //    the provider redirects to a localhost URL that won't load on a remote VPS, so the user pastes that
 //    URL (or just the code) back into the dashboard and we exchange it here.
-//  - device code (copilot, kimi): user enters a short code on the provider's site while we poll.
+//  - device code (copilot, kimi, kilocode, muse, nous): user approves on the provider's site while we poll.
 import crypto from 'crypto';
 
-export type OAuthProviderId = 'claude' | 'codex' | 'copilot' | 'gemini-cli' | 'kimi';
-export const OAUTH_PROVIDER_IDS: OAuthProviderId[] = ['claude', 'codex', 'copilot', 'gemini-cli', 'kimi'];
+export type OAuthProviderId = 'claude' | 'codex' | 'copilot' | 'gemini-cli' | 'kimi' | 'kilocode' | 'muse' | 'nous';
+export const OAUTH_PROVIDER_IDS: OAuthProviderId[] = ['claude', 'codex', 'copilot', 'gemini-cli', 'kimi', 'kilocode', 'muse', 'nous'];
 export const isOAuthProvider = (v: unknown): v is OAuthProviderId => OAUTH_PROVIDER_IDS.includes(v as OAuthProviderId);
 
 /** Stored (encrypted at rest by the store) credential for one logged-in account. */
@@ -25,6 +25,8 @@ export interface OAuthCredential {
   /** gemini-cli: Cloud Code Assist project; codex: ChatGPT account id */
   projectId?: string;
   accountId?: string;
+  /** kilocode: organization sent as X-Kilocode-OrganizationID */
+  orgId?: string;
   /** kimi: device id sent on every request (X-Msh-Device-Id), fixed at login */
   deviceId?: string;
   /** copilot: short-lived API token derived from the GitHub token */
@@ -81,6 +83,33 @@ export const KIMI = {
   authorizeDeviceUrl: 'https://www.kimi.com/code/authorize_device',
   chatUrl: 'https://api.kimi.com/coding/v1/chat/completions'
 };
+// Kilo Code (device flow, OpenRouter-style catalog: anthropic/..., google/..., openai/...). Token never expires.
+export const KILOCODE = {
+  apiBaseUrl: 'https://api.kilo.ai',
+  codesUrl: 'https://api.kilo.ai/api/device-auth/codes',
+  chatUrl: 'https://api.kilo.ai/api/openrouter/chat/completions'
+};
+// Standard RFC 8628 device flow, then a provider API key minted from the account token for chat.
+// Muse Code (Meta) and Nous Research, as in 9Router's oauth/providers/{muse,nous}.js.
+interface StdDevice { clientId: string; deviceCodeUrl: string; tokenUrl: string; scope?: string; headers?: Record<string, string>; chatUrl: string }
+export const MUSE: StdDevice & { keyUrl: string } = {
+  clientId: '1031625952748946',
+  deviceCodeUrl: 'https://auth.meta.com/oidc/device/authorization/',
+  tokenUrl: 'https://auth.meta.com/oidc/device/token/',
+  headers: { 'x-api-version': '1.0.0' },
+  chatUrl: 'https://api.meta.ai/v1/chat/completions',
+  keyUrl: 'https://api.meta.ai/muse-code/key'
+};
+export const NOUS: StdDevice & { agentKeyUrl: string } = {
+  clientId: 'hermes-cli',
+  deviceCodeUrl: 'https://portal.nousresearch.com/api/oauth/device/code',
+  tokenUrl: 'https://portal.nousresearch.com/api/oauth/token',
+  scope: 'inference:invoke inference:mint_agent_key',
+  chatUrl: 'https://inference-api.nousresearch.com/v1/chat/completions',
+  agentKeyUrl: 'https://portal.nousresearch.com/api/oauth/agent-key'
+};
+const STD_DEVICE: Partial<Record<OAuthProviderId, StdDevice>> = { muse: MUSE, nous: NOUS };
+
 /** Kimi identifies the calling device on every request; the id is created at login and reused. */
 export function kimiHeaders(deviceId?: string): Record<string, string> {
   const os = process.platform === 'darwin' ? 'macOS' : process.platform === 'win32' ? 'Windows' : 'Linux';
@@ -156,6 +185,19 @@ export async function startLogin(provider: OAuthProviderId): Promise<StartResult
       verificationUri: d.verification_uri_complete || d.verification_uri || `${KIMI.authorizeDeviceUrl}?user_code=${d.user_code}`,
       interval: Number(d.interval) || 5, expiresIn: Number(d.expires_in) || 900
     };
+  }
+
+  const std = STD_DEVICE[provider];
+  if (std) {
+    const d = await postJson(std.deviceCodeUrl, { client_id: std.clientId, ...(std.scope ? { scope: std.scope } : {}) }, true, std.headers);
+    pending.set(sessionId, { provider, deviceCode: d.device_code, interval: Number(d.interval) || 5, createdAt: Date.now() });
+    return { kind: 'device', sessionId, userCode: d.user_code, verificationUri: d.verification_uri_complete || d.verification_uri, interval: Number(d.interval) || 5, expiresIn: Number(d.expires_in) || 900 };
+  }
+
+  if (provider === 'kilocode') {
+    const d = await postJson(KILOCODE.codesUrl, {});
+    pending.set(sessionId, { provider, deviceCode: d.code, interval: 3, createdAt: Date.now() });
+    return { kind: 'device', sessionId, userCode: d.code, verificationUri: d.verificationUrl, interval: 3, expiresIn: Number(d.expiresIn) || 300 };
   }
 
   const { verifier, challenge } = pkce();
@@ -252,8 +294,10 @@ export type PollResult = { status: 'pending' } | { status: 'done'; cred: OAuthCr
 
 export async function pollDeviceLogin(sessionId: string): Promise<PollResult> {
   const p = pending.get(sessionId);
-  if (!p || (p.provider !== 'copilot' && p.provider !== 'kimi') || !p.deviceCode) throw new Error('Sesi login tidak ditemukan atau kedaluwarsa; klik Login lagi');
+  if (!p || !['copilot', 'kimi', 'kilocode', 'muse', 'nous'].includes(p.provider) || !p.deviceCode) throw new Error('Sesi login tidak ditemukan atau kedaluwarsa; klik Login lagi');
+  if (STD_DEVICE[p.provider]) return pollStdDevice(sessionId, p, STD_DEVICE[p.provider]!);
   if (p.provider === 'kimi') return pollKimi(sessionId, p);
+  if (p.provider === 'kilocode') return pollKilocode(sessionId, p);
   const res = await fetch(COPILOT.tokenUrl, {
     method: 'POST',
     headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -293,6 +337,69 @@ async function pollKimi(sessionId: string, p: Pending): Promise<PollResult> {
   return { status: 'done', cred: { accessToken: t.access_token, refreshToken: t.refresh_token, expiresAt: expiry(t.expires_in), deviceId: p.deviceId, email: claims.email || claims.name || claims.sub } };
 }
 
+async function pollStdDevice(sessionId: string, p: Pending, cfg: StdDevice): Promise<PollResult> {
+  const res = await fetch(cfg.tokenUrl, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded', ...cfg.headers },
+    body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:device_code', client_id: cfg.clientId, device_code: p.deviceCode! }).toString(),
+    signal: AbortSignal.timeout(20000)
+  });
+  const t: any = await res.json().catch(() => ({}));
+  if (t.error === 'authorization_pending' || t.error === 'slow_down') return { status: 'pending' };
+  pending.delete(sessionId);
+  if (t.error || !t.access_token) throw new Error(`${p.provider}: ${t.error_description || t.error || res.status}`);
+  return { status: 'done', cred: p.provider === 'muse' ? await mintMuseKey(t.access_token) : await mintNousKey(t) };
+}
+
+// Muse chat uses a minted Model API key (no expiry); the Meta token is kept so a re-mint needs no new login.
+async function mintMuseKey(metaToken: string): Promise<OAuthCredential> {
+  const r = await fetch(MUSE.keyUrl, {
+    method: 'POST',
+    headers: { Accept: 'application/json', Authorization: `Bearer ${metaToken}`, 'Content-Type': 'application/json', ...MUSE.headers },
+    body: JSON.stringify({ onboard: true }),
+    signal: AbortSignal.timeout(20000)
+  });
+  const j: any = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(`Muse Code: ${[j.title, j.detail].filter(Boolean).join(': ') || r.status}${j.action_url ? ` (${j.action_url})` : ''}`);
+  if (j.is_subs_active === false || !j.api_key) throw new Error(`Muse Code: langganan tidak aktif${j.action_url || j.require_payment_action_url ? ` (${j.action_url || j.require_payment_action_url})` : ''}`);
+  return { accessToken: j.api_key, email: j.user_email?.trim().toLowerCase(), refreshToken: metaToken };
+}
+
+// Nous chat prefers a short-lived agent key; if minting fails the OAuth token still works for inference.
+async function mintNousKey(t: any): Promise<OAuthCredential> {
+  const cred: OAuthCredential = { accessToken: t.access_token, refreshToken: t.refresh_token, expiresAt: expiry(t.expires_in) };
+  try {
+    const r = await fetch(NOUS.agentKeyUrl, {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${t.access_token}` },
+      body: JSON.stringify({ min_ttl_seconds: 7200 }),
+      signal: AbortSignal.timeout(20000)
+    });
+    if (r.ok) { const j: any = await r.json(); if (j.api_key) { cred.apiToken = j.api_key; cred.apiTokenExpiresAt = j.expires_at ? Date.parse(j.expires_at) || Number(j.expires_at) * 1000 : undefined; } }
+  } catch { /* fall back to the OAuth token */ }
+  return cred;
+}
+
+// Kilo answers 202 while waiting, 403 when denied, 410 when the code expired.
+async function pollKilocode(sessionId: string, p: Pending): Promise<PollResult> {
+  const res = await fetch(`${KILOCODE.codesUrl}/${encodeURIComponent(p.deviceCode!)}`, { signal: AbortSignal.timeout(20000) });
+  if (res.status === 202) return { status: 'pending' };
+  pending.delete(sessionId);
+  if (res.status === 403) throw new Error('Kilo Code: login ditolak');
+  if (res.status === 410) throw new Error('Kilo Code: kode kedaluwarsa, klik Login lagi');
+  const d: any = await res.json().catch(() => ({}));
+  if (!res.ok || d.status !== 'approved' || !d.token) {
+    if (res.ok) { pending.set(sessionId, p); return { status: 'pending' }; }
+    throw new Error(`Kilo Code: ${res.status}`);
+  }
+  let orgId: string | undefined;
+  try {
+    const pr = await fetch(`${KILOCODE.apiBaseUrl}/api/profile`, { headers: { Authorization: `Bearer ${d.token}` }, signal: AbortSignal.timeout(10000) });
+    if (pr.ok) orgId = (await pr.json())?.organizations?.[0]?.id || undefined;
+  } catch { /* personal account: no org header */ }
+  return { status: 'done', cred: { accessToken: d.token, email: d.userEmail, orgId } };
+}
+
 export async function fetchCopilotApiToken(githubToken: string): Promise<Pick<OAuthCredential, 'apiToken' | 'apiTokenExpiresAt'>> {
   const res = await fetch(COPILOT.copilotTokenUrl, {
     headers: { Authorization: `token ${githubToken}`, Accept: 'application/json', 'x-github-api-version': '2025-04-01', ...COPILOT.headers },
@@ -318,15 +425,25 @@ async function loadGeminiProject(accessToken: string): Promise<string | undefine
 // ------------------------------------------------------------------ refresh
 // Refresh ahead of expiry. Codex rotates the refresh token on every use and re-using a rotated one logs
 // the account out, so only refresh it when the access token is actually close to expiring.
-const LEAD_MS: Record<OAuthProviderId, number> = { claude: 5 * 60_000, codex: 5 * 60_000, 'gemini-cli': 5 * 60_000, copilot: 5 * 60_000, kimi: 5 * 60_000 };
+const LEAD_MS: Record<OAuthProviderId, number> = { claude: 5 * 60_000, codex: 5 * 60_000, 'gemini-cli': 5 * 60_000, copilot: 5 * 60_000, kimi: 5 * 60_000, kilocode: 0, muse: 0, nous: 5 * 60_000 };
 
 export const needsRefresh = (provider: OAuthProviderId, c: OAuthCredential, now = Date.now()) =>
   provider === 'copilot'
     ? !c.apiToken || !c.apiTokenExpiresAt || c.apiTokenExpiresAt - now < LEAD_MS.copilot
-    : c.expiresAt !== undefined && c.expiresAt - now < LEAD_MS[provider]; // 0 = forced by markExpired()
+    : (c.expiresAt !== undefined && c.expiresAt - now < LEAD_MS[provider]) // 0 = forced by markExpired()
+      // Nous: the minted agent key expires on its own schedule.
+      || (provider === 'nous' && !!c.apiTokenExpiresAt && c.apiTokenExpiresAt - now < LEAD_MS.nous);
 
 export async function refreshCredential(provider: OAuthProviderId, c: OAuthCredential): Promise<OAuthCredential> {
   if (provider === 'copilot') return { ...c, ...(await fetchCopilotApiToken(c.accessToken)) };
+  if (provider === 'kilocode') throw new Error('Token Kilo Code ditolak; login ulang di AI Gateway');
+  // Muse keeps the Meta token in refreshToken: a rejected key is re-minted from it.
+  if (provider === 'muse') { if (!c.refreshToken) throw new Error('Muse Code: login ulang'); return mintMuseKey(c.refreshToken); }
+  if (provider === 'nous') {
+    if (!c.refreshToken) throw new Error('Nous: login ulang');
+    const t = await postJson(NOUS.tokenUrl, { grant_type: 'refresh_token', refresh_token: c.refreshToken, client_id: NOUS.clientId }, true);
+    return mintNousKey({ ...t, refresh_token: t.refresh_token || c.refreshToken });
+  }
   if (!c.refreshToken) throw new Error('Sesi kedaluwarsa dan tidak ada refresh token; login ulang');
   if (provider === 'claude') {
     const t = await postJson(CLAUDE.tokenUrl, { grant_type: 'refresh_token', refresh_token: c.refreshToken, client_id: CLAUDE.clientId });

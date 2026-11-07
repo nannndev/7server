@@ -4,15 +4,15 @@
 import type { Request, Response } from 'express';
 import { getCredential, isConnected, markExpired } from './accounts.js';
 import { markRateLimited } from './usage.js';
-import { COPILOT, KIMI, kimiHeaders, type OAuthCredential, type OAuthProviderId } from './oauth.js';
+import { COPILOT, KIMI, KILOCODE, MUSE, NOUS, kimiHeaders, type OAuthCredential, type OAuthProviderId } from './oauth.js';
 import {
   type ChatRequest, type StreamPart, type ToolDelta, CLAUDE_CODE_SYSTEM, toClaude, claudeToOpenAi, claudeEvent, claudeParser, toCodex, codexParser, toGemini, geminiParser,
   completion, chunk, sseEvents
 } from './formats.js';
 
 // Aliases match 9Router so existing client configs carry over.
-export const ALIASES: Record<string, OAuthProviderId> = { cc: 'claude', cx: 'codex', gh: 'copilot', gc: 'gemini-cli', km: 'kimi' };
-const ALIAS_OF: Record<OAuthProviderId, string> = { claude: 'cc', codex: 'cx', copilot: 'gh', 'gemini-cli': 'gc', kimi: 'km' };
+export const ALIASES: Record<string, OAuthProviderId> = { cc: 'claude', cx: 'codex', gh: 'copilot', gc: 'gemini-cli', km: 'kimi', kc: 'kilocode', mu: 'muse', ns: 'nous' };
+export const ALIAS_OF: Record<OAuthProviderId, string> = { claude: 'cc', codex: 'cx', copilot: 'gh', 'gemini-cli': 'gc', kimi: 'km', kilocode: 'kc', muse: 'mu', nous: 'ns' };
 
 // Seed lists (from 9Router's registry, Nov 2026). Copilot's live catalog is fetched when connected.
 export const MODELS: Record<OAuthProviderId, string[]> = {
@@ -20,6 +20,9 @@ export const MODELS: Record<OAuthProviderId, string[]> = {
   codex: ['gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'],
   copilot: ['gpt-5.5', 'gpt-5.4', 'gpt-5-mini', 'claude-sonnet-5.5', 'claude-opus-5.5', 'claude-haiku-5.5', 'gemini-3.8-flash'],
   kimi: ['kimi-for-coding', 'kimi-for-coding-highspeed', 'k3'],
+  muse: ['muse-spark-1.3', 'muse-spark-1.2', 'muse-spark-1.1'],
+  nous: ['meituan/longcat-2.0:free', 'stepfun/step-5-preview:free', 'upstage/solar-mini4:free', 'poolside/laguna-s-2.1:free'],
+  kilocode: ['anthropic/claude-sonnet-4-20250514', 'anthropic/claude-opus-4-20250514', 'google/gemini-2.5-pro', 'google/gemini-2.5-flash', 'openai/gpt-4.1', 'openai/o3', 'deepseek/deepseek-chat'],
   'gemini-cli': ['gemini-3.1-pro-preview', 'gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-2.5-pro', 'gemini-2.5-flash']
 };
 
@@ -81,6 +84,17 @@ async function call(provider: OAuthProviderId, cred: OAuthCredential, model: str
       Accept: req.stream ? 'text/event-stream' : 'application/json'
     }, toGemini(req, model, cred.projectId));
   }
+  if (provider === 'muse') {
+    return json(MUSE.chatUrl, { Authorization: `Bearer ${cred.accessToken}`, Accept: req.stream ? 'text/event-stream' : 'application/json' }, { ...req, model });
+  }
+  if (provider === 'nous') {
+    // Nous requires attribution tags on its inference API.
+    const tags = [...(Array.isArray((req as any).tags) ? (req as any).tags : []), 'product=7server', 'client=7server'];
+    return json(NOUS.chatUrl, { Authorization: `Bearer ${cred.apiToken || cred.accessToken}`, Accept: req.stream ? 'text/event-stream' : 'application/json' }, { ...req, model, tags });
+  }
+  if (provider === 'kilocode') {
+    return json(KILOCODE.chatUrl, { Authorization: `Bearer ${cred.accessToken}`, Accept: req.stream ? 'text/event-stream' : 'application/json', ...(cred.orgId ? { 'X-Kilocode-OrganizationID': cred.orgId } : {}) }, { ...req, model });
+  }
   if (provider === 'kimi') {
     return json(KIMI.chatUrl, { Authorization: `Bearer ${cred.accessToken}`, Accept: req.stream ? 'text/event-stream' : 'application/json', ...kimiHeaders(cred.deviceId) }, { ...req, model });
   }
@@ -135,8 +149,8 @@ export async function subscriptionChat(req: Request, res: Response, body: ChatRe
     throw new UpstreamError(up.status, `${provider} ${up.status}: ${text.slice(0, 400)}`);
   }
 
-  // Copilot and Kimi: OpenAI format already, stream/JSON through untouched.
-  if (provider === 'copilot' || provider === 'kimi') {
+  // Copilot, Kimi, Kilo Code: OpenAI format already, stream/JSON through untouched.
+  if (provider === 'copilot' || provider === 'kimi' || provider === 'kilocode' || provider === 'muse' || provider === 'nous') {
     res.status(200).setHeader('Content-Type', up.headers.get('content-type') || 'application/json');
     if (!body.stream) {
       const j: any = await up.json();

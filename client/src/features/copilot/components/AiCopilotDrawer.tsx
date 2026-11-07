@@ -185,9 +185,9 @@ export default function AiCopilotDrawer({
   const [modelOptions, setModelOptions] = useState<string[]>([]);
   const [model, setModel] = useState<string>(() => { try { return localStorage.getItem('copilot.model') || ''; } catch { return ''; } });
   useEffect(() => {
-    const alias: Record<string, string> = { claude: 'cc', codex: 'cx', copilot: 'gh', 'gemini-cli': 'gc' };
+    // Aliases come from the server, so a newly added login provider shows up here without a client change.
     fetchAccounts()
-      .then(({ accounts, models }) => setModelOptions(accounts.flatMap((a) => (models[a.provider] || []).map((m) => `${alias[a.provider]}/${m}`))))
+      .then(({ accounts, models, aliases }) => setModelOptions(accounts.flatMap((a) => (aliases?.[a.provider] ? (models[a.provider] || []).map((m) => `${aliases[a.provider]}/${m}`) : []))))
       .catch(() => setModelOptions([]));
   }, []);
   const pickModel = (m: string) => { setModel(m); try { localStorage.setItem('copilot.model', m); } catch { /* private mode */ } };

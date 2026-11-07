@@ -19,7 +19,10 @@ const PROVIDERS: { id: OAuthProviderId; alias: string; name: string; plan: strin
   { id: 'codex', alias: 'cx', name: 'ChatGPT / Codex', plan: 'Plus / Pro', color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' },
   { id: 'copilot', alias: 'gh', name: 'GitHub Copilot', plan: 'subs.planCopilot', color: 'text-sky-500 bg-sky-500/10 border-sky-500/20' },
   { id: 'gemini-cli', alias: 'gc', name: 'Gemini (Google)', plan: 'subs.planGoogle', color: 'text-blue-500 bg-blue-500/10 border-blue-500/20' },
-  { id: 'kimi', alias: 'km', name: 'Kimi Code', plan: 'subs.planKimi', color: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20' }
+  { id: 'kimi', alias: 'km', name: 'Kimi Code', plan: 'subs.planKimi', color: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20' },
+  { id: 'kilocode', alias: 'kc', name: 'Kilo Code', plan: 'subs.planKilo', color: 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20' },
+  { id: 'muse', alias: 'mu', name: 'Muse Code (Meta)', plan: 'subs.planMuse', color: 'text-blue-400 bg-blue-500/10 border-blue-500/20' },
+  { id: 'nous', alias: 'ns', name: 'Nous Research', plan: 'subs.planNous', color: 'text-zinc-300 bg-zinc-500/10 border-zinc-500/20' }
 ];
 
 
