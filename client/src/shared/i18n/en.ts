@@ -1059,6 +1059,7 @@ export const en = {
   'aiGw.allowedProviders': "Allowed providers (leave empty for all connected providers)",
   'aiGw.connectTo': "Connect to {name}",
   'subs.planCopilot': "Copilot subscription",
+  'subs.planKimi': "Kimi Code subscription",
   'subs.planGoogle': "Google account",
   'subs.tokenExpired': "token expired (refreshed automatically on use)",
   'subs.tokenMinutes': "token valid for {n} more minutes",

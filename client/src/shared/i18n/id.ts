@@ -1052,6 +1052,7 @@ export const id: Record<keyof typeof en, string> = {
   'aiGw.allowedProviders': "Provider yang diizinkan (kosongkan untuk semua provider terhubung)",
   'aiGw.connectTo': "Hubungkan ke {name}",
   'subs.planCopilot': "Langganan Copilot",
+  'subs.planKimi': "Langganan Kimi Code",
   'subs.planGoogle': "Akun Google",
   'subs.tokenExpired': "token kedaluwarsa (diperbarui otomatis saat dipakai)",
   'subs.tokenMinutes': "token berlaku {n} menit lagi",

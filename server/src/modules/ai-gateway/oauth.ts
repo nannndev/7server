@@ -8,11 +8,11 @@
 //  - authorization code + PKCE (claude, codex) and authorization code (gemini): the browser logs in,
 //    the provider redirects to a localhost URL that won't load on a remote VPS, so the user pastes that
 //    URL (or just the code) back into the dashboard and we exchange it here.
-//  - device code (copilot): user enters a short code on github.com while we poll.
+//  - device code (copilot, kimi): user enters a short code on the provider's site while we poll.
 import crypto from 'crypto';
 
-export type OAuthProviderId = 'claude' | 'codex' | 'copilot' | 'gemini-cli';
-export const OAUTH_PROVIDER_IDS: OAuthProviderId[] = ['claude', 'codex', 'copilot', 'gemini-cli'];
+export type OAuthProviderId = 'claude' | 'codex' | 'copilot' | 'gemini-cli' | 'kimi';
+export const OAUTH_PROVIDER_IDS: OAuthProviderId[] = ['claude', 'codex', 'copilot', 'gemini-cli', 'kimi'];
 export const isOAuthProvider = (v: unknown): v is OAuthProviderId => OAUTH_PROVIDER_IDS.includes(v as OAuthProviderId);
 
 /** Stored (encrypted at rest by the store) credential for one logged-in account. */
@@ -25,6 +25,8 @@ export interface OAuthCredential {
   /** gemini-cli: Cloud Code Assist project; codex: ChatGPT account id */
   projectId?: string;
   accountId?: string;
+  /** kimi: device id sent on every request (X-Msh-Device-Id), fixed at login */
+  deviceId?: string;
   /** copilot: short-lived API token derived from the GitHub token */
   apiToken?: string;
   apiTokenExpiresAt?: number;
@@ -71,9 +73,29 @@ export const COPILOT = {
   }
 };
 
+// Kimi Code subscription (device flow), as in 9Router's registry/kimi.js and CLIProxyAPI.
+export const KIMI = {
+  clientId: '17e5f671-d194-4dfb-9706-5516cb48c098',
+  deviceCodeUrl: 'https://auth.kimi.com/api/oauth/device_authorization',
+  tokenUrl: 'https://auth.kimi.com/api/oauth/token',
+  authorizeDeviceUrl: 'https://www.kimi.com/code/authorize_device',
+  chatUrl: 'https://api.kimi.com/coding/v1/chat/completions'
+};
+/** Kimi identifies the calling device on every request; the id is created at login and reused. */
+export function kimiHeaders(deviceId?: string): Record<string, string> {
+  const os = process.platform === 'darwin' ? 'macOS' : process.platform === 'win32' ? 'Windows' : 'Linux';
+  return {
+    'X-Msh-Platform': '7server',
+    'X-Msh-Version': '1.0.0',
+    'X-Msh-Device-Name': 'unknown',
+    'X-Msh-Device-Model': `${os} ${process.arch}`,
+    'X-Msh-Device-Id': deviceId || `kimi-${Date.now()}`
+  };
+}
+
 // ------------------------------------------------------------------ pending login sessions
 // shortcut: in-memory, lost on restart (user just clicks "Login" again); fine for a single-node dashboard.
-interface Pending { provider: OAuthProviderId; verifier?: string; deviceCode?: string; interval?: number; createdAt: number }
+interface Pending { provider: OAuthProviderId; verifier?: string; deviceCode?: string; deviceId?: string; interval?: number; createdAt: number }
 const pending = new Map<string, Pending>();
 const SESSION_TTL_MS = 15 * 60 * 1000;
 const sweep = () => { for (const [k, v] of pending) if (Date.now() - v.createdAt > SESSION_TTL_MS) pending.delete(k); };
@@ -123,6 +145,17 @@ export async function startLogin(provider: OAuthProviderId): Promise<StartResult
     const d = await postJson(COPILOT.deviceCodeUrl, { client_id: COPILOT.clientId, scope: 'read:user' }, true);
     pending.set(sessionId, { provider, deviceCode: d.device_code, interval: Number(d.interval) || 5, createdAt: Date.now() });
     return { kind: 'device', sessionId, userCode: d.user_code, verificationUri: d.verification_uri, interval: Number(d.interval) || 5, expiresIn: Number(d.expires_in) || 900 };
+  }
+
+  if (provider === 'kimi') {
+    const deviceId = crypto.randomUUID();
+    const d = await postJson(KIMI.deviceCodeUrl, { client_id: KIMI.clientId }, true, kimiHeaders(deviceId));
+    pending.set(sessionId, { provider, deviceCode: d.device_code, deviceId, interval: Number(d.interval) || 5, createdAt: Date.now() });
+    return {
+      kind: 'device', sessionId, userCode: d.user_code,
+      verificationUri: d.verification_uri_complete || d.verification_uri || `${KIMI.authorizeDeviceUrl}?user_code=${d.user_code}`,
+      interval: Number(d.interval) || 5, expiresIn: Number(d.expires_in) || 900
+    };
   }
 
   const { verifier, challenge } = pkce();
@@ -219,7 +252,8 @@ export type PollResult = { status: 'pending' } | { status: 'done'; cred: OAuthCr
 
 export async function pollDeviceLogin(sessionId: string): Promise<PollResult> {
   const p = pending.get(sessionId);
-  if (!p || p.provider !== 'copilot' || !p.deviceCode) throw new Error('Sesi login tidak ditemukan atau kedaluwarsa; klik Login lagi');
+  if (!p || (p.provider !== 'copilot' && p.provider !== 'kimi') || !p.deviceCode) throw new Error('Sesi login tidak ditemukan atau kedaluwarsa; klik Login lagi');
+  if (p.provider === 'kimi') return pollKimi(sessionId, p);
   const res = await fetch(COPILOT.tokenUrl, {
     method: 'POST',
     headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -241,6 +275,22 @@ export async function pollDeviceLogin(sessionId: string): Promise<PollResult> {
   // Fail the login now if the account has no Copilot subscription, instead of on the first request.
   Object.assign(cred, await fetchCopilotApiToken(t.access_token));
   return { status: 'done', cred };
+}
+
+// Kimi answers pending states with HTTP 200 and an `error` field, unlike GitHub.
+async function pollKimi(sessionId: string, p: Pending): Promise<PollResult> {
+  const res = await fetch(KIMI.tokenUrl, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded', ...kimiHeaders(p.deviceId) },
+    body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:device_code', client_id: KIMI.clientId, device_code: p.deviceCode! }).toString(),
+    signal: AbortSignal.timeout(20000)
+  });
+  const t: any = await res.json().catch(() => ({}));
+  if (t.error === 'authorization_pending' || t.error === 'slow_down') return { status: 'pending' };
+  pending.delete(sessionId);
+  if (t.error || !t.access_token) throw new Error(`Kimi: ${t.error_description || t.error || res.status}`);
+  const claims = jwtPayload(t.access_token);
+  return { status: 'done', cred: { accessToken: t.access_token, refreshToken: t.refresh_token, expiresAt: expiry(t.expires_in), deviceId: p.deviceId, email: claims.email || claims.name || claims.sub } };
 }
 
 export async function fetchCopilotApiToken(githubToken: string): Promise<Pick<OAuthCredential, 'apiToken' | 'apiTokenExpiresAt'>> {
@@ -268,7 +318,7 @@ async function loadGeminiProject(accessToken: string): Promise<string | undefine
 // ------------------------------------------------------------------ refresh
 // Refresh ahead of expiry. Codex rotates the refresh token on every use and re-using a rotated one logs
 // the account out, so only refresh it when the access token is actually close to expiring.
-const LEAD_MS: Record<OAuthProviderId, number> = { claude: 5 * 60_000, codex: 5 * 60_000, 'gemini-cli': 5 * 60_000, copilot: 5 * 60_000 };
+const LEAD_MS: Record<OAuthProviderId, number> = { claude: 5 * 60_000, codex: 5 * 60_000, 'gemini-cli': 5 * 60_000, copilot: 5 * 60_000, kimi: 5 * 60_000 };
 
 export const needsRefresh = (provider: OAuthProviderId, c: OAuthCredential, now = Date.now()) =>
   provider === 'copilot'
@@ -280,6 +330,10 @@ export async function refreshCredential(provider: OAuthProviderId, c: OAuthCrede
   if (!c.refreshToken) throw new Error('Sesi kedaluwarsa dan tidak ada refresh token; login ulang');
   if (provider === 'claude') {
     const t = await postJson(CLAUDE.tokenUrl, { grant_type: 'refresh_token', refresh_token: c.refreshToken, client_id: CLAUDE.clientId });
+    return { ...c, accessToken: t.access_token, refreshToken: t.refresh_token || c.refreshToken, expiresAt: expiry(t.expires_in) };
+  }
+  if (provider === 'kimi') {
+    const t = await postJson(KIMI.tokenUrl, { grant_type: 'refresh_token', refresh_token: c.refreshToken, client_id: KIMI.clientId }, true, kimiHeaders(c.deviceId));
     return { ...c, accessToken: t.access_token, refreshToken: t.refresh_token || c.refreshToken, expiresAt: expiry(t.expires_in) };
   }
   if (provider === 'codex') {

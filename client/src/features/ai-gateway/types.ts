@@ -69,7 +69,7 @@ export interface AiGatewayStats {
 }
 
 // Subscription accounts logged in via OAuth (9Router style). Model ids are `alias/model`.
-export type OAuthProviderId = 'claude' | 'codex' | 'copilot' | 'gemini-cli';
+export type OAuthProviderId = 'claude' | 'codex' | 'copilot' | 'gemini-cli' | 'kimi';
 export interface SubscriptionAccount {
   provider: OAuthProviderId;
   email?: string;

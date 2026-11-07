@@ -2,7 +2,7 @@ export type AiProviderId = 'anthropic' | 'openai' | 'gemini' | 'deepseek' | 'oll
   // OpenAI-compatible API-key providers (see compatProviders.ts)
   | 'groq' | 'mistral' | 'xai' | 'together' | 'fireworks' | 'cerebras' | 'perplexity' | 'moonshot' | 'dashscope' | 'zai' | 'minimax' | 'nvidia' | 'custom'
   // logged-in subscription accounts (OAuth)
-  | 'claude' | 'codex' | 'copilot' | 'gemini-cli';
+  | 'claude' | 'codex' | 'copilot' | 'gemini-cli' | 'kimi';
 
 export interface VirtualApiKey {
   id: string;

@@ -4,21 +4,22 @@
 import type { Request, Response } from 'express';
 import { getCredential, isConnected, markExpired } from './accounts.js';
 import { markRateLimited } from './usage.js';
-import { COPILOT, type OAuthCredential, type OAuthProviderId } from './oauth.js';
+import { COPILOT, KIMI, kimiHeaders, type OAuthCredential, type OAuthProviderId } from './oauth.js';
 import {
   type ChatRequest, type StreamPart, type ToolDelta, CLAUDE_CODE_SYSTEM, toClaude, claudeToOpenAi, claudeEvent, claudeParser, toCodex, codexParser, toGemini, geminiParser,
   completion, chunk, sseEvents
 } from './formats.js';
 
 // Aliases match 9Router so existing client configs carry over.
-export const ALIASES: Record<string, OAuthProviderId> = { cc: 'claude', cx: 'codex', gh: 'copilot', gc: 'gemini-cli' };
-const ALIAS_OF: Record<OAuthProviderId, string> = { claude: 'cc', codex: 'cx', copilot: 'gh', 'gemini-cli': 'gc' };
+export const ALIASES: Record<string, OAuthProviderId> = { cc: 'claude', cx: 'codex', gh: 'copilot', gc: 'gemini-cli', km: 'kimi' };
+const ALIAS_OF: Record<OAuthProviderId, string> = { claude: 'cc', codex: 'cx', copilot: 'gh', 'gemini-cli': 'gc', kimi: 'km' };
 
 // Seed lists (from 9Router's registry, Nov 2026). Copilot's live catalog is fetched when connected.
 export const MODELS: Record<OAuthProviderId, string[]> = {
   claude: ['claude-opus-5-5', 'claude-opus-5', 'claude-fable-5-1', 'claude-sonnet-5-5', 'claude-sonnet-5', 'claude-haiku-4-5-20251001'],
   codex: ['gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'],
   copilot: ['gpt-5.5', 'gpt-5.4', 'gpt-5-mini', 'claude-sonnet-5.5', 'claude-opus-5.5', 'claude-haiku-5.5', 'gemini-3.8-flash'],
+  kimi: ['kimi-for-coding', 'kimi-for-coding-highspeed', 'k3'],
   'gemini-cli': ['gemini-3.1-pro-preview', 'gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-2.5-pro', 'gemini-2.5-flash']
 };
 
@@ -80,6 +81,9 @@ async function call(provider: OAuthProviderId, cred: OAuthCredential, model: str
       Accept: req.stream ? 'text/event-stream' : 'application/json'
     }, toGemini(req, model, cred.projectId));
   }
+  if (provider === 'kimi') {
+    return json(KIMI.chatUrl, { Authorization: `Bearer ${cred.accessToken}`, Accept: req.stream ? 'text/event-stream' : 'application/json', ...kimiHeaders(cred.deviceId) }, { ...req, model });
+  }
   // copilot already speaks OpenAI chat completions: forward the body as-is with the real model name.
   return json('https://api.githubcopilot.com/chat/completions', {
     Authorization: `Bearer ${cred.apiToken}`,
@@ -131,8 +135,8 @@ export async function subscriptionChat(req: Request, res: Response, body: ChatRe
     throw new UpstreamError(up.status, `${provider} ${up.status}: ${text.slice(0, 400)}`);
   }
 
-  // Copilot: OpenAI format already, stream/JSON through untouched.
-  if (provider === 'copilot') {
+  // Copilot and Kimi: OpenAI format already, stream/JSON through untouched.
+  if (provider === 'copilot' || provider === 'kimi') {
     res.status(200).setHeader('Content-Type', up.headers.get('content-type') || 'application/json');
     if (!body.stream) {
       const j: any = await up.json();

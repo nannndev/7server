@@ -18,7 +18,8 @@ const PROVIDERS: { id: OAuthProviderId; alias: string; name: string; plan: strin
   { id: 'claude', alias: 'cc', name: 'Claude', plan: 'Pro / Max', color: 'text-amber-500 bg-amber-500/10 border-amber-500/20' },
   { id: 'codex', alias: 'cx', name: 'ChatGPT / Codex', plan: 'Plus / Pro', color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' },
   { id: 'copilot', alias: 'gh', name: 'GitHub Copilot', plan: 'subs.planCopilot', color: 'text-sky-500 bg-sky-500/10 border-sky-500/20' },
-  { id: 'gemini-cli', alias: 'gc', name: 'Gemini (Google)', plan: 'subs.planGoogle', color: 'text-blue-500 bg-blue-500/10 border-blue-500/20' }
+  { id: 'gemini-cli', alias: 'gc', name: 'Gemini (Google)', plan: 'subs.planGoogle', color: 'text-blue-500 bg-blue-500/10 border-blue-500/20' },
+  { id: 'kimi', alias: 'km', name: 'Kimi Code', plan: 'subs.planKimi', color: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20' }
 ];
 
 
@@ -80,7 +81,7 @@ export function SubscriptionAccounts({ onChange }: { onChange?: (accounts: Subsc
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // GitHub device flow: poll until the user approves the code on github.com.
+  // Device flow (GitHub, Kimi): poll until the user approves the code on the provider site.
   useEffect(() => {
     if (!flow || flow.start.kind !== 'device') return;
     const { provider, start } = flow;
