@@ -23,6 +23,7 @@ interface TaskContextType {
     category: TaskCategory;
     url: string;
     body?: any;
+    metadata?: Record<string, any>;
     onDone?: (res: any) => void;
     onError?: (err: any) => void;
   }) => Promise<void>;
@@ -56,7 +57,17 @@ export function TaskManagerProvider({ children }: { children: React.ReactNode })
       );
     }, 1000);
 
-    return () => clearInterval(interval);
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = 'A server task or deployment is currently running. Reloading will interrupt progress.';
+      return e.returnValue;
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
   }, [tasks]);
 
   const startTask = useCallback((params: StartTaskParams): string => {
@@ -84,9 +95,12 @@ export function TaskManagerProvider({ children }: { children: React.ReactNode })
       prev.map((t) => {
         if (t.id === id) {
           const lines = chunk.split('\n').filter((l) => l.length > 0);
+          // Stage markers are kept apart from the capped log, so a long build can't scroll the early stages away.
+          const marks = lines.filter((l) => l.startsWith('@@STAGE ')).map((l) => l.slice(8).trim());
           return {
             ...t,
-            logs: [...t.logs, ...lines].slice(-1000) // retain up to 1000 lines
+            logs: [...t.logs, ...lines].slice(-1000), // retain up to 1000 lines
+            ...(marks.length ? { stages: [...(t.stages ?? []), ...marks] } : {})
           };
         }
         return t;
@@ -136,6 +150,7 @@ export function TaskManagerProvider({ children }: { children: React.ReactNode })
       category: TaskCategory;
       url: string;
       body?: any;
+      metadata?: Record<string, any>;
       onDone?: (res: any) => void;
       onError?: (err: any) => void;
     }) => {
@@ -145,6 +160,7 @@ export function TaskManagerProvider({ children }: { children: React.ReactNode })
         serverName: params.serverName,
         title: params.title,
         category: params.category,
+        metadata: params.metadata,
         initialLog: `Starting: ${params.title}...`
       });
 

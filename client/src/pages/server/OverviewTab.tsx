@@ -231,7 +231,7 @@ export default function OverviewTab() {
                 variant="outline"
                 size="sm"
                 disabled={!!ctx.quickActionRunning}
-                onClick={() => ctx.runQuickAction(t('overview.reloadNginx'), 'nginx -t && systemctl reload nginx && echo "Nginx reloaded OK"')}
+                onClick={() => ctx.runQuickAction(t('overview.reloadNginx'), 'nginx -t 2>&1 && systemctl reload nginx && echo "Nginx reloaded OK"', { sudo: true })}
                 className="text-xs justify-start gap-2 h-8"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
@@ -242,7 +242,7 @@ export default function OverviewTab() {
                 variant="outline"
                 size="sm"
                 disabled={!!ctx.quickActionRunning}
-                onClick={() => ctx.runQuickAction(t('overview.clearRamCache'), 'sync; echo 3 > /proc/sys/vm/drop_caches && free -m')}
+                onClick={() => ctx.runQuickAction(t('overview.clearRamCache'), 'sync; echo 3 > /proc/sys/vm/drop_caches && free -m', { sudo: true })}
                 className="text-xs justify-start gap-2 h-8"
               >
                 <Database className="w-3.5 h-3.5" />
@@ -264,7 +264,7 @@ export default function OverviewTab() {
                 variant="outline"
                 size="sm"
                 disabled={!!ctx.quickActionRunning}
-                onClick={() => ctx.runQuickAction(t('overview.trimLogs'), 'journalctl --vacuum-size=100M 2>&1')}
+                onClick={() => ctx.runQuickAction(t('overview.trimLogs'), 'journalctl --vacuum-size=100M 2>&1', { sudo: true })}
                 className="text-xs justify-start gap-2 h-8"
               >
                 <FileText className="w-3.5 h-3.5" />
@@ -275,7 +275,7 @@ export default function OverviewTab() {
                 variant="destructive"
                 size="sm"
                 disabled={!!ctx.quickActionRunning}
-                onClick={() => ctx.runQuickAction(t('overview.rebootNode'), 'reboot')}
+                onClick={() => ctx.runQuickAction(t('overview.rebootNode'), 'reboot', { sudo: true })}
                 className="text-xs justify-start gap-2 h-8"
               >
                 <Power className="w-3.5 h-3.5" />

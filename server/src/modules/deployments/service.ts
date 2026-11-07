@@ -16,23 +16,69 @@ for d in /var/www/*; do
   app_type="Web App"
   if [ -f "$d/artisan" ]; then
     app_type="Laravel (PHP)"
+  elif [ -d "$d/.output" ] || [ -f "$d/nuxt.config.ts" ] || [ -f "$d/nuxt.config.js" ]; then
+    app_type="Nuxt (Node.js)"
+  elif [ -d "$d/.next" ] || [ -f "$d/next.config.js" ] || [ -f "$d/next.config.mjs" ] || [ -f "$d/next.config.ts" ]; then
+    app_type="Next.js (Node.js)"
   elif [ -f "$d/package.json" ]; then
     app_type="Node.js"
+  elif [ -f "$d/Dockerfile" ] || [ -f "$d/docker-compose.yml" ] || [ -f "$d/docker-compose.yaml" ] || [ -f "$d/compose.yml" ]; then
+    app_type="Docker"
   elif [ -d "$d/dist" ]; then
     app_type="Frontend (SPA / Vite)"
   elif ls "$d"/*.php >/dev/null 2>&1; then
     app_type="PHP Application"
-  elif [ -f "$d/requirements.txt" ] || [ -f "$d/app.py" ]; then
+  elif [ -f "$d/requirements.txt" ] || [ -f "$d/app.py" ] || [ -f "$d/main.py" ]; then
     app_type="Python"
+  elif [ -f "$d/go.mod" ]; then
+    app_type="Go"
   fi
 
-  # Nginx configs that reference this exact folder (not a prefix like X-STAGING)
+  # Nginx configs that reference this exact folder or its 7server-<name> site
   domain=""
   ports=""
   confs=$(grep -RlE "/var/www/\${name}(/|;|[[:space:]]|$)" /etc/nginx/sites-enabled/ /etc/nginx/conf.d/ 2>/dev/null)
+  if [ -f "/etc/nginx/sites-enabled/7server-\${name}" ]; then
+    confs="$confs /etc/nginx/sites-enabled/7server-\${name}"
+  fi
   if [ -n "$confs" ]; then
-    domain=$(cat $confs | grep -E '^[[:space:]]*server_name' | sed -e 's/^[[:space:]]*server_name//' -e 's/;.*//' | tr ' ' '\n' | grep -vE '^(_|)$' | sort -u | tr '\n' ',' | sed 's/,$//')
-    ports=$(cat $confs | grep -E '^[[:space:]]*listen' | grep -v '::' | sed -e 's/^[[:space:]]*listen//' -e 's/;.*//' | awk '{print $1}' | sort -u | tr '\n' ',' | sed 's/,$//')
+    domain=$(cat $confs 2>/dev/null | grep -E '^[[:space:]]*server_name' | sed -e 's/^[[:space:]]*server_name//' -e 's/;.*//' | tr ' ' '\n' | grep -vE '^(_|)$' | sort -u | tr '\n' ',' | sed 's/,$//')
+    ports=$(cat $confs 2>/dev/null | grep -E '^[[:space:]]*listen' | grep -v '::' | sed -e 's/^[[:space:]]*listen//' -e 's/;.*//' | awk '{print $1}' | sed 's/.*://' | sort -u | tr '\n' ',' | sed 's/,$//')
+  fi
+
+  # Also report the port the app's own process listens on (PM2 or Docker deploys, including monorepo subfolders).
+  proc_ports=""
+  pids=$(for p in /proc/[0-9]*; do cw=$(readlink "$p/cwd" 2>/dev/null); case "$cw" in "$d"|"$d"/*) echo "\${p#/proc/}";; esac; done)
+  for pid in $pids; do
+    proc_ports="$proc_ports$(ss -ltnpH 2>/dev/null | grep "pid=$pid," | awk '{print $4}' | sed 's/.*://' | sort -u | tr '\n' ',')"
+  done
+  if [ -z "$proc_ports" ] && command -v docker >/dev/null 2>&1; then
+    proc_ports=$( (
+      docker ps --filter "name=7server-\${name}" --format '{{.Ports}}' 2>/dev/null
+      docker ps --filter "label=com.docker.compose.project=7server-\${name}" --format '{{.Ports}}' 2>/dev/null
+      docker ps --filter "label=com.docker.compose.project.working_dir=$d" --format '{{.Ports}}' 2>/dev/null
+    ) | grep -oE ':[0-9]+->' | tr -d ':>-' | sort -u | tr '\n' ',' )
+  fi
+  if [ -z "$ports" ] || [ "$ports" = "80" ] || [ "$ports" = "80,443" ]; then
+    [ -n "$proc_ports" ] && ports="$proc_ports"
+  fi
+  ports=$(echo "$ports" | tr ',' '\n' | grep -v '^$' | sort -un | tr '\n' ',' | sed 's/,$//')
+
+  # Check Cloudflare Tunnel ingress if no Nginx domain is attached
+  if [ -z "$domain" ]; then
+    for cfg in /etc/cloudflared/config.yml /etc/cloudflared/config.yaml /root/.cloudflared/config.yml ~/.cloudflared/config.yml; do
+      if [ -f "$cfg" ]; then
+        for prt in $(echo "$ports" | tr ',' ' '); do
+          [ -z "$prt" ] && continue
+          cf_dom=$(grep -B2 -E "service: *https?://(localhost|127\.0\.0\.1):$prt" "$cfg" 2>/dev/null | grep -E 'hostname:' | awk '{print $NF}' | head -n 1)
+          if [ -n "$cf_dom" ]; then
+            domain="$cf_dom"
+            break
+          fi
+        done
+        [ -n "$domain" ] && break
+      fi
+    done
   fi
 
   # Mod date
@@ -49,11 +95,15 @@ done
 echo "===END_WEBAPPS==="
 EOF
 chmod +x /tmp/__vps_webapps.sh
-/bin/sh /tmp/__vps_webapps.sh
+# root apps (PM2 under sudo) hide their cwd/sockets from a non-root SSH user, so scan as root when we can.
+if [ "$(id -u)" -eq 0 ]; then /bin/sh /tmp/__vps_webapps.sh
+elif [ -n "$HAS_SUDO_PASS" ]; then sudo -k -S -p '' /bin/sh /tmp/__vps_webapps.sh
+else sudo -n /bin/sh /tmp/__vps_webapps.sh 2>/dev/null || /bin/sh /tmp/__vps_webapps.sh; fi
 rm -f /tmp/__vps_webapps.sh
 `;
 
-  const { stdout } = await executeCommand(serverConfig, script, 12000);
+  const pass = serverConfig.sudoPassword || (serverConfig.authType === 'password' ? serverConfig.password : undefined);
+  const { stdout } = await executeCommand(serverConfig, `export HAS_SUDO_PASS=${pass ? '1' : ''}\n${script}`, 15000, pass ? { stdin: `${pass}\n` } : {});
   const apps: WebAppInfo[] = [];
 
   const lines = stdout.split('\n');
@@ -111,14 +161,16 @@ for f in /etc/nginx/sites-enabled/* /etc/nginx/conf.d/*.conf; do
   echo "SITE::$name::1::$domains::$root_path::$proxy_port::$ssl::$real_path"
 done
 echo "===NGINX_TEST==="
-nginx -t 2>&1 || true
+if [ "$(id -u)" -eq 0 ]; then nginx -t 2>&1; elif [ -n "$HAS_SUDO_PASS" ]; then sudo -k -S -p '' nginx -t 2>&1; else sudo -n nginx -t 2>&1 || nginx -t 2>&1; fi || true
 echo "===NGINX_END==="
 EOF
 chmod +x /tmp/__vps_nginx.sh
 /bin/sh /tmp/__vps_nginx.sh
 rm -f /tmp/__vps_nginx.sh
 `;
-  const { stdout } = await executeCommand(serverConfig, script, 10000);
+  // nginx -t opens /run/nginx.pid, which only root can; use the saved sudo password like the deploy does.
+  const pass = serverConfig.sudoPassword || (serverConfig.authType === 'password' ? serverConfig.password : undefined);
+  const { stdout } = await executeCommand(serverConfig, `export HAS_SUDO_PASS=${pass ? '1' : ''}\n${script}`, 10000, pass ? { stdin: `${pass}\n` } : {});
   const sites: NginxSiteInfo[] = [];
 
   const sitesPart = stdout.match(/===NGINX_SITES===([\s\S]*?)===NGINX_TEST===/);
@@ -151,6 +203,8 @@ export async function fetchListeningPorts(serverConfig: ServerCredentials): Prom
   ports: ListeningPortInfo[];
   ufwStatus: string;
   raw: string;
+  /** Ports in the usual app ranges that accept a connection on 127.0.0.1 even though ss doesn't list them (e.g. held by the Windows host under WSL). */
+  probed: number[];
 }> {
   const cmd = `
     echo "===SS_START==="
@@ -161,14 +215,18 @@ export async function fetchListeningPorts(serverConfig: ServerCredentials): Prom
     else
       echo "ufw not installed"
     fi
+    echo "===PROBE_START==="
+    bash -c 'for p in $(seq 3000 3199) $(seq 4000 4099) $(seq 5000 5199) $(seq 8000 8199); do (exec 3<>/dev/tcp/127.0.0.1/$p) 2>/dev/null && echo $p; done' 2>/dev/null || true
     echo "===END==="
   `;
-  const { stdout } = await executeCommand(serverConfig, cmd, 8000);
+  const { stdout } = await executeCommand(serverConfig, cmd, 15000);
   const ssMatch = stdout.match(/===SS_START===([\s\S]*?)===UFW_START===/);
-  const ufwMatch = stdout.match(/===UFW_START===([\s\S]*?)===END===/);
+  const ufwMatch = stdout.match(/===UFW_START===([\s\S]*?)===PROBE_START===/);
+  const probeMatch = stdout.match(/===PROBE_START===([\s\S]*?)===END===/);
 
   const raw = ssMatch?.[1]?.trim() || '';
   const ufwStatus = ufwMatch?.[1]?.trim() || '';
+  const probed = (probeMatch?.[1] || '').split('\n').map((l) => Number(l.trim())).filter((n) => Number.isInteger(n) && n > 0);
   const ports: ListeningPortInfo[] = [];
 
   for (const line of raw.split('\n')) {
@@ -194,5 +252,5 @@ export async function fetchListeningPorts(serverConfig: ServerCredentials): Prom
     }
   }
 
-  return { ports, ufwStatus, raw };
+  return { ports, ufwStatus, raw, probed };
 }

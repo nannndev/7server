@@ -3,8 +3,8 @@
 > **Target Agent**: Claude / Pair Programmer  
 > **Repository**: `7server`  
 > **Current Branch**: `feature/deployment`  
-> **Date**: 6 November 2026  
-> **Status**: Verified, TypeScript 0 Errors, 24/24 Test Suites Passed, Production Build Green.
+> **Date**: 7 November 2026  
+> **Status**: Verified, TypeScript 0 Errors, 28/28 Test Suites Passed, Production Build Green.
 
 ---
 
@@ -13,13 +13,43 @@
 `7server` adalah platform manajemen VPS mandiri (self-hosted multi-VPS fleet management platform) yang modern, cepat, dan ringan. Platform ini mengontrol server Linux remote melalui SSH non-interaktif dan API streaming.
 
 Dalam sesi terkini pada branch `feature/deployment`, telah diselesaikan serangkaian fitur inti, bugfix arsitektur, dan peningkatan UX:
-1. **Deployment Integration & Git System**: Integrasi GitHub PAT global, inspeksi repository otomatis, auto-framework detection, serta wizard 3-langkah deployment web application.
-2. **Background Task Manager (Persistence across navigation)**: Eksekusi streaming jangka panjang yang tetap berjalan saat user berpindah tab/halaman, dilengkapi floating widget dan slide-out drawer.
-3. **Sudo Password Interception & Non-Root SSH**: Penanganan otomatis privilege escalation saat SSH user bukan root, dengan modal password dan opsi enkripsi simpanan (AES-256-GCM).
-4. **3D Server Rack & Telemetry Console**: Fitur Zoom in/out, pan, reset view, Blade Units Quick Switcher, dan chassis hardware console.
-5. **Multi-Task & Batch Software Installer**: Instalasi multi-komponen secara pipeline berurutan di background dengan proteksi APT/DPKG file lock guard.
-6. **1-Click Software Uninstaller**: Fitur pencopotan bersih untuk seluruh 39 paket software dan runtime (menghentikan daemon, purge APT/binaries, dan autoremove).
-7. **Universal Light Mode & Theme Fix**: Standardisasi penggunaan CSS variables (`bg-[var(--card)]`, `text-[var(--foreground)]`, dll.) mengatasi bug teks hitam di atas background hitam.
+1. **Cloudflare Tunnel Manager, Visual Flow Map & Ingress Auto-Pointing**:
+   - **Visual Ingress Route Editor & Topology Map**: Interactive Visual Map matching Cloudflare Zero Trust with toggle between Map and Table views. Shows public hostnames, local target services, live pulse, and tunnel gateway details.
+   - **Quick App Selector ("Select Deployed App")**: Di modal penambahan rute ingress, tersedia kartu visual aplikasi-aplikasi yang terpasang di server dengan status (`Pointed` / `+ Select`). Sekali klik, port lokal dan saran subdomain otomatis terisi.
+   - **Unpointed Apps Banner**: Banner deteksi otomatis di atas visual map jika ada aplikasi di server yang belum memiliki rute publik.
+   - **Direct 1-Click Pointing di Menu Apps (`AppsTab`)**: Di tabel aplikasi `/var/www`, untuk app yang belum memiliki domain muncul tombol `[📡 + Point Tunnel]` dan opsi di menu `Actions`. Membuka modal khusus dengan data terisi otomatis.
+   - **Structured YAML Serializer & Line-Based Deploy Ingress**: Menggunakan serializer terstruktur dan line-based parser yang menjamin tidak ada duplikasi key `service:` atau syntax YAML rusak saat deploy otomatis.
+   - **Automated DNS CNAME Provisioning**: Menjalankan `cloudflared tunnel route dns <tunnel> <hostname>` secara otomatis saat menambah rute baru atau deploy aplikasi.
+   - **Dedicated Sub-tab di Nginx & Domains**: Tab `Nginx & Domains` kini memiliki toggle subtab: `Nginx VirtualHosts` dan `Cloudflare Tunnels`.
+2. **Docker Self-Healing & Disk Cleanup Optimization**:
+   - **Auto-Chown Self-Healing**: Mengatasi `ERROR: open /home/dev/.docker/buildx/.lock: permission denied` dengan koreksi izin berkas otomatis via sudo sebelum menjalankan docker buildx/prune.
+   - **Resilient Compose Stacks**: Mengatasi error `cd: /var/www/<app>: No such file or directory` saat folder aplikasi sudah dihapus dari disk. Tombol `Stop` dan `Down` pada stack kini otomatis fallback membersihkan container via Docker CLI engine (`docker rm -f`).
+3. **Real-Time DNS Pre-Flight Check (Cloud VPS Publik)**:
+   - **Komponen `DnsPreFlightBadge`**: Saat user mengetik nama domain di form deploy, 7Server melakukan DNS resolution real-time (`/api/dns/check`).
+   - Memberikan badge visual instan:
+     - 🟢 **DNS Verified**: Domain mengarah tepat ke IP publik server (Let's Encrypt SSL siap terbit).
+     - 🟡 **NXDOMAIN Warning**: Memberikan instruksi spesifik dan tombol copy record A (`Type: A | Host: <subdomain> | Target: <server_ip>`).
+     - 🟠 **IP Mismatch Warning**: Memperingatkan jika domain masih mengarah ke host lain sebelum deploy dieksekusi.
+3. **Smart Exposure Mode di Deployment Wizard (`NewAppModal`)**:
+   - Di bagian Domain, user dapat memilih mode ekspos:
+     - `🌐 Public Nginx`: Menggunakan Nginx vhost + Let's Encrypt SSL (dilengkapi live DNS check).
+     - `🚇 CF Tunnel`: Otomatis mendeteksi tunnel aktif di server, mendaftarkan route ke `config.yml`, dan me-reload cloudflared tanpa membuka port firewall (sangat ideal untuk PC lokal, WSL, homelab, atau NAT/Tailscale).
+     - `🔒 Port Only`: Hanya melayani aplikasi di port localhost internal.
+   - **Auto-Detection Pintar**: Jika IP server adalah IP lokal/Tailscale (`100.x.x.x`, `192.168.x.x`, `127.x.x.x`), 7Server secara otomatis memprioritaskan mode `CF Tunnel` jika `cloudflared` aktif!
+4. **AI-Assisted Deployment & Diagnostic Loop (Killer Feature)**:
+   - **Post-Failure AI Auto-Diagnostic ("Fix with AI Copilot")**: Saat deploy gagal (status `failed` di `DeployProgress`), sistem memunculkan banner SRE diagnostik dan tombol bersinar `✨ Fix with AI Copilot`. Tombol ini menyuntikkan konteks kegagalan (nama app, repo, branch, port, failed stage, dan 35 baris log terminal) langsung ke AI Copilot Drawer sehingga Copilot langsung mengeksekusi investigasi dan perbaikan (port override, compose fix, env tuning).
+   - **AI Pre-Flight Architecture Review**: Di layar konfigurasi deploy, terdapat tombol `✨ AI Pre-Flight Review` untuk meminta AI menganalisa arsitektur repo/monorepo, memeriksa kemungkinan konflik port dan env vars yang kurang sebelum deploy dieksekusi.
+2. **Monorepo Multi-Deploy Stack**: Mendeteksi repository monorepo secara otomatis dan memberikan mode `⚡ Deploy Stack`. User dapat memilih multiple packages (misal `/backend` dan `/frontend`), mengonfigurasi port bebas tabrakan & env masing-masing dalam 1 layar, lalu menjalankannya secara berurutan dengan dual/multi-tab real-time streaming progress di `DeployProgress`.
+2. **Automated `.env.example` Discovery & Pre-population**: Saat menginspeksi folder repo atau sub-package monorepo, 7Server langsung membaca `.env.example`, `.env.sample`, atau `.env.template` dari GitHub API dan mengisikannya otomatis ke tabel Environment Variables.
+3. **Docker Compose DB Port Collision Auto-Resolver**: Menghindari kegagalan deploy saat port umum (5432 Postgres, 6379 Redis, 3306 MySQL) sudah digunakan di VPS host, dengan memetakan port service compose ke port bebas di `127.0.0.1`.
+4. **PM2 Multi-User Daemon Discovery (Dev + Root)**: Mengatasi masalah proses PM2 yang berjalan di bawah akun user non-root atau root sehingga kedua daemon terdeteksi di UI Apps & Processes.
+5. **Deployment Integration & Git System**: Integrasi GitHub PAT global, inspeksi repository otomatis, auto-framework detection, serta wizard deployment web application.
+6. **Background Task Manager (Persistence across navigation)**: Eksekusi streaming jangka panjang yang tetap berjalan saat user berpindah tab/halaman, dilengkapi floating widget dan slide-out drawer.
+7. **Sudo Password Interception & Non-Root SSH**: Penanganan otomatis privilege escalation saat SSH user bukan root, dengan modal password dan opsi enkripsi simpanan (AES-256-GCM).
+8. **3D Server Rack & Telemetry Console**: Fitur Zoom in/out, pan, reset view, Blade Units Quick Switcher, dan chassis hardware console.
+9. **Multi-Task & Batch Software Installer**: Instalasi multi-komponen secara pipeline berurutan di background dengan proteksi APT/DPKG file lock guard.
+10. **1-Click Software Uninstaller**: Fitur pencopotan bersih untuk seluruh 39 paket software dan runtime (menghentikan daemon, purge APT/binaries, dan autoremove).
+11. **Universal Light Mode & Theme Fix**: Standardisasi penggunaan CSS variables (`bg-[var(--card)]`, `text-[var(--foreground)]`, dll.) mengatasi bug teks hitam di atas background hitam.
 
 ---
 
@@ -185,3 +215,4 @@ Jika Anda ingin melanjutkan pengembangan pada branch ini:
 1. **Uji Coba Deployment Webhook**: Menambahkan instruksi public webhook URL (misal via Cloudflare Tunnel atau domain publik) agar saat user push git ke GitHub, endpoint `/api/git/webhooks/:token` langsung mentrigger deploy otomatis.
 2. **Ekspansi Provider Git**: Menambahkan implementasi GitLab dan Bitbucket pada `server/src/modules/git/` (saat ini card-nya masih berstatus *Coming Soon* di UI).
 3. **Commit & Push**: Kode saat ini berada dalam kondisi *unstaged changes* yang bersih dan siap di-commit ke branch `feature/deployment`.
+

@@ -132,3 +132,44 @@ test('Framework Detection Engine - detects Python FastAPI/Django', () => {
   assert.equal(result.suggested_config.start_command, 'python main.py');
 });
 
+
+// Node major the repo needs: lowest major any declared range allows.
+{
+  const { minNodeMajor } = await import('./githubService.js');
+  const cases: [string | null, number | undefined][] = [
+    ['^22.11.0 || ^24.11.0 || >=26.0', 22], ['>=18', 18], ['v20.10.0\n', 20], ['20', 20],
+    ['lts/*', undefined], ['>= 22.x', 22], ['', undefined], [null, undefined], ['18.x || 20.x', 18]
+  ];
+  for (const [input, want] of cases) assert.equal(minNodeMajor(input), want, String(input));
+}
+
+// Compose handling: published ports, and a db-only compose next to a Node app is a sidecar, not the app.
+{
+  const { readCompose } = await import('./githubService.js');
+  const pg = `services:\n  db:\n    image: postgres:16-alpine\n    container_name: warnet_postgres\n    ports:\n      - "5432:5432"\n`;
+  assert.deepEqual(readCompose(pg), { ports: [5432], builds: false });
+  assert.deepEqual(readCompose(`services:\n  web:\n    build: .\n    ports:\n      - 127.0.0.1:8080:80\n      - "9000"\n`), { ports: [8080, 9000], builds: true });
+
+  const pkg = JSON.stringify({ dependencies: { next: '14' }, scripts: { build: 'next build', start: 'next start' } });
+  const sidecar = detectFrameworkFromFiles(['package.json', 'docker-compose.yml'], pkg, null, pg);
+  assert.equal(sidecar.detected_engine, 'native_node', 'db-only compose must not make a Node app "Docker"');
+
+  const app = detectFrameworkFromFiles(['docker-compose.yml'], null, null, `services:\n  web:\n    build: .\n    ports:\n      - "8080:80"\n  db:\n    image: postgres\n    ports:\n      - "5432:5432"\n`);
+  assert.equal(app.detected_engine, 'docker');
+  assert.equal(app.suggested_config.internal_port, 8080, 'uses the app port, not the database port');
+
+  const { readDockerfilePort } = await import('./githubService.js');
+  assert.equal(readDockerfilePort('FROM node:20\nEXPOSE 4000/tcp\nCMD ["node","index.js"]'), 4000);
+  const pnpmMonorepo = detectFrameworkFromFiles(
+    ['package.json', 'nuxt.config.ts'],
+    JSON.stringify({ dependencies: { nuxt: '^3.13.0' }, scripts: { build: 'nuxt build' } }),
+    null,
+    null,
+    null,
+    ['pnpm-lock.yaml', 'pnpm-workspace.yaml']
+  );
+  assert.equal(pnpmMonorepo.framework, 'Nuxt');
+  assert.equal(pnpmMonorepo.suggested_config.install_command, 'pnpm install');
+  assert.equal(pnpmMonorepo.suggested_config.build_command, 'pnpm run build');
+  assert.equal(pnpmMonorepo.suggested_config.start_command, 'node .output/server/index.mjs');
+}

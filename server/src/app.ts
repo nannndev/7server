@@ -29,6 +29,7 @@ import { usersRoutes } from './modules/users/routes.js';
 import { firewallRoutes } from './modules/firewall/routes.js';
 import { gitPublicRoutes, gitManagementRoutes } from './modules/git/routes.js';
 import { systemRoutes } from './modules/system/routes.js';
+import { tunnelsRoutes } from './modules/tunnels/routes.js';
 
 export function createApp() {
   const app = express();
@@ -64,7 +65,7 @@ export function createApp() {
   // Order matters where paths overlap (e.g. /servers/test and /servers/batch-exec vs /servers/:id):
   // this is the order the routes had in the old single-file server.
   app.use('/api', usersRoutes, firewallRoutes, aiGatewayManagementRoutes, gitManagementRoutes, monitoringRoutes, transferRoutes, serversRoutes, diagnosticsRoutes, metricsRoutes, processesRoutes,
-    logsRoutes, filesRoutes, dockerRoutes, databasesRoutes, execRoutes, softwareRoutes, cronRoutes, certificateRoutes, securityRoutes, backupRoutes, systemRoutes);
+    logsRoutes, filesRoutes, dockerRoutes, databasesRoutes, execRoutes, softwareRoutes, cronRoutes, certificateRoutes, securityRoutes, backupRoutes, systemRoutes, tunnelsRoutes);
 
   app.use(errorHandler);
 

@@ -49,3 +49,19 @@ assert.equal(upg.nginx?.currentVersion, '1.18.0-6ubuntu14.4');
 assert.equal(upg['docker-ce']?.newVersion, '5:27.3.1-1~ubuntu.22.04~jammy');
 
 console.log('software tests ok');
+
+// The wrapper must report the script's real exit code (a failed deploy step was reported as success before).
+{
+  const { wrapScript } = await import('./service.js');
+  const run = (script: string) => execFileSync('bash', ['-c', wrapScript(script, `/tmp/__7server_test_${process.pid}.sh`)], { encoding: 'utf8' });
+  if (process.getuid?.() === 0) {
+    assert.match(run('echo hi; exit 3'), /hi\n__7SERVER_EXIT_CODE:3/);
+    assert.match(run('true'), /__7SERVER_EXIT_CODE:0/);
+  } else {
+    // Non-root without sudo access: the sudo branch is taken; check the plain branch by faking root.
+    const asRoot = (script: string) => execFileSync('bash', ['-c', `id() { echo 0; }; export -f id; ${wrapScript(script, `/tmp/__7server_test_${process.pid}.sh`)}`], { encoding: 'utf8' });
+    assert.match(asRoot('echo hi; exit 3'), /hi\n__7SERVER_EXIT_CODE:3/);
+    assert.match(asRoot('true'), /__7SERVER_EXIT_CODE:0/);
+  }
+}
+console.log('wrapper exit code ok');

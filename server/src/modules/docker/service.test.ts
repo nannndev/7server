@@ -19,7 +19,7 @@ assert.equal(containerCommand('abc123', 'rm'), "docker rm -f 'abc123'");
 assert.throws(() => containerCommand('x', 'exec'));
 for (const bad of ["a;rm -rf /", "a'b", "$(id)", "a b", "", "-rf", "a`id`", "../x"]) assert.throws(() => checkName(bad), bad);
 
-assert.match(composeCommand('global-erp-pos-api-prod', '/home/deploy/erp-pos', 'pull-up'), /^cd '\/home\/deploy\/erp-pos' && DC="docker compose -p global-erp-pos-api-prod"/);
+assert.match(composeCommand('global-erp-pos-api-prod', '/home/deploy/erp-pos', 'pull-up'), /if \[ -d '\/home\/deploy\/erp-pos' \]; then cd '\/home\/deploy\/erp-pos'; fi; DC="docker compose -p global-erp-pos-api-prod"/);
 assert.throws(() => composeCommand('p', '/x; rm -rf /', 'up'));
 assert.throws(() => composeCommand('p', '/a/../etc', 'up'));
 assert.throws(() => composeCommand('p', 'relative', 'up'));

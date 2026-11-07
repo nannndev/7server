@@ -1,5 +1,5 @@
 import { API_BASE, apiFetch, unwrap } from '@/shared/api/client';
-import type { WebAppInfo, NginxSiteInfo, ListeningPortInfo } from '@/features/webapps/types';
+import type { WebAppInfo, NginxSiteInfo, ListeningPortInfo } from '@/features/deployments/types';
 
 export async function fetchWebApps(id: string): Promise<WebAppInfo[]> {
   const res = await apiFetch(`${API_BASE}/servers/${id}/webapps`);
@@ -12,6 +12,6 @@ export async function fetchNginxSites(id: string): Promise<{ sites: NginxSiteInf
   return unwrap(await apiFetch(`${API_BASE}/servers/${id}/nginx`), 'Failed to fetch Nginx sites');
 }
 
-export async function fetchListeningPorts(id: string): Promise<{ ports: ListeningPortInfo[]; ufwStatus: string; raw: string }> {
+export async function fetchListeningPorts(id: string): Promise<{ ports: ListeningPortInfo[]; ufwStatus: string; raw: string; probed?: number[] }> {
   return unwrap(await apiFetch(`${API_BASE}/servers/${id}/ports`), 'Failed to fetch listening ports');
 }

@@ -1,4 +1,4 @@
-import React, { useState, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
 import { swr } from '@/shared/lib/cache';
 import {
   Terminal as TermIcon,
@@ -11,12 +11,22 @@ import {
   GitPullRequest,
   Wrench,
   ChevronDown,
-  Plus
+  Plus,
+  Trash2,
+  Radio,
+  X,
+  Sparkles
 } from 'lucide-react';
-import NewAppModal from '@/features/webapps/components/NewAppModal';
+import NewAppModal from '@/features/deployments/components/NewAppModal';
+import { useTaskManager } from '@/shared/tasks/TaskContext';
+import { updateServer } from '@/features/servers/api';
+import { SudoPasswordModal } from '@/features/servers/components/SudoPasswordModal';
 import { BrandIcon } from '@/shared/ui/brand-icon';
-import type { WebAppInfo } from '@/features/webapps/types';
-import { fetchWebApps } from '@/features/webapps/api';
+import type { WebAppInfo } from '@/features/deployments/types';
+import { fetchWebApps } from '@/features/deployments/api';
+import { fetchCloudflareTunnelStatus, addCloudflareRoute } from '@/features/tunnels/api';
+import { getBaseDomain } from '@/features/tunnels/components/CloudflareTunnelView';
+import { toast } from '@/shared/ui/toast';
 import { Button } from '@/shared/ui/button';
 import { Badge } from '@/shared/ui/badge';
 import { Card } from '@/shared/ui/card';
@@ -26,7 +36,7 @@ import { useServerPage, sq } from './context';
 import { useT } from '@/shared/i18n';
 import { confirmModal } from '@/shared/ui/confirm-dialog';
 
-export default function WebAppsTab() {
+export default function AppsTab() {
   const t = useT();
   const ctx = useServerPage();
   const { server } = ctx;
@@ -35,7 +45,106 @@ export default function WebAppsTab() {
   const [appSearchQuery, setAppSearchQuery] = useState('');
   const [appTypeFilter, setAppTypeFilter] = useState<string>('ALL');
   const [appMenu, setAppMenu] = useState<string | null>(null);
-  const [showNewAppModal, setShowNewAppModal] = useState(false);
+  // Fixed position from the button: the table's overflow-x-auto wrapper would clip an absolute dropdown.
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number; up: boolean }>({ top: 0, right: 0, up: false });
+  const { tasks, runStreamTask } = useTaskManager();
+  const [sudoFor, setSudoFor] = useState<WebAppInfo | null>(null);
+
+  // Cloudflare Tunnel quick-pointing state
+  const [tunnelBaseDomain, setTunnelBaseDomain] = useState<string>('');
+  const [pointModalApp, setPointModalApp] = useState<WebAppInfo | null>(null);
+  const [pointHostname, setPointHostname] = useState('');
+  const [pointService, setPointService] = useState('');
+  const [pointAutoDns, setPointAutoDns] = useState(true);
+  const [pointingLoading, setPointingLoading] = useState(false);
+
+  useEffect(() => {
+    fetchCloudflareTunnelStatus(server.id)
+      .then((st) => {
+        if (st?.routes) {
+          const base = getBaseDomain(st.routes);
+          if (base) setTunnelBaseDomain(base);
+        }
+      })
+      .catch(() => {});
+  }, [server.id]);
+
+  const openPointTunnel = (app: WebAppInfo) => {
+    setPointModalApp(app);
+    const appPort = app.ports ? app.ports.split(',')[0].trim() : '';
+    const isStatic = app.type.includes('Frontend') || app.type.includes('SPA') || app.type.includes('Web App');
+    const targetPort = isStatic ? '80' : (appPort || '80');
+    setPointService(`http://localhost:${targetPort}`);
+
+    const base = tunnelBaseDomain || 'supraairways.space';
+    setPointHostname(`${app.name}.${base}`);
+    setPointAutoDns(true);
+  };
+
+  const handleSavePointTunnel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pointModalApp) return;
+    const cleanHost = pointHostname.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    const cleanSvc = pointService.trim();
+    if (!cleanHost || !cleanHost.includes('.')) {
+      toast.error('Please enter a valid hostname (e.g. myapp.domain.com)');
+      return;
+    }
+    if (!cleanSvc) {
+      toast.error('Please enter a target service (e.g. http://localhost:3000)');
+      return;
+    }
+
+    try {
+      setPointingLoading(true);
+      await addCloudflareRoute(server.id, {
+        hostname: cleanHost,
+        service: cleanSvc,
+        autoDns: pointAutoDns
+      });
+      toast.success(`App ${pointModalApp.name} successfully pointed to https://${cleanHost}!`);
+      setPointModalApp(null);
+      loadWebAppsData(true);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to point app');
+    } finally {
+      setPointingLoading(false);
+    }
+  };
+
+  // Real removal (folder + PM2/Docker/Nginx/SSL that point at it) runs as a background task.
+  const removeApp = (app: WebAppInfo, sudoPassword?: string) =>
+    runStreamTask({
+      serverId: server.id,
+      serverName: server.name,
+      title: t('webapps.removeTitle', { name: app.name }),
+      category: 'git',
+      url: `/api/servers/${server.id}/webapps/remove?stream=1`,
+      body: { name: app.name, sudoPassword },
+      onDone: () => {
+        try { localStorage.setItem(mockKey, JSON.stringify(getLocalMocks().filter((m) => m.path !== app.path))); } catch {}
+        setWebApps((prev) => prev.filter((a) => a.path !== app.path));
+        loadWebAppsData(true);
+      },
+      onError: (err: any) => {
+        if (err.sudoRequired) setSudoFor(app);
+      }
+    });
+
+  const confirmRemove = async (app: WebAppInfo) => {
+    setAppMenu(null);
+    const ok = await confirmModal({
+      title: t('webapps.removeTitle', { name: app.name }),
+      message: t('webapps.removeConfirm', { path: app.path, domain: app.domain || '—' }),
+      variant: 'danger',
+      confirmText: t('webapps.removeAction')
+    });
+    if (ok) removeApp(app);
+  };
+  // Leaving the tab unmounts the wizard; reopen it if this server still has a deploy running.
+  const [showNewAppModal, setShowNewAppModal] = useState(() =>
+    tasks.some((tk) => tk.serverId === server.id && tk.metadata?.kind === 'deploy' && tk.status === 'running')
+  );
   const mockKey = `7server_mock_webapps_${server.id}`;
   const getLocalMocks = (): WebAppInfo[] => {
     try { return JSON.parse(localStorage.getItem(mockKey) || '[]'); } catch { return []; }
@@ -53,10 +162,20 @@ export default function WebAppsTab() {
       list.push({ label: t('webapps.artisanClear'), cmd: `${cd}php artisan optimize:clear 2>&1`, confirm: true });
       list.push({ label: t('webapps.artisanMigrate'), cmd: `${cd}php artisan migrate:status 2>&1` });
     }
-    if (app.type.includes('Node') || app.type.includes('Next') || app.type.includes('Vite')) {
-      list.push({ label: t('webapps.npmBuild'), cmd: `${cd}npm run build 2>&1 | tail -n 40`, confirm: true });
+    if (app.type.includes('Node') || app.type.includes('Next') || app.type.includes('Vite') || app.type.includes('Nuxt')) {
+      list.push({ label: t('webapps.pm2Restart'), cmd: `${cd}set -a; [ -f .env ] && . ./.env; set +a; pm2 restart ${sq(app.name)} --update-env 2>&1`, confirm: true });
+      list.push({ label: t('webapps.npmBuildAndRestart'), cmd: `${cd}set -a; [ -f .env ] && . ./.env; set +a; npm run build 2>&1 && pm2 restart ${sq(app.name)} --update-env 2>&1`, confirm: true });
+      list.push({ label: t('webapps.npmBuild'), cmd: `${cd}set -a; [ -f .env ] && . ./.env; set +a; npm run build 2>&1 | tail -n 40`, confirm: true });
+    }
+    if (app.type.includes('Docker')) {
+      list.push({ label: t('webapps.dockerRestart'), cmd: `docker restart ${sq(`7server-${app.name}`)} 2>&1`, confirm: true });
     }
     list.push({ label: t('webapps.folderSize'), cmd: `du -sh ${sq(app.path)} 2>&1` });
+    list.push({
+      label: '🚇 ' + t('webapps.pointTunnel'),
+      cmd: '',
+      action: () => openPointTunnel(app)
+    });
 
     // Allow deleting mock/locally added apps
     const mocks = getLocalMocks();
@@ -90,7 +209,8 @@ export default function WebAppsTab() {
       a.action();
       return;
     }
-    ctx.runQuickAction(`${app.name}: ${a.label}`, a.cmd);
+    // Deployed apps are root-owned: as the SSH user git refuses them ("dubious ownership") and npm can't write.
+    ctx.runQuickAction(`${app.name}: ${a.label}`, a.cmd, { sudo: true });
   };
   const loadWebAppsData = async (manual?: unknown) => {
     try {
@@ -137,13 +257,7 @@ export default function WebAppsTab() {
         isOpen={true}
         onClose={() => setShowNewAppModal(false)}
         server={server}
-        onAppCreated={(newApp) => {
-          try {
-            const existing = getLocalMocks();
-            localStorage.setItem(mockKey, JSON.stringify([newApp, ...existing.filter((a) => a.path !== newApp.path)]));
-          } catch {}
-          setWebApps((prev) => [newApp, ...prev.filter((a) => a.path !== newApp.path)]);
-        }}
+        onAppCreated={() => loadWebAppsData(true)}
         onOpenIntegrations={() => {
           window.location.hash = '#/settings/integrations';
         }}
@@ -275,42 +389,49 @@ export default function WebAppsTab() {
                       </Badge>
                     </td>
                     <td className="py-2.5 px-3">
-                      {app.domain || app.ports ? (
-                        <div className="flex flex-col gap-0.5 font-mono text-[11px]">
-                          {(app.domain || '')
+                      {app.domain ? (
+                        <div className="flex items-center gap-1.5 flex-wrap font-mono text-[11px]">
+                          {app.domain
                             .split(',')
                             .filter(Boolean)
                             .filter((d) => !d.startsWith('www.'))
                             .map((d) => (
                               <a
                                 key={d}
-                                href={`http://${d}`}
+                                href={`https://${d}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-sky-500 hover:underline"
+                                className="inline-flex items-center gap-1 text-emerald-400 hover:underline font-semibold"
                               >
+                                <Globe className="w-3 h-3 text-emerald-400 shrink-0" />
                                 <span className="sensitive">{d}</span>
-                                <ExternalLink className="w-3 h-3" />
+                                <ExternalLink className="w-2.5 h-2.5 text-[var(--muted-foreground)]" />
                               </a>
                             ))}
                           {app.ports && (
-                            <div className="flex flex-wrap gap-1 mt-0.5">
-                              {app.ports.split(',').map((p) => (
-                                <a
-                                  key={p}
-                                  href={`http://${server.host}:${p}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="px-1.5 rounded bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] hover:underline"
-                                >
-                                  :{p}
-                                </a>
-                              ))}
-                            </div>
+                            <span className="text-[10px] text-[var(--muted-foreground)]">
+                              (:{app.ports})
+                            </span>
                           )}
                         </div>
                       ) : (
-                        <span className="text-[var(--muted-foreground)] italic font-mono text-[11px]">-</span>
+                        <div className="flex items-center gap-1.5 flex-wrap font-mono text-[11px]">
+                          {app.ports ? (
+                            <span className="px-1.5 py-0.5 rounded bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)]">
+                              :{app.ports}
+                            </span>
+                          ) : (
+                            <span className="text-[var(--muted-foreground)]">-</span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => openPointTunnel(app)}
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-sans font-medium bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/20 transition shadow-sm"
+                            title={t('webapps.pointTunnelDesc')}
+                          >
+                            <Radio className="w-2.5 h-2.5" /> + Point Tunnel
+                          </button>
+                        </div>
                       )}
                     </td>
                     <td className="py-2.5 px-3 font-mono text-[11px]">
@@ -368,7 +489,12 @@ export default function WebAppsTab() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => setAppMenu(appMenu === app.path ? null : app.path)}
+                            onClick={(e) => {
+                              const r = e.currentTarget.getBoundingClientRect();
+                              const up = r.bottom + 280 > window.innerHeight;
+                              setMenuPos({ top: up ? r.top - 4 : r.bottom + 4, right: window.innerWidth - r.right, up });
+                              setAppMenu(appMenu === app.path ? null : app.path);
+                            }}
                             disabled={!!ctx.quickActionRunning}
                             className="h-6 px-2 text-[10px] gap-1"
                           >
@@ -379,7 +505,19 @@ export default function WebAppsTab() {
                           {appMenu === app.path && (
                             <>
                               <div className="fixed inset-0 z-20" onClick={() => setAppMenu(null)} />
-                              <div className="absolute right-0 mt-1 w-52 z-30 bg-[var(--card)] border border-[var(--border)] rounded-lg shadow-2xl py-1 text-left">
+                              <div
+                                className="fixed w-52 z-30 bg-[var(--card)] border border-[var(--border)] rounded-lg shadow-2xl py-1 text-left"
+                                style={{ top: menuPos.top, right: menuPos.right, transform: menuPos.up ? 'translateY(-100%)' : undefined }}
+                              >
+                                {(
+                                  <button
+                                    onClick={() => confirmRemove(app)}
+                                    className="w-full px-3 py-1.5 text-[11px] text-left text-red-600 dark:text-red-400 hover:bg-red-500/10 flex items-center gap-2 border-b border-[var(--border)]"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                    {t('webapps.removeAction')}
+                                  </button>
+                                )}
                                 {appActions(app).map((a) => (
                                   <button
                                     key={a.label}
@@ -388,6 +526,8 @@ export default function WebAppsTab() {
                                   >
                                     {a.label.startsWith('Git') ? (
                                       <GitPullRequest className="w-3 h-3" />
+                                    ) : a.label.includes('Tunnel') ? (
+                                      <Radio className="w-3 h-3 text-amber-400" />
                                     ) : (
                                       <TermIcon className="w-3 h-3" />
                                     )}
@@ -407,6 +547,131 @@ export default function WebAppsTab() {
             </table>
           </div>
         )}
+      <SudoPasswordModal
+        isOpen={!!sudoFor}
+        onClose={() => setSudoFor(null)}
+        onConfirm={async (pw, remember) => {
+          const app = sudoFor!;
+          setSudoFor(null);
+          if (remember) await updateServer(server.id, { sudoPassword: pw }).catch(() => {});
+          removeApp(app, pw);
+        }}
+        serverName={server.name}
+        username={server.username}
+        hasExistingPassword={server.hasSudoPassword}
+        reason={t('webapps.removeSudo')}
+      />
+
+      {/* Quick Point to Cloudflare Tunnel Modal */}
+      {pointModalApp && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-5 py-4 border-b border-[var(--border)] flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Radio className="w-4 h-4 text-amber-400 animate-pulse" />
+                <h3 className="text-sm font-semibold text-[var(--foreground)]">
+                  Point {pointModalApp.name} to Cloudflare Tunnel
+                </h3>
+              </div>
+              <button
+                onClick={() => setPointModalApp(null)}
+                className="text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSavePointTunnel} className="p-5 space-y-4">
+              <div className="p-3 rounded-lg bg-[var(--muted)]/50 border border-[var(--border)] flex items-center justify-between text-xs">
+                <div>
+                  <div className="font-semibold text-[var(--foreground)] flex items-center gap-1.5">
+                    <span>{pointModalApp.name}</span>
+                    <Badge variant="secondary" className="text-[10px] py-0">{pointModalApp.type}</Badge>
+                  </div>
+                  <div className="text-[11px] text-[var(--muted-foreground)] font-mono mt-0.5 truncate max-w-[220px]">
+                    {pointModalApp.path}
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider block">Local Port</span>
+                  <span className="font-mono font-semibold text-emerald-400">:{pointModalApp.ports || '80'}</span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-[var(--foreground)]">
+                  Public Hostname (Domain / Subdomain)
+                </label>
+                <Input
+                  placeholder="e.g. app.yourdomain.com"
+                  value={pointHostname}
+                  onChange={(e) => {
+                    const clean = e.target.value.toLowerCase().trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+                    setPointHostname(clean);
+                  }}
+                  className="font-mono text-xs"
+                  required
+                />
+                <p className="text-[11px] text-[var(--muted-foreground)]">
+                  Visitors on the public internet will access your app using this HTTPS domain.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-[var(--foreground)]">
+                  Target Service (Local URL)
+                </label>
+                <Input
+                  placeholder="http://localhost:3000"
+                  value={pointService}
+                  onChange={(e) => setPointService(e.target.value)}
+                  className="font-mono text-xs"
+                  required
+                />
+              </div>
+
+              <div className="pt-1">
+                <label className="flex items-start gap-2.5 text-xs text-[var(--foreground)] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={pointAutoDns}
+                    onChange={(e) => setPointAutoDns(e.target.checked)}
+                    className="mt-0.5 rounded border-zinc-700 bg-zinc-800 text-emerald-500 focus:ring-0"
+                  />
+                  <div>
+                    <span className="font-medium text-[var(--foreground)]">Auto-create Cloudflare DNS route</span>
+                    <p className="text-[11px] text-[var(--muted-foreground)]">
+                      Executes <code>cloudflared tunnel route dns</code> to automatically register the CNAME record in Cloudflare.
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--border)]">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPointModalApp(null)}
+                  disabled={pointingLoading}
+                  className="text-xs"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="default"
+                  size="sm"
+                  disabled={pointingLoading}
+                  className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white"
+                >
+                  {pointingLoading ? 'Pointing App...' : 'Save & Point Route'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }

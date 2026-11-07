@@ -261,11 +261,39 @@ echo "@@RESULT|$UNIT|$STATE"
   };
 }
 
+/** Writes the script to a temp file and runs it (via sudo for non-root users), ending with "__7SERVER_EXIT_CODE:<n>". */
+export function wrapScript(script: string, remoteFile: string): string {
+  return `cat << 'EOF_7SERVER_SCRIPT' > ${remoteFile}
+${script}
+EOF_7SERVER_SCRIPT
+chmod +x ${remoteFile}
+export DEBIAN_FRONTEND=noninteractive
+
+# Capture $? right after each run: reading it after another test (e.g. [ -z ... ]) always yields 0.
+if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1; then
+  if [ -n "$__7SERVER_HAS_SUDO_PASS" ]; then
+    sudo -S -p '' -E bash ${remoteFile} 2>&1; EXIT_CODE=$?
+  elif sudo -n true 2>/dev/null; then
+    sudo -n -E bash ${remoteFile} 2>&1; EXIT_CODE=$?
+  else
+    echo "__7SERVER_SUDO_REQUIRED__"
+    echo "sudo: a password is required for $(whoami) on $(hostname) to install system packages"
+    EXIT_CODE=126
+  fi
+else
+  bash ${remoteFile} 2>&1; EXIT_CODE=$?
+fi
+rm -f ${remoteFile}
+echo "__7SERVER_EXIT_CODE:\${EXIT_CODE}"
+`;
+}
+
 export async function executeSoftwareScript(
   target: ServerCredentials,
   script: string,
   sudoPasswordOverride?: string,
-  onChunk?: (chunk: string, isStderr: boolean) => void
+  onChunk?: (chunk: string, isStderr: boolean) => void,
+  timeoutMs = 300000
 ): Promise<{ ok: boolean; exitCode: number; output: string; durationMs: number; sudoRequired?: boolean }> {
   if (!script || !script.trim()) {
     throw new Error('Script cannot be empty');
@@ -278,29 +306,7 @@ export async function executeSoftwareScript(
   const sudoPass = sudoPasswordOverride || target.sudoPassword || (target.authType === 'password' ? target.password : undefined);
   const hasSudoPass = !!sudoPass;
 
-  const wrapper = `cat << 'EOF_7SERVER_SCRIPT' > ${remoteFile}
-${script}
-EOF_7SERVER_SCRIPT
-chmod +x ${remoteFile}
-export DEBIAN_FRONTEND=noninteractive
-
-if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1; then
-  if [ -n "$__7SERVER_HAS_SUDO_PASS" ]; then
-    sudo -S -p '' -E bash ${remoteFile} 2>&1
-  elif sudo -n true 2>/dev/null; then
-    sudo -n -E bash ${remoteFile} 2>&1
-  else
-    echo "__7SERVER_SUDO_REQUIRED__"
-    echo "sudo: a password is required for $(whoami) on $(hostname) to install system packages"
-    EXIT_CODE=126
-  fi
-else
-  bash ${remoteFile} 2>&1
-fi
-[ -z "$EXIT_CODE" ] && EXIT_CODE=$?
-rm -f ${remoteFile}
-echo "__7SERVER_EXIT_CODE:\${EXIT_CODE}"
-`;
+  const wrapper = wrapScript(script, remoteFile);
 
   const wrappedCmd = `export __7SERVER_HAS_SUDO_PASS=${hasSudoPass ? '1' : ''}\n${wrapper}`;
   const r = onChunk
@@ -308,13 +314,13 @@ echo "__7SERVER_EXIT_CODE:\${EXIT_CODE}"
         target,
         wrappedCmd,
         onChunk,
-        300000,
+        timeoutMs,
         hasSudoPass ? { stdin: `${sudoPass}\n` } : {}
       )
     : await executeCommand(
         target,
         wrappedCmd,
-        300000,
+        timeoutMs,
         hasSudoPass ? { stdin: `${sudoPass}\n` } : {}
       );
 

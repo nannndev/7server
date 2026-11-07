@@ -49,7 +49,7 @@ server/src/
 │   ├── servers/     routes.ts  store.ts (dari db.ts)  types.ts
 │   ├── metrics/     routes.ts  service.ts (fetchServerMetrics, history)
 │   ├── processes/   routes.ts  service.ts (processes, services, pm2, supervisor)
-│   ├── webapps/     routes.ts  service.ts (webapps, nginx, ports)
+│   ├── deployments/ service.ts (apps, nginx, ports)  deploy.ts (git deploy + remove scripts)
 │   ├── files/       routes.ts  (pakai withSftp)
 │   ├── logs/        routes.ts
 │   ├── docker/      routes.ts  service.ts (dari dockerService.ts)  service.test.ts
@@ -123,7 +123,7 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
 | `server.ts` 127–140 (audit middleware) | `http/audit.ts` |
 | `server.ts` 142–198 (audit, history, monitor, uptime, export/import) | `modules/monitoring/routes.ts`, `modules/servers/routes.ts` |
 | `server.ts` 200–330 (servers CRUD, test, ping, metrics) | `modules/servers/routes.ts`, `modules/metrics/routes.ts` |
-| `server.ts` 332–483 (processes, services, webapps, pm2, supervisor, nginx, ports) | `modules/processes/routes.ts`, `modules/webapps/routes.ts` |
+| `server.ts` 332–483 (processes, services, webapps, pm2, supervisor, nginx, ports) | `modules/processes/routes.ts`, `modules/deployments/routes.ts` |
 | `server.ts` 485–511 (logs) | `modules/logs/routes.ts` |
 | `server.ts` 513–606 (files / sftp) | `modules/files/routes.ts` |
 | `server.ts` 403, 608–630 (docker) | `modules/docker/routes.ts`; `withServer` → `http/handlers.ts` |
@@ -133,7 +133,7 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
 | `server.ts` 874–879 (start) | `index.ts` |
 | `metricsService.ts` 15–198 | `modules/metrics/service.ts` |
 | `metricsService.ts` 199–305, 393–508 | `modules/processes/service.ts` (manageDockerContainer → `modules/docker/service.ts`) |
-| `metricsService.ts` 307–392, 509–617 | `modules/webapps/service.ts` |
+| `metricsService.ts` 307–392, 509–617 | `modules/deployments/service.ts` |
 | `db.ts` | `modules/servers/store.ts` |
 | `dockerService.ts` (+ test) | `modules/docker/service.ts` |
 | `monitor.ts` (+ test) | `modules/monitoring/monitor.ts` |

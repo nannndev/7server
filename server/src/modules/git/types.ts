@@ -66,5 +66,13 @@ export interface InspectResult {
   build_preset: string;
   suggested_config: SuggestedConfig;
   available_directories?: string[];
+  /** Directories in the repository that contain a deployable project manifest (package.json, Dockerfile, composer.json, etc.) */
+  project_roots?: string[];
+  /** Environment variables parsed from .env.example / .env.sample in this directory */
+  suggested_env?: Array<{ key: string; value: string }>;
+  /** Lowest Node major the repo declares (engines.node, .nvmrc, .node-version), if any */
+  node_version?: number;
+  /** Repo has a compose file that only provides services (db, cache) for the app; deploy starts it first. */
+  compose_sidecar?: boolean;
 }
 

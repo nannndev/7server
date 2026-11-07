@@ -16,7 +16,7 @@ import { ServerPageProvider, type LogsTarget, type ServerPageCtx } from './serve
 import OverviewTab from './server/OverviewTab';
 import TopologyTab from './server/TopologyTab';
 import TemplatesTab from './server/TemplatesTab';
-import WebAppsTab from './server/WebAppsTab';
+import AppsTab from './server/AppsTab';
 import Pm2Tab from './server/Pm2Tab';
 import DockerTab from './server/DockerTab';
 import DatabasesTab from './server/DatabasesTab';
@@ -36,7 +36,7 @@ const TABS: Record<ServerTab, React.FC> = {
   overview: OverviewTab,
   topology: TopologyTab,
   templates: TemplatesTab,
-  webapps: WebAppsTab,
+  webapps: AppsTab,
   pm2: Pm2Tab,
   docker: DockerTab,
   databases: DatabasesTab,
@@ -124,7 +124,7 @@ export default function ServerPage({ server, tab, onTabChange, history = [], thr
     }
   };
 
-  const runQuickAction = async (label: string, cmd: string) => {
+  const runQuickAction = async (label: string, cmd: string, opts?: { sudo?: boolean }) => {
     if (label === 'Reboot Server') {
       const ok = await confirmModal({
         title: 'Reboot Server',
@@ -140,7 +140,7 @@ export default function ServerPage({ server, tab, onTabChange, history = [], thr
       const res = await apiFetch(`/api/servers/${server.id}/exec`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ command: cmd })
+        body: JSON.stringify({ command: cmd, sudo: opts?.sudo })
       });
       const data = await res.json();
       setQuickActionOutput(data.data?.stdout || data.data?.stderr || data.error || t('server.commandDone'));

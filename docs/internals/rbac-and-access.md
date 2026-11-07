@@ -11,7 +11,7 @@ Pasangan dokumen: [backend-architecture.md](backend-architecture.md), [frontend-
 | Token | Satu token statis `HMAC(password, 'vps-hub-token')`: sama untuk semua orang, tidak kedaluwarsa, hanya bisa dicabut dengan ganti password | `server/src/http/auth.ts` |
 | Peran | Tidak ada. Semua yang login = admin penuh | – |
 | Audit log | Ada: setiap request non-GET dicatat (`t`, `ip`, `method`, `path`, `detail`, `status`). **Tidak ada siapa**-nya | `server/src/http/audit.ts`, `server/src/infra/audit.ts` |
-| Firewall | Hanya **baca** `ufw status` di tab Ports. Tidak bisa ubah aturan | `server/src/modules/webapps/service.ts` |
+| Firewall | Hanya **baca** `ufw status` di tab Ports. Tidak bisa ubah aturan | `server/src/modules/deployments/service.ts` |
 | Endpoint | 59 route yang mengubah sesuatu, plus terminal WebSocket dan AI Copilot (bisa menjalankan perintah) | `server/src/modules/*/routes.ts` |
 
 Masalah utamanya: tidak bisa memberi akses terbatas ke orang lain (mis. developer yang cuma boleh lihat log), tidak bisa mencabut akses satu orang, dan audit tidak menjawab "siapa".

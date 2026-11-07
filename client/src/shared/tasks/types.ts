@@ -12,6 +12,8 @@ export interface BackgroundTask {
   finishedAt?: number;
   durationSec: number;
   logs: string[];
+  /** "@@STAGE <id>" markers seen in the output, in order (never trimmed) */
+  stages?: string[];
   error?: string;
   metadata?: Record<string, any>;
 }

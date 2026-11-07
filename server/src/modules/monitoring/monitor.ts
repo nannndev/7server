@@ -5,7 +5,7 @@ import tls from 'tls';
 import { getKv, setKv } from '../../infra/db.js';
 import { getAllServers, updateServer } from '../servers/store.js';
 import { fetchServerMetrics } from '../metrics/service.js';
-import { fetchNginxSites } from '../webapps/service.js';
+import { fetchNginxSites } from '../deployments/service.js';
 import { encrypt, decrypt } from '../../infra/crypto.js';
 import { badRequest } from '../../http/errors.js';
 

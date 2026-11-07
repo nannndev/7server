@@ -90,14 +90,24 @@ export async function executeDockerCommand(
 
   // Self-healing pre-flight for non-root users: if /var/run/docker.sock is not writable,
   // grant group membership and socket rw permissions using sudo so docker works seamlessly.
+  // Also ensure ~/.docker is owned by user to prevent buildx lock permission denied.
   const wrapper = `
-if [ "$(id -u)" -ne 0 ] && [ -S /var/run/docker.sock ] && [ ! -w /var/run/docker.sock ]; then
-  if [ -n "$__7SERVER_HAS_SUDO_PASS" ]; then
-    sudo -S -p '' usermod -aG docker $(whoami) 2>/dev/null || true
-    sudo -S -p '' chmod 666 /var/run/docker.sock 2>/dev/null || true
-  elif sudo -n true 2>/dev/null; then
-    sudo -n usermod -aG docker $(whoami) 2>/dev/null || true
-    sudo -n chmod 666 /var/run/docker.sock 2>/dev/null || true
+if [ "$(id -u)" -ne 0 ]; then
+  if [ -S /var/run/docker.sock ] && [ ! -w /var/run/docker.sock ]; then
+    if [ -n "$__7SERVER_HAS_SUDO_PASS" ]; then
+      sudo -S -p '' usermod -aG docker $(whoami) 2>/dev/null || true
+      sudo -S -p '' chmod 666 /var/run/docker.sock 2>/dev/null || true
+    elif sudo -n true 2>/dev/null; then
+      sudo -n usermod -aG docker $(whoami) 2>/dev/null || true
+      sudo -n chmod 666 /var/run/docker.sock 2>/dev/null || true
+    fi
+  fi
+  if [ -d "$HOME/.docker" ] && [ ! -w "$HOME/.docker/buildx/.lock" -o ! -w "$HOME/.docker" ]; then
+    if [ -n "$__7SERVER_HAS_SUDO_PASS" ]; then
+      sudo -S -p '' chown -R $(whoami):$(id -gn) "$HOME/.docker" 2>/dev/null || true
+    elif sudo -n true 2>/dev/null; then
+      sudo -n chown -R $(whoami):$(id -gn) "$HOME/.docker" 2>/dev/null || true
+    fi
   fi
 fi
 ${cmd}
@@ -123,13 +133,22 @@ export async function executeDockerCommandStream(
   const hasSudoPass = !!sudoPass;
 
   const wrapper = `
-if [ "$(id -u)" -ne 0 ] && [ -S /var/run/docker.sock ] && [ ! -w /var/run/docker.sock ]; then
-  if [ -n "$__7SERVER_HAS_SUDO_PASS" ]; then
-    sudo -S -p '' usermod -aG docker $(whoami) 2>/dev/null || true
-    sudo -S -p '' chmod 666 /var/run/docker.sock 2>/dev/null || true
-  elif sudo -n true 2>/dev/null; then
-    sudo -n usermod -aG docker $(whoami) 2>/dev/null || true
-    sudo -n chmod 666 /var/run/docker.sock 2>/dev/null || true
+if [ "$(id -u)" -ne 0 ]; then
+  if [ -S /var/run/docker.sock ] && [ ! -w /var/run/docker.sock ]; then
+    if [ -n "$__7SERVER_HAS_SUDO_PASS" ]; then
+      sudo -S -p '' usermod -aG docker $(whoami) 2>/dev/null || true
+      sudo -S -p '' chmod 666 /var/run/docker.sock 2>/dev/null || true
+    elif sudo -n true 2>/dev/null; then
+      sudo -n usermod -aG docker $(whoami) 2>/dev/null || true
+      sudo -n chmod 666 /var/run/docker.sock 2>/dev/null || true
+    fi
+  fi
+  if [ -d "$HOME/.docker" ] && [ ! -w "$HOME/.docker/buildx/.lock" -o ! -w "$HOME/.docker" ]; then
+    if [ -n "$__7SERVER_HAS_SUDO_PASS" ]; then
+      sudo -S -p '' chown -R $(whoami):$(id -gn) "$HOME/.docker" 2>/dev/null || true
+    elif sudo -n true 2>/dev/null; then
+      sudo -n chown -R $(whoami):$(id -gn) "$HOME/.docker" 2>/dev/null || true
+    fi
   fi
 fi
 ${cmd}
@@ -297,7 +316,17 @@ export function composeCommand(project: unknown, workingDir: unknown, action: st
   const files = String(configFiles ?? '').split(',').map((f) => f.trim()).filter(Boolean)
     .map((f) => `-f ${unq(checkPath(f, 'config file'))}`).join(' ');
   const args = `-p ${p}${files ? ` ${files}` : ''}`;
-  return `cd ${dir} && DC="docker compose ${args}"; (docker compose version >/dev/null 2>&1 || DC="docker-compose ${args}"); $DC ${sub} 2>&1`;
+
+  let fallback = '';
+  if (action === 'stop') {
+    fallback = ` || (docker stop $(docker ps -q --filter label=com.docker.compose.project=${p}) 2>/dev/null || true)`;
+  } else if (action === 'down') {
+    fallback = ` || (docker rm -f $(docker ps -aq --filter label=com.docker.compose.project=${p}) 2>/dev/null || true)`;
+  } else if (action === 'restart') {
+    fallback = ` || (docker restart $(docker ps -q --filter label=com.docker.compose.project=${p}) 2>/dev/null || true)`;
+  }
+
+  return `if [ -d ${dir} ]; then cd ${dir}; fi; DC="docker compose ${args}"; (docker compose version >/dev/null 2>&1 || DC="docker-compose ${args}"); ($DC ${sub}${fallback}) 2>&1`;
 }
 
 const PRUNE: Record<string, string> = {

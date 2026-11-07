@@ -7,8 +7,8 @@ import {
   Shield,
   Network
 } from 'lucide-react';
-import type { ListeningPortInfo } from '@/features/webapps/types';
-import { fetchListeningPorts } from '@/features/webapps/api';
+import type { ListeningPortInfo } from '@/features/deployments/types';
+import { fetchListeningPorts } from '@/features/deployments/api';
 import { killProcess } from '@/features/processes/api';
 import { Button } from '@/shared/ui/button';
 import { Card } from '@/shared/ui/card';

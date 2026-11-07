@@ -18,7 +18,7 @@ export interface ServerPageCtx {
   setActiveTab: (t: ServerTab) => void;
   onMetricsUpdated: (id: string, m: ServerMetrics) => void;
   /** Runs a shell command on the server; output shows in the banner above the tab. */
-  runQuickAction: (label: string, cmd: string) => Promise<void>;
+  runQuickAction: (label: string, cmd: string, opts?: { sudo?: boolean }) => Promise<void>;
   quickActionRunning: string | null;
   setQuickActionOutput: (out: string | null) => void;
   openFiles: (path?: string, file?: string) => void;

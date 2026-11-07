@@ -1,10 +1,13 @@
 import { Router, Request, Response } from 'express';
-import { fetchListeningPorts, fetchNginxSites, fetchWebApps } from '../webapps/service.js';
+import { fetchListeningPorts, fetchNginxSites, fetchWebApps } from '../deployments/service.js';
 import { fetchPm2AndSupervisor, fetchRunningProcesses, fetchServices, managePm2Process, manageProcess, manageService, manageSupervisorProcess } from './service.js';
 import { getServerById } from '../servers/store.js';
 import { manageDockerContainer } from '../docker/service.js';
 import { need } from '../../http/auth.js';
-import { isServerAllowed } from '../../http/handlers.js';
+import { isServerAllowed, withServer } from '../../http/handlers.js';
+import { parseDeploySpec, buildDeployScript, buildRemoveScript } from '../deployments/deploy.js';
+import { runScript } from '../software/routes.js';
+import { getActiveIntegration, getDecryptedAccessToken } from '../git/store.js';
 
 export const processesRoutes = Router();
 
@@ -73,6 +76,22 @@ processesRoutes.get('/servers/:id/webapps', async (req: Request, res: Response) 
   const apps = await fetchWebApps(target);
   res.json({ success: true, data: apps });
 });
+
+// Clone/update a GitHub repo into /var/www/<app>, build, run under PM2/Docker and put Nginx in front.
+processesRoutes.post('/servers/:id/webapps/deploy', need('service.control'), withServer((t, req, res) => {
+  const spec = parseDeploySpec(req.body);
+  const integration = getActiveIntegration('github');
+  const token = integration ? getDecryptedAccessToken(integration) : undefined;
+  // Optional install script for missing software (from the install catalog), run in the same task so sudo is asked once.
+  const pre = typeof req.body?.preScript === 'string' ? `${req.body.preScript}\n` : '';
+  // Installs + npm ci + build on a 1-vCPU VPS routinely pass the 5-minute software default.
+  return runScript(t, req, res, pre + buildDeployScript(spec, token), 30 * 60 * 1000);
+}));
+
+// Delete an app folder plus the PM2/Docker/Nginx/SSL setup that points at it.
+processesRoutes.post('/servers/:id/webapps/remove', need('service.control'), withServer((t, req, res) =>
+  runScript(t, req, res, buildRemoveScript(req.body?.name))
+));
 
 processesRoutes.post('/servers/:id/docker/control', need('service.control'), async (req: Request, res: Response) => {
   if (!checkServerScope(req, res)) return;

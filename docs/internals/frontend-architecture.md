@@ -50,7 +50,7 @@ client/src/
 │   │                components/views/RackView.tsx  TopologyVisualizer.tsx  CyberMatrixVisualizer.tsx
 │   │                components/overview/OverviewTab.tsx
 │   ├── processes/   api.ts  components/ProcessServiceModal.tsx  Pm2Tab.tsx  ServicesTab.tsx
-│   ├── webapps/     api.ts  components/WebAppsTab.tsx  NginxTab.tsx  PortsTab.tsx
+│   ├── deployments/ api.ts  components/(NewAppModal, RepoPicker, DeployProgress)  lib/requirements.ts
 │   ├── docker/      api.ts  types.ts  components/DockerPanel.tsx (+ pecahan)
 │   ├── databases/   api.ts  types.ts  components/DatabasePanel.tsx  db/*  (folder db/ sekarang)
 │   ├── files/       api.ts  components/FileManagerModal.tsx
@@ -89,7 +89,7 @@ features/<nama>/
 | 60 | `fetchLogs` | `features/logs/api.ts` |
 | 66–101 | files | `features/files/api.ts` |
 | 167–200, 221–231 | processes, services, pm2, supervisor | `features/processes/api.ts` |
-| 214, 233–240 | webapps, nginx, ports | `features/webapps/api.ts` |
+| 214, 233–240 | webapps, nginx, ports | `features/deployments/api.ts` |
 | 203, 305–352 | docker | `features/docker/api.ts` + `types.ts` |
 | 241 | batch command | `features/terminal/api.ts` |
 | 255–302 | monitor, uptime, audit, discord | `features/monitoring/api.ts` + `types.ts` |

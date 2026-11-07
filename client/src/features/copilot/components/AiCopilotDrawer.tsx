@@ -33,7 +33,7 @@ import { streamCopilotChat, execOnServer } from '../api';
 import { isReadOnlyCommand, isRiskyCommand, parseSegments, extractCommands, looksLikeInjection, fenceUntrusted } from '../safety';
 import { confirmModal } from '@/shared/ui/confirm-dialog';
 import { AgentSettings } from './AgentSettings';
-import { useI18n } from '@/shared/i18n';
+import { useI18n, type MessageKey } from '@/shared/i18n';
 import { loadPreferences, savePreferences, preferencesPayload, type AgentPreferences } from '../preferences';
 import { fetchAccounts } from '@/features/ai-gateway/api';
 import { useCan } from '@/features/auth/AuthContext';
@@ -55,6 +55,18 @@ const QUICK_ACTIONS = [
   { icon: '🐳', label: 'copilot.qa.docker', prompt: 'copilot.qa.dockerPrompt' },
   { icon: '🛡️', label: 'copilot.qa.ports', prompt: 'copilot.qa.portsPrompt' }
 ] as const;
+
+// Tab-specific prompts shown first; they pair with the server-side playbook for the same tab.
+const TAB_ACTIONS: Record<string, { icon: string; label: MessageKey; prompt: MessageKey }[]> = {
+  webapps: [
+    { icon: '🚀', label: 'copilot.qa.deployFail', prompt: 'copilot.qa.deployFailPrompt' },
+    { icon: '🌐', label: 'copilot.qa.appDown', prompt: 'copilot.qa.appDownPrompt' }
+  ],
+  nginx: [{ icon: '🌐', label: 'copilot.qa.nginx', prompt: 'copilot.qa.nginxPrompt' }],
+  ssl: [{ icon: '🔒', label: 'copilot.qa.ssl', prompt: 'copilot.qa.sslPrompt' }],
+  databases: [{ icon: '🗄️', label: 'copilot.qa.db', prompt: 'copilot.qa.dbPrompt' }],
+  security: [{ icon: '🔑', label: 'copilot.qa.ssh', prompt: 'copilot.qa.sshPrompt' }]
+};
 
 interface SavedChat { id: string; title: string; updatedAt: number; messages: ChatMessage[] }
 const CHATS_KEY = '7server_copilot_chats';
@@ -607,7 +619,7 @@ export default function AiCopilotDrawer({
                 <div className="text-[10px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wider px-1">
                   {t('copilot.quickPrompts')}
                 </div>
-                {QUICK_ACTIONS.map((action, i) => (
+                {[...(TAB_ACTIONS[activeTab || ''] || []), ...QUICK_ACTIONS].slice(0, 5).map((action, i) => (
                   <button
                     key={i}
                     onClick={() => handleSend(t(action.prompt))}
