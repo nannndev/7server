@@ -105,3 +105,7 @@ console.log('deploy ok');
   const probe = `port_probe() { (exec 3<>/dev/tcp/127.0.0.1/$1) 2>/dev/null; }\nif port_probe 1; then echo busy; else echo free; fi`;
   assert.equal(execFileSync('bash', ['-c', probe], { encoding: 'utf8' }).trim(), 'free');
 }
+
+// Hosts without systemd (containers, WSL1) must still reload Nginx.
+assert.ok(buildDeployScript(parseDeploySpec({ ...base })).includes('systemctl reload nginx 2>/dev/null || nginx -s reload'));
+console.log('nginx reload fallback ok');

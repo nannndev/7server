@@ -231,7 +231,7 @@ export default function OverviewTab() {
                 variant="outline"
                 size="sm"
                 disabled={!!ctx.quickActionRunning}
-                onClick={() => ctx.runQuickAction(t('overview.reloadNginx'), 'nginx -t 2>&1 && systemctl reload nginx && echo "Nginx reloaded OK"', { sudo: true })}
+                onClick={() => ctx.runQuickAction(t('overview.reloadNginx'), 'nginx -t 2>&1 && { systemctl reload nginx 2>/dev/null || nginx -s reload; } && echo "Nginx reloaded OK"', { sudo: true })}
                 className="text-xs justify-start gap-2 h-8"
               >
                 <RefreshCw className="w-3.5 h-3.5" />

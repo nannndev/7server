@@ -45,6 +45,15 @@ Every page comes in dark and light; GitHub shows the one matching your theme.
 | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/monitoring-dark.png"><img alt="Monitoring" src="docs/screenshots/monitoring-light.png"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/users-dark.png"><img alt="Users and roles" src="docs/screenshots/users-light.png"></picture> |
 | Monitoring | Users and roles |
 
+### Deploy from GitHub
+
+| | |
+|---|---|
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/deploy-repos-dark.png"><img alt="Pick a repository" src="docs/screenshots/deploy-repos-light.png"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/deploy-config-dark.png"><img alt="Configure" src="docs/screenshots/deploy-config-light.png"></picture> |
+| 1. Pick a repository | 2. Configure: framework, port, missing software |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/deploy-running-dark.png"><img alt="Live pipeline" src="docs/screenshots/deploy-running-light.png"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/deploy-success-dark.png"><img alt="Deployed" src="docs/screenshots/deploy-success-light.png"></picture> |
+| 3. Live pipeline and build log | 4. Deployed (or failed, with retry and AI fix) |
+
 <details>
 <summary>More screenshots</summary>
 
