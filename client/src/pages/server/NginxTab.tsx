@@ -139,7 +139,7 @@ export default function NginxTab() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => ctx.runQuickAction(t('nginx.reload'), 'nginx -t 2>&1 && systemctl reload nginx && echo "Nginx reloaded OK"', { sudo: true })}
+                onClick={() => ctx.runQuickAction(t('nginx.reload'), 'nginx -t 2>&1 && { systemctl reload nginx 2>/dev/null || nginx -s reload; } && echo "Nginx reloaded OK"', { sudo: true })}
                 className="gap-1.5 text-xs"
               >
                 <RefreshCw className="w-3.5 h-3.5" /> {t('nginx.reload')}

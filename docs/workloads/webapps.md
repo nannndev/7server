@@ -36,6 +36,23 @@ flowchart LR
 
 GitHub is the only Git provider today. Private repositories are cloned with the token sent as an HTTP header, so it is not written into `.git/config`.
 
+<img class="only-light" src="/screenshots/deploy-light.png" alt="Connect GitHub with a personal access token">
+<img class="only-dark" src="/screenshots/deploy-dark.png" alt="Connect GitHub with a personal access token">
+
+## Step 1: Pick a Repository
+
+Repositories are grouped by account and organization, with filters for owner, language and visibility. Click **Import** on the one you want.
+
+<img class="only-light" src="/screenshots/deploy-repos-light.png" alt="Repository picker grouped by account and organization">
+<img class="only-dark" src="/screenshots/deploy-repos-dark.png" alt="Repository picker grouped by account and organization">
+
+## Step 2: Configure
+
+7Server inspects the branch and fills in everything it can: framework, install, build and start commands, a free port, and variables from `.env.example`. The panel on the right shows the server software this app needs; missing ones turn the button into **Install N missing & Deploy**.
+
+<img class="only-light" src="/screenshots/deploy-config-light.png" alt="Configuration step with detected framework and required software">
+<img class="only-dark" src="/screenshots/deploy-config-dark.png" alt="Configuration step with detected framework and required software">
+
 ---
 
 ## Framework Detection
@@ -90,10 +107,10 @@ Under **Configure & Build** you choose how the app is reached:
 
 ---
 
-## What a Deploy Does
+## Step 3: What a Deploy Does
 
-<img class="only-light" src="/screenshots/deploy-light.png" alt="Deploy wizard, repository step">
-<img class="only-dark" src="/screenshots/deploy-dark.png" alt="Deploy wizard, repository step">
+<img class="only-light" src="/screenshots/deploy-running-light.png" alt="Live deployment with pipeline stages and streamed build log">
+<img class="only-dark" src="/screenshots/deploy-running-dark.png" alt="Live deployment with pipeline stages and streamed build log">
 
 The live view shows these pipeline stages with the streamed log:
 
@@ -113,6 +130,16 @@ Details that keep small servers and odd repos working:
 - **Honest health check**: 7Server polls `http://127.0.0.1:<port>/` for about 30 seconds. Without a domain it also checks that a process on this server really listens on the port. If nothing answers, the log lists the listening ports and the app's recent logs, and the deploy is marked **failed**, not live.
 - **Wrong port in the app**: if a PM2 app listens on a different port than configured, 7Server bridges the configured port to it with Nginx.
 - A deploy can run for up to 30 minutes.
+
+### When it finishes
+
+A successful deploy shows **Visit App**. A failed one stops at the stage that broke, keeps the full log, and offers **Retry Deploy**, **Back to Configuration** and **Fix with AI Copilot**.
+
+<img class="only-light" src="/screenshots/deploy-success-light.png" alt="Deployment successful with all stages done">
+<img class="only-dark" src="/screenshots/deploy-success-dark.png" alt="Deployment successful with all stages done">
+
+<img class="only-light" src="/screenshots/deploy-failed-light.png" alt="Deployment failed at the build stage, with retry and AI fix">
+<img class="only-dark" src="/screenshots/deploy-failed-dark.png" alt="Deployment failed at the build stage, with retry and AI fix">
 
 ---
 

@@ -198,7 +198,7 @@ server {
 }
 NGINX_BRIDGE_EOF
             ln -sf /etc/nginx/sites-available/${site} /etc/nginx/sites-enabled/${site}
-            nginx -t 2>/dev/null && systemctl reload nginx || true
+            nginx -t 2>/dev/null && { systemctl reload nginx 2>/dev/null || nginx -s reload; } || true
           else
             echo "Warning: the app only listens on localhost, so http://<server-ip>:${s.port} will be refused. Set HOST=0.0.0.0 in the app config or add a domain."
           fi
@@ -234,7 +234,7 @@ server {
 }
 NGINX_REMAP_EOF
           ln -sf /etc/nginx/sites-available/${site} /etc/nginx/sites-enabled/${site}
-          nginx -t 2>/dev/null && systemctl reload nginx || true
+          nginx -t 2>/dev/null && { systemctl reload nginx 2>/dev/null || nginx -s reload; } || true
         fi
       fi
     fi
@@ -519,7 +519,7 @@ ${body}
 }
 NGINX_EOF
   ln -sf /etc/nginx/sites-available/${site} /etc/nginx/sites-enabled/${site}
-  nginx -t && systemctl reload nginx
+  nginx -t && { systemctl reload nginx 2>/dev/null || nginx -s reload; }
   echo "Nginx: ${s.domain || `static files on port ${s.port}`} configured"
 ${(s.exposure === 'tunnel' && s.domain) ? `  if command -v cloudflared >/dev/null 2>&1; then
     echo "Registering route in Cloudflare Tunnel for ${s.domain}..."
@@ -639,7 +639,7 @@ for f in /etc/nginx/sites-enabled/* /etc/nginx/conf.d/*.conf; do
   CHANGED=1
 done
 if [ -n "$CHANGED" ] && command -v nginx >/dev/null 2>&1; then
-  nginx -t && systemctl reload nginx && echo "nginx reloaded"
+  nginx -t && { systemctl reload nginx 2>/dev/null || nginx -s reload; } && echo "nginx reloaded"
 fi
 
 if command -v certbot >/dev/null 2>&1; then
@@ -757,7 +757,7 @@ NGINX_EOF`;
   certbot --nginx -d ${cleanDomain} --non-interactive --agree-tos --register-unsafely-without-email --redirect || {
     echo "Warning: SSL certificate request failed. Verify that your DNS A record points to this server IP."
   }
-  nginx -t && systemctl reload nginx || true
+  nginx -t && { systemctl reload nginx 2>/dev/null || nginx -s reload; } || true
 else
   echo "Notice: Certbot not installed. Skipping automatic SSL."
 fi`
@@ -780,7 +780,7 @@ echo "Testing Nginx configuration..."
 nginx -t
 
 echo "Reloading Nginx..."
-systemctl reload nginx
+{ systemctl reload nginx 2>/dev/null || nginx -s reload; }
 echo "✓ Nginx reloaded successfully"
 
 ${sslBlock}
