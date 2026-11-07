@@ -59,6 +59,7 @@ export default defineConfig({
             items: [
               { text: 'Docker & Compose Stacks', link: '/workloads/docker' },
               { text: 'Web Apps, Nginx & SSL', link: '/workloads/webapps' },
+              { text: 'Cloudflare Tunnels', link: '/workloads/cloudflare-tunnel' },
               { text: 'Database Workbench', link: '/workloads/databases' },
               { text: 'Backups & Scheduled Retention', link: '/workloads/backups' },
               { text: 'Systemd & Cron Jobs', link: '/workloads/processes-cron' },

@@ -2,6 +2,9 @@
 
 7Server provides multi-user enterprise governance with granular permission enforcement and server scoping.
 
+<img class="only-light" src="/screenshots/roles-light.png" alt="Roles & Permissions Matrix">
+<img class="only-dark" src="/screenshots/roles-dark.png" alt="Roles & Permissions Matrix">
+
 ---
 
 ## Pre-Built Roles

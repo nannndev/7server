@@ -2,6 +2,9 @@
 
 7Server features a built-in terminal emulator powered by **xterm.js** and WebSocket streaming directly into an interactive SSH pseudo-terminal (PTY).
 
+<img class="only-light" src="/screenshots/terminal-light.png" alt="Browser Terminal Emulator">
+<img class="only-dark" src="/screenshots/terminal-dark.png" alt="Browser Terminal Emulator">
+
 ---
 
 ## Capabilities

@@ -2,6 +2,9 @@
 
 Protecting server data is an essential operation. 7Server provides an automated backup manager for files, directories, and databases.
 
+<img class="only-light" src="/screenshots/backups-light.png" alt="Backups and Retention">
+<img class="only-dark" src="/screenshots/backups-dark.png" alt="Backups and Retention">
+
 ---
 
 ## Backup Types

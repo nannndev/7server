@@ -2,6 +2,9 @@
 
 7Server provides live and historical telemetry for every server in your fleet without installing Prometheus node exporters or Telegraf daemons.
 
+<img class="only-light" src="/screenshots/fleet-matrix-light.png" alt="3D Resource Saturation Matrix">
+<img class="only-dark" src="/screenshots/fleet-matrix-dark.png" alt="3D Resource Saturation Matrix">
+
 ---
 
 ## How Telemetry Works (Agentless)

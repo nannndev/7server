@@ -2,6 +2,9 @@
 
 Track who is accessing your servers and review every administrative action.
 
+<img class="only-light" src="/screenshots/audit-light.png" alt="Audit Log & Activity Timeline">
+<img class="only-dark" src="/screenshots/audit-dark.png" alt="Audit Log & Activity Timeline">
+
 ---
 
 ## Active Sessions & Instant Revocation

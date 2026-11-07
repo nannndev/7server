@@ -1,7 +1,10 @@
 // Contributors and Support pages. Facts only: contributors come from the GitHub API at view time
 // (no invented names or counts); support points at the real channels (GitHub issues, docs, security).
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowLeft, Bug, BookOpen, Coffee, GitPullRequest, HeartHandshake, LifeBuoy, MessageSquare, ShieldAlert, Star } from 'lucide-react';
+import {
+  ArrowLeft, Bug, BookOpen, Coffee, EyeOff, GitPullRequest, HeartHandshake,
+  LifeBuoy, Lock, MessageSquare, Radio, Server, ShieldAlert, ShieldCheck, Star
+} from 'lucide-react';
 import { GithubIcon } from './components/BrandIcons';
 
 export const REPO = 'https://github.com/nannndev/7server';
@@ -144,6 +147,69 @@ export function SupportPage() {
       <p className="reveal mt-10 inline-flex items-center gap-2 text-sm">
         <GithubIcon className="h-4 w-4" /> Everything happens on <a className="underline" href={REPO}>github.com/nannndev/7server</a>.
       </p>
+    </PageShell>
+  );
+}
+
+export function PrivacyPage() {
+  const principles = [
+    {
+      icon: ShieldCheck,
+      title: 'Zero Telemetry & Tracking',
+      body: '7Server contains zero analytics trackers, telemetry beacons, or crash reporters. It never phones home to external servers or collects metrics on how you manage your servers.',
+    },
+    {
+      icon: Lock,
+      title: 'Encrypted Local Storage (At Rest)',
+      body: 'All data is stored on your own host machine in a single SQLite database. Passwords, private SSH keys, and provider tokens are encrypted at rest with AES-256-GCM using a master key kept separately in secret.key.',
+    },
+    {
+      icon: Server,
+      title: 'Pure Agentless SSH',
+      body: 'No background daemons, agents, or extra ports are installed on your VPS nodes. 7Server executes standard read-only commands over standard OpenSSH (port 22) and leaves zero traces when a server is removed.',
+    },
+    {
+      icon: Radio,
+      title: 'Direct API Connections',
+      body: 'When you interact with GitHub, Cloudflare, AI providers (Claude, OpenAI, Gemini), or Discord, your 7Server instance communicates directly with their official APIs. No traffic passes through any third-party intermediary.',
+    },
+    {
+      icon: EyeOff,
+      title: 'Built-In Privacy Mode for Screencasts',
+      body: 'Includes a one-click streamer privacy mode that immediately blurs all server IPs, domain names, file paths, ports, and credentials, allowing you to safely record tutorials and present live demonstrations.',
+    },
+  ];
+
+  return (
+    <PageShell
+      eyebrow="Privacy Policy & Architecture"
+      title="Your infrastructure. Your data. Zero telemetry."
+      lead="7Server is open source and strictly self-hosted. There is no cloud account to sign up for, no tracking pixels, and no phone-home telemetry."
+    >
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {principles.map(({ icon: Icon, title, body }, i) => (
+          <article key={title} className="metal reveal flex flex-col rounded-2xl p-6" style={v(i % 3)}>
+            <Icon className="h-5 w-5" style={{ color: 'var(--accent)' }} aria-hidden />
+            <h3 className="mt-4 font-semibold" style={{ color: 'var(--anatomy-strong)' }}>{title}</h3>
+            <p className="mt-2 flex-1 text-[15px] leading-relaxed">{body}</p>
+          </article>
+        ))}
+      </div>
+
+      <div className="metal reveal mt-10 rounded-2xl p-6 sm:p-8">
+        <h2 className="text-xl font-semibold" style={{ color: 'var(--anatomy-strong)' }}>Open Source & Security Disclosures</h2>
+        <p className="mt-2 max-w-2xl text-[15px] leading-relaxed">
+          7Server is released under the <strong>MIT License</strong> by Nandang Eka Prasetya (nannndev). If you discover a potential security issue, please report it privately via GitHub Security Advisories so it can be resolved safely.
+        </p>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <a href={`${REPO}/security/advisories/new`} className="btn-silver inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold">
+            <ShieldAlert className="h-4 w-4" /> Report Security Advisory
+          </a>
+          <a href={REPO} className="metal inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold" style={{ color: 'var(--anatomy-strong)' }}>
+            <GithubIcon className="h-4 w-4" /> View Source on GitHub
+          </a>
+        </div>
+      </div>
     </PageShell>
   );
 }

@@ -4,6 +4,9 @@ Managing iptables or UFW rules across multiple VPS machines is prone to fatal op
 
 7Server introduces a **Centralized Firewall Control Panel** with built-in **SSH Lockout Prevention**.
 
+<img class="only-light" src="/screenshots/ports-light.png" alt="Listening Ports & Firewall Manager">
+<img class="only-dark" src="/screenshots/ports-dark.png" alt="Listening Ports & Firewall Manager">
+
 ---
 
 ## The SSH Lockout Safeguard

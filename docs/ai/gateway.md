@@ -2,6 +2,9 @@
 
 7Server includes an internal **AI Gateway** compatible with standard OpenAI (`/v1/chat/completions`) and Anthropic (`/v1/messages`) protocols.
 
+<img class="only-light" src="/screenshots/ai-gateway-light.png" alt="Universal AI Gateway Providers">
+<img class="only-dark" src="/screenshots/ai-gateway-dark.png" alt="Universal AI Gateway Providers">
+
 ---
 
 ## Log In with Existing Subscriptions

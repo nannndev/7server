@@ -2,6 +2,9 @@
 
 7Server turns your remote Docker engine into an interactive visual control center while providing automated healing for common container deployment pitfalls—such as port collisions, empty development containers, and silent container crashes.
 
+<img class="only-light" src="/screenshots/docker-light.png" alt="Docker Engine & Compose Stacks">
+<img class="only-dark" src="/screenshots/docker-dark.png" alt="Docker Engine & Compose Stacks">
+
 ---
 
 ## Capabilities

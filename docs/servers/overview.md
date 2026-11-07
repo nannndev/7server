@@ -2,6 +2,9 @@
 
 7Server centralizes all your Linux servers into a unified fleet view.
 
+<img class="only-light" src="/screenshots/fleet-grid-light.png" alt="Fleet Overview Grid">
+<img class="only-dark" src="/screenshots/fleet-grid-dark.png" alt="Fleet Overview Grid">
+
 ---
 
 ## Adding a Server
@@ -28,6 +31,9 @@ Before persisting your credentials to the SQLite vault, 7Server executes a pre-f
 ---
 
 ## Fleet Overview & Tagging
+
+<img class="only-light" src="/screenshots/server-overview-light.png" alt="Single Server Overview & Quick Maintenance">
+<img class="only-dark" src="/screenshots/server-overview-dark.png" alt="Single Server Overview & Quick Maintenance">
 
 Servers can be grouped and filtered using tags:
 

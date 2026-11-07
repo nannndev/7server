@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { AgentlessBench } from './figure/AgentlessBench';
 import { GithubIcon } from './components/BrandIcons';
-import { ContributorsPage, SupportPage } from './pages';
+import { ContributorsPage, PrivacyPage, SupportPage } from './pages';
 import { COPY, type Lang } from './i18n';
 
 const REPO = 'https://github.com/nannndev/7server';
@@ -66,6 +66,17 @@ function useLang() {
 
 const v = (i: number) => ({ ['--i' as string]: i });
 
+// Screenshots exist in both themes (public/screenshots/<page>-dark.png / -light.png); follow the page theme.
+function useShot() {
+  const [theme, setTheme] = useState(() => document.documentElement.dataset.theme || 'dark');
+  useEffect(() => {
+    const mo = new MutationObserver(() => setTheme(document.documentElement.dataset.theme || 'dark'));
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => mo.disconnect();
+  }, []);
+  return (src: string) => src.replace(/\.png$/, theme === 'light' ? '-light.png' : '-dark.png');
+}
+
 function CopyLine({ text, label }: { text: string; label: string }) {
   const [done, setDone] = useState(false);
   return (
@@ -105,6 +116,7 @@ function Lightbox({
   onClose: () => void;
   closeLabel: string;
 }) {
+  const shot = useShot();
   useEffect(() => {
     if (!item) return;
     const onKey = (e: KeyboardEvent) => {
@@ -159,7 +171,7 @@ function Lightbox({
         </div>
         <div className="overflow-auto bg-black/50 p-2 sm:p-4">
           <img
-            src={item.src}
+            src={shot(item.src)}
             alt={item.title}
             className="mx-auto max-h-[80vh] w-auto rounded-lg object-contain shadow-2xl"
           />
@@ -237,6 +249,7 @@ function Hero({
   lang: Lang;
   onZoom: (item: { src: string; title: string; route?: string }) => void;
 }) {
+  const shot = useShot();
   const t = COPY[lang].hero;
   const [activeTab, setActiveTab] = useState(0);
   const currentPreview = t.heroTabs[activeTab] || t.heroTabs[0];
@@ -303,9 +316,8 @@ function Hero({
                     role="tab"
                     aria-selected={selected}
                     onClick={() => setActiveTab(idx)}
-                    className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-all ${
-                      selected ? 'btn-silver font-semibold' : 'hover:bg-[var(--line)] hover:text-[var(--anatomy-strong)]'
-                    }`}
+                    className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-all ${selected ? 'btn-silver font-semibold' : 'hover:bg-[var(--line)] hover:text-[var(--anatomy-strong)]'
+                      }`}
                   >
                     {tab.label}
                   </button>
@@ -321,7 +333,7 @@ function Hero({
           >
             <img
               key={currentPreview.image}
-              src={currentPreview.image}
+              src={shot(currentPreview.image)}
               alt={currentPreview.label}
               className="block w-full object-cover transition-transform duration-500 group-hover:scale-[1.005]"
               loading="eager"
@@ -356,6 +368,7 @@ function HowItWorks({
   lang: Lang;
   onZoom: (item: { src: string; title: string; route?: string }) => void;
 }) {
+  const shot = useShot();
   const t = COPY[lang].how;
   const [activeStep, setActiveStep] = useState(0);
   const [mode, setMode] = useState<'workflow' | 'bench'>('workflow');
@@ -382,9 +395,8 @@ function HowItWorks({
             role="tab"
             aria-selected={mode === 'workflow'}
             onClick={() => setMode('workflow')}
-            className={`rounded-lg px-3.5 py-1.5 text-xs font-medium transition-all ${
-              mode === 'workflow' ? 'btn-silver font-semibold' : 'hover:text-[var(--anatomy-strong)]'
-            }`}
+            className={`rounded-lg px-3.5 py-1.5 text-xs font-medium transition-all ${mode === 'workflow' ? 'btn-silver font-semibold' : 'hover:text-[var(--anatomy-strong)]'
+              }`}
           >
             {t.modeWorkflow}
           </button>
@@ -393,9 +405,8 @@ function HowItWorks({
             role="tab"
             aria-selected={mode === 'bench'}
             onClick={() => setMode('bench')}
-            className={`rounded-lg px-3.5 py-1.5 text-xs font-medium transition-all ${
-              mode === 'bench' ? 'btn-silver font-semibold' : 'hover:text-[var(--anatomy-strong)]'
-            }`}
+            className={`rounded-lg px-3.5 py-1.5 text-xs font-medium transition-all ${mode === 'bench' ? 'btn-silver font-semibold' : 'hover:text-[var(--anatomy-strong)]'
+              }`}
           >
             {t.modeBench}
           </button>
@@ -447,9 +458,8 @@ function HowItWorks({
                   role="tab"
                   aria-selected={active}
                   onClick={() => setActiveStep(idx)}
-                  className={`w-full rounded-2xl p-5 text-left transition-all ${
-                    active ? 'metal ring-1 ring-[var(--accent)]/50' : 'well opacity-75 hover:opacity-100'
-                  }`}
+                  className={`w-full rounded-2xl p-5 text-left transition-all ${active ? 'metal ring-1 ring-[var(--accent)]/50' : 'well opacity-75 hover:opacity-100'
+                    }`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-mono text-xs font-semibold" style={{ color: 'var(--accent)' }}>
@@ -526,7 +536,7 @@ function HowItWorks({
             >
               <img
                 key={step.screenshot}
-                src={step.screenshot}
+                src={shot(step.screenshot)}
                 alt={step.screenshotTitle}
                 className="block w-full object-cover transition-transform duration-500 group-hover:scale-[1.01]"
                 loading="lazy"
@@ -582,6 +592,7 @@ function ProductShowcase({
   lang: Lang;
   onZoom: (item: { src: string; title: string; route?: string }) => void;
 }) {
+  const shot = useShot();
   const t = COPY[lang].showcase;
   const [catIdx, setCatIdx] = useState(0);
   const [screenIdx, setScreenIdx] = useState(0);
@@ -629,9 +640,8 @@ function ProductShowcase({
               role="tab"
               aria-selected={active}
               onClick={() => selectCategory(idx)}
-              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all ${
-                active ? 'btn-silver font-semibold' : 'metal hover:text-[var(--anatomy-strong)]'
-              }`}
+              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all ${active ? 'btn-silver font-semibold' : 'metal hover:text-[var(--anatomy-strong)]'
+                }`}
             >
               <Icon className="h-4 w-4" />
               <span>{cat.label}</span>
@@ -672,11 +682,10 @@ function ProductShowcase({
                     role="tab"
                     aria-selected={isSelected}
                     onClick={() => setScreenIdx(sIdx)}
-                    className={`rounded-lg px-3 py-1 text-xs font-medium transition-all ${
-                      isSelected
-                        ? 'btn-silver font-semibold'
-                        : 'well opacity-80 hover:opacity-100 hover:text-[var(--anatomy-strong)]'
-                    }`}
+                    className={`rounded-lg px-3 py-1 text-xs font-medium transition-all ${isSelected
+                      ? 'btn-silver font-semibold'
+                      : 'well opacity-80 hover:opacity-100 hover:text-[var(--anatomy-strong)]'
+                      }`}
                   >
                     {sc.label}
                   </button>
@@ -694,7 +703,7 @@ function ProductShowcase({
         >
           <img
             key={screen.image}
-            src={screen.image}
+            src={shot(screen.image)}
             alt={screen.title}
             className="block w-full object-cover transition-transform duration-500 group-hover:scale-[1.006]"
             loading="lazy"
@@ -813,17 +822,17 @@ function Features({ lang }: { lang: Lang }) {
 function AI({ lang }: { lang: Lang }) {
   const bullets = lang === 'id'
     ? [
-        ['Gunakan langganan yang sudah ada', 'Login dengan akun Claude, ChatGPT, GitHub Copilot, atau Gemini, atau masukkan API key biasa. Tanpa tagihan AI tambahan.'],
-        ['Meminta izin sebelum bertindak', 'Perintah pengecekan (read-only) berjalan otomatis. Restart, edit, dan hapus wajib mendapat persetujuan Anda.'],
-        ['Memisahkan data log dari instruksi', 'Output server diisolasi agar teks berbahaya di dalam log tidak dapat membajak instruksi AI (proteksi prompt injection).'],
-        ['Satu kunci universal untuk coding tools', 'AI Gateway yang sama memberikan satu kunci API 7Server untuk Claude Code, Cursor, dan CLI Anda.'],
-      ]
+      ['Gunakan langganan yang sudah ada', 'Login dengan akun Claude, ChatGPT, GitHub Copilot, atau Gemini, atau masukkan API key biasa. Tanpa tagihan AI tambahan.'],
+      ['Meminta izin sebelum bertindak', 'Perintah pengecekan (read-only) berjalan otomatis. Restart, edit, dan hapus wajib mendapat persetujuan Anda.'],
+      ['Memisahkan data log dari instruksi', 'Output server diisolasi agar teks berbahaya di dalam log tidak dapat membajak instruksi AI (proteksi prompt injection).'],
+      ['Satu kunci universal untuk coding tools', 'AI Gateway yang sama memberikan satu kunci API 7Server untuk Claude Code, Cursor, dan CLI Anda.'],
+    ]
     : [
-        ['Uses your subscriptions', 'Log in with Claude, ChatGPT, GitHub Copilot or Gemini, or add an API key. No separate AI bill.'],
-        ['Asks before it acts', 'Read-only commands run on their own. Restarts, edits and deletes need approval, and risky ones a second confirmation.'],
-        ['Treats logs as data', 'Server output is fenced off from the instructions, and text that tries to steer the AI turns automatic runs off.'],
-        ['One key for your tools', 'The same gateway gives Claude Code, Cursor and other tools one 7Server key, usable only from your own servers.'],
-      ];
+      ['Uses your subscriptions', 'Log in with Claude, ChatGPT, GitHub Copilot or Gemini, or add an API key. No separate AI bill.'],
+      ['Asks before it acts', 'Read-only commands run on their own. Restarts, edits and deletes need approval, and risky ones a second confirmation.'],
+      ['Treats logs as data', 'Server output is fenced off from the instructions, and text that tries to steer the AI turns automatic runs off.'],
+      ['One key for your tools', 'The same gateway gives Claude Code, Cursor and other tools one 7Server key, usable only from your own servers.'],
+    ];
 
   return (
     <section id="ai" className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
@@ -875,17 +884,17 @@ function AI({ lang }: { lang: Lang }) {
 function Security({ lang }: { lang: Lang }) {
   const items: { icon: typeof Lock; title: string; body: string }[] = lang === 'id'
     ? [
-        { icon: Lock, title: 'Terenkripsi Penuh (At-Rest)', body: 'Seluruh data tersimpan dalam satu file SQLite lokal. Kredensial SSH, token Git/AI, dan webhook dienkripsi dengan AES-256-GCM menggunakan file kunci terpisah di mesin Anda.' },
-        { icon: ShieldCheck, title: 'Pengguna, Peran (RBAC) & Audit', body: 'Setiap anggota tim memiliki akun sendiri: Admin, Operator, atau Viewer, yang dapat dibatasi per VPS. Sesi login dapat dicabut kapan saja dan setiap aksi tercatat di Audit Log.' },
-        { icon: EyeOff, title: 'Mode Privasi Demo & Screencast', body: 'Sembunyikan seluruh IP server, domain, path file, dan port secara instan dengan satu tombol privasi di TopBar. Aman digunakan saat rekaman video, webinar, atau livestreaming.' },
-        { icon: Sparkles, title: 'Gateway Terisolasi Jaringan Privat', body: 'AI Gateway hanya merespons localhost, jaringan privat, dan IP VPS yang telah Anda daftarkan di 7Server. Akses luar lainnya otomatis ditolak (403).' },
-      ]
+      { icon: Lock, title: 'Terenkripsi Penuh (At-Rest)', body: 'Seluruh data tersimpan dalam satu file SQLite lokal. Kredensial SSH, token Git/AI, dan webhook dienkripsi dengan AES-256-GCM menggunakan file kunci terpisah di mesin Anda.' },
+      { icon: ShieldCheck, title: 'Pengguna, Peran (RBAC) & Audit', body: 'Setiap anggota tim memiliki akun sendiri: Admin, Operator, atau Viewer, yang dapat dibatasi per VPS. Sesi login dapat dicabut kapan saja dan setiap aksi tercatat di Audit Log.' },
+      { icon: EyeOff, title: 'Mode Privasi Demo & Screencast', body: 'Sembunyikan seluruh IP server, domain, path file, dan port secara instan dengan satu tombol privasi di TopBar. Aman digunakan saat rekaman video, webinar, atau livestreaming.' },
+      { icon: Sparkles, title: 'Gateway Terisolasi Jaringan Privat', body: 'AI Gateway hanya merespons localhost, jaringan privat, dan IP VPS yang telah Anda daftarkan di 7Server. Akses luar lainnya otomatis ditolak (403).' },
+    ]
     : [
-        { icon: Lock, title: 'Encrypted at rest', body: 'Everything lives in one SQLite file. SSH credentials, AI tokens and webhooks inside it are encrypted with AES-256-GCM, with the key kept in a separate file on your machine.' },
-        { icon: ShieldCheck, title: 'Users and roles', body: 'Each person gets an account: Admin, Operator or Viewer, optionally limited to some servers. Sessions can be revoked, and every change is written to an audit log with who did it.' },
-        { icon: EyeOff, title: 'Privacy Mode for Screencasts', body: 'Instantly blur all server IPs, domain names, application paths, local ports, and tokens with one click in the top bar. Built for live demos, streaming, and video recording.' },
-        { icon: Sparkles, title: 'Gateway stays inside', body: 'The AI gateway only answers this machine, private networks and the servers you registered. Everyone else gets 403.' },
-      ];
+      { icon: Lock, title: 'Encrypted at rest', body: 'Everything lives in one SQLite file. SSH credentials, AI tokens and webhooks inside it are encrypted with AES-256-GCM, with the key kept in a separate file on your machine.' },
+      { icon: ShieldCheck, title: 'Users and roles', body: 'Each person gets an account: Admin, Operator or Viewer, optionally limited to some servers. Sessions can be revoked, and every change is written to an audit log with who did it.' },
+      { icon: EyeOff, title: 'Privacy Mode for Screencasts', body: 'Instantly blur all server IPs, domain names, application paths, local ports, and tokens with one click in the top bar. Built for live demos, streaming, and video recording.' },
+      { icon: Sparkles, title: 'Gateway stays inside', body: 'The AI gateway only answers this machine, private networks and the servers you registered. Everyone else gets 403.' },
+    ];
 
   return (
     <section id="security" className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
@@ -979,6 +988,7 @@ function Footer() {
         <nav className="flex gap-5" aria-label="More">
           <a href="#/contributors" className="transition-colors hover:text-[var(--anatomy-strong)]">Contributors</a>
           <a href="#/support" className="transition-colors hover:text-[var(--anatomy-strong)]">Support</a>
+          <a href="#/privacy" className="transition-colors hover:text-[var(--anatomy-strong)]">Privacy</a>
           <a href="https://saweria.co/nannndev" target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-[var(--anatomy-strong)]">Saweria</a>
           <a href="https://buymeacoffee.com/ekaprasety8" target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-[var(--anatomy-strong)]">Buy Me a Coffee</a>
         </nav>
@@ -988,7 +998,7 @@ function Footer() {
   );
 }
 
-/** Tiny hash router: #/contributors and #/support are pages; anything else is the home page and its #section anchors. */
+/** Tiny hash router: #/contributors, #/support, and #/privacy are pages; anything else is the home page and its #section anchors. */
 function useRoute() {
   const read = () => (location.hash.startsWith('#/') ? location.hash.slice(2).split(/[?#]/)[0] : '');
   const [route, setRoute] = useState(read);
@@ -1015,7 +1025,7 @@ export default function App() {
     <>
       <Nav lang={lang} toggleLang={toggleLang} />
       <main key={route}>
-        {route === 'contributors' ? <ContributorsPage /> : route === 'support' ? <SupportPage /> : (
+        {route === 'contributors' ? <ContributorsPage /> : route === 'support' ? <SupportPage /> : route === 'privacy' ? <PrivacyPage /> : (
           <>
             <Hero lang={lang} onZoom={setLightbox} />
             <HowItWorks lang={lang} onZoom={setLightbox} />

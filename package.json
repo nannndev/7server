@@ -1,6 +1,8 @@
 {
   "name": "7server-root",
   "version": "1.0.0",
+  "license": "MIT",
+  "author": "Nandang Eka Prasetya (nannndev)",
   "type": "module",
   "private": true,
   "scripts": {

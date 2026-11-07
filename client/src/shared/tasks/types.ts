@@ -1,4 +1,4 @@
-export type TaskCategory = 'docker' | 'software' | 'git' | 'database' | 'system';
+export type TaskCategory = 'docker' | 'software' | 'git' | 'database' | 'system' | 'services' | 'nginx';
 export type TaskStatus = 'running' | 'success' | 'failed';
 
 export interface BackgroundTask {

@@ -2,6 +2,9 @@
 
 Interact directly with your server databases—including database engines running inside Docker containers or natively on the host.
 
+<img class="only-light" src="/screenshots/databases-light.png" alt="Database Workbench">
+<img class="only-dark" src="/screenshots/databases-dark.png" alt="Database Workbench">
+
 ---
 
 ## Supported Engines

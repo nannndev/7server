@@ -4,6 +4,9 @@ The 7Server **AI SRE Copilot** is an agentic troubleshooting assistant designed 
 
 Rather than giving generic boilerplate answers, the Copilot **inspects the actual state of your server over SSH before answering**, providing precise root-cause analysis and executable remediations.
 
+<img class="only-light" src="/screenshots/copilot-light.png" alt="AI SRE Copilot Drawer">
+<img class="only-dark" src="/screenshots/copilot-dark.png" alt="AI SRE Copilot Drawer">
+
 ---
 
 ## How Copilot Agent Mode Works

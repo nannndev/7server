@@ -1,171 +1,177 @@
 # Web Apps, Git Deployment & Monorepo Stacks
 
-7Server provides a comprehensive, production-grade application deployment workflow. Connect your Git repositories, deploy individual web applications or multi-service monorepos, configure Nginx reverse proxies, and provision automated Let's Encrypt SSL certificates—all completely agentless over SSH.
+7Server deploys applications straight from GitHub to your servers over SSH. Pick a repository, check the detected settings, and 7Server clones, builds, starts and (optionally) puts Nginx and a Let's Encrypt certificate in front of the app. Nothing is installed on the server except the software the app itself needs.
+
+<img class="only-light" src="/screenshots/apps-light.png" alt="Apps tab listing projects in /var/www">
+<img class="only-dark" src="/screenshots/apps-dark.png" alt="Apps tab listing projects in /var/www">
 
 ---
 
 ## Overview
 
-Deploying applications traditionally requires repetitive terminal operations: cloning repos, installing runtimes, configuring environment variables, setting up process supervisors (PM2/Docker), tuning Nginx vhosts, and obtaining SSL certificates.
-
-7Server automates this entire lifecycle into a unified 3-step wizard with real-time streaming pipeline feedback and built-in AI SRE diagnostics.
+Deploys are started from the **Apps** tab of a server (**Deploy New App**) and run through a 3-step wizard: **Select Repository → Configure & Build → Live Deployment**. The deploy runs as a background task, so you can leave the page and come back to the live log.
 
 ```mermaid
 flowchart LR
-    A[Git Repository] --> B[7Server Wizard]
+    A[GitHub Repository] --> B[7Server Wizard]
     B --> C{Deployment Mode}
-    C -->|Single App| D[Single App Pipeline]
-    C -->|Monorepo| E[⚡ Multi-Service Stack]
-    D --> F[PM2 / Docker Process]
+    C -->|Single App| D[One app]
+    C -->|Monorepo| E[⚡ Deploy Stack]
+    D --> F[PM2 or Docker]
     E --> F
-    F --> G[Nginx Reverse Proxy]
-    G --> H[Automated Let's Encrypt SSL]
+    F --> G{Exposure}
+    G -->|Public domain| H[Nginx + Let's Encrypt]
+    G -->|Cloudflare Tunnel| I[Tunnel ingress route]
+    G -->|None| J[Served on its port]
 ```
 
 ---
 
-## Connecting Git Providers
+## Connecting GitHub
 
-7Server integrates directly with Git providers:
+- **Personal Access Token (PAT)**: paste a token; the wizard links to GitHub with the needed scopes preselected.
+- **GitHub OAuth**: available once you save a GitHub OAuth client ID and secret in 7Server.
+- **Repository browser**: lists the repositories your account can access (personal and organization, public and private).
+- **Branch selection**: pick any branch of the repository.
 
-- **GitHub Integration**: Connect via Personal Access Token (PAT) with `repo` scope or GitHub OAuth.
-- **Repository Browser**: Automatically lists your personal and organization repositories (both public and private).
-- **Branch Selection**: Select any branch or tag; pipelines automatically track changes from the selected branch.
-- **Monorepo Detection**: Subfolders and workspace directories (`apps/*`, `packages/*`, `/backend`, `/frontend`) are automatically discovered.
+GitHub is the only Git provider today. Private repositories are cloned with the token sent as an HTTP header, so it is not written into `.git/config`.
 
 ---
 
-## Intelligent Framework Detection
+## Framework Detection
 
-When you select a repository or package folder, 7Server scans repository manifests to detect the underlying framework and runtime:
+When you select a repository (or a sub-folder of it), 7Server reads its manifests through the GitHub API and fills in suggested commands and a default port:
 
-| Framework / Runtime | Detected Manifests | Default Build Command | Default Start / Process |
+| Detected | Based on | Runs as | Default port |
 | :--- | :--- | :--- | :--- |
-| **Next.js** | `next` in `package.json` | `npm run build` | `npm start` (PM2) |
-| **Nuxt** | `nuxt` in `package.json` | `npm run build` | `node .output/server/index.mjs` (PM2) |
-| **Node.js / Express** | `package.json` | `npm run build` *(if present)* | `npm start` (PM2) |
-| **Vite / SPA** | `vite` in `package.json` | `npm run build` | Static Nginx root / PM2 preview |
-| **Laravel / PHP** | `composer.json`, `artisan` | `composer install --no-dev` | `php artisan serve` / PHP-FPM |
-| **Docker Container** | `Dockerfile` | `docker build -t <app> .` | `docker run -d` |
-| **Docker Compose** | `docker-compose.yml`, `compose.yaml` | `docker compose build` | `docker compose up -d` |
-| **Python** | `requirements.txt`, `Pipfile` | `pip install -r requirements.txt` | `uvicorn` / `gunicorn` |
-| **Go** | `go.mod` | `go build -o app` | `./app` |
+| **Docker** | `Dockerfile` or a compose file (`docker-compose.yml`, `compose.yaml`, …) | Docker | port from compose / `EXPOSE`, else 3000 |
+| **Next.js** | `next` dependency or `next.config.*` | PM2 | 3000 |
+| **Nuxt** | `nuxt` dependency or `nuxt.config.*` | PM2 (`node .output/server/index.mjs`) | 3000 |
+| **SvelteKit / Remix / Astro** | their packages in `package.json` | PM2 | 3000 (Astro 4321) |
+| **Vite / SPA** | `vite`, `react-scripts` or `vue` without a server framework | Static files (no start command) | 3000 |
+| **Node.js API** | Express, Fastify, NestJS, Hono or Koa | PM2 | 3001 |
+| **Node.js** | any other `package.json` | PM2 | 3000 |
+| **Laravel / PHP** | `composer.json` (Laravel via `laravel/framework`) | Nginx + PHP-FPM | 8000 |
+| **Python** | `requirements.txt`, `Pipfile`, `pyproject.toml`, `main.py`, `app.py` | PM2 | 8000 |
+| **Go** | `go.mod` | PM2 (`./app`) | 8080 |
+| **Static** | none of the above | Static files | 3000 |
 
-Presets automatically populate the recommended package install commands, build commands, start scripts, and default internal listening ports. All fields remain fully customizable.
+For Node.js projects the install command follows the lockfile (`pnpm install`, `yarn install`, `bun install` or `npm ci`). The wizard also reads the Node version the repo asks for (`engines.node`, `.nvmrc` or `.node-version`).
 
----
+A compose file that only runs supporting services (a database or cache, no build) next to a Node.js or PHP app is treated as a **sidecar**: the app is deployed normally and `docker compose up -d` starts those services first.
 
-## Automated Environment (.env) Configuration
-
-To eliminate tedious manual environment configuration:
-
-1. **Automatic `.env.example` Parsing**: 7Server reads any `.env.example` or `.env.sample` present in the repository root or package subdirectory.
-2. **Key-Value Extraction**: Variable keys are automatically extracted into the UI form, ready for secret values.
-3. **Secure SSH Injection**: Environment variables are written directly to `/var/www/<app-name>/.env` with strict `0600` Linux permissions, ensuring non-root processes cannot read sensitive credentials.
-4. **Bulk Raw Import**: Paste `.env` text directly or upload existing `.env` files with automatic duplicate deduplication.
+You can switch to a different framework preset and edit every command and the port before deploying.
 
 ---
 
-## Conflict-Free Port Assignment
+## Environment Variables (.env)
 
-Every deployed application requires a dedicated internal listening port. 7Server eliminates port collision errors:
-
-- Scans the target server's active TCP sockets (`ss -tulpn`) before provisioning.
-- If the default framework port (e.g., `3000` or `8000`) is already bound by another service, 7Server automatically assigns the next available non-privileged port (e.g., `3001`, `3002`, `8001`).
-- The internal port is passed directly to the application environment (`PORT=<port>`) and registered with the reverse proxy.
-
----
-
-## Monorepo Multi-Deploy Stack (`⚡ Deploy Stack`)
-
-Modern projects frequently live in monorepos containing multiple interdependent applications—such as a Laravel or Go backend paired with a React or Next.js frontend, worker processes, and microservices.
-
-7Server features a dedicated **Monorepo Stack Deployer**:
-
-### 1. Dual Deployment Modes
-
-When a monorepo structure is detected, you can choose:
-- **Single App Mode**: Deploy only a specific subfolder as an independent service.
-- **⚡ Deploy Stack Mode**: Configure and deploy multiple sub-packages in one coordinated workflow.
-
-### 2. Multi-Package Checklist & Blueprint
-
-In Stack Mode, 7Server displays discovered subdirectories (e.g. `/backend`, `/frontend`, `/docs`):
-- Check the packages you want to include in the stack.
-- Click any selected package tab to configure its individual parameters independently:
-  - Custom Application Name
-  - Framework Preset (e.g., Laravel for backend, Next.js for frontend)
-  - Process Manager (PM2 or Docker Container)
-  - Build & Start Commands
-  - Dedicated conflict-free internal listening port
-  - Package-specific `.env` configuration
-
-### 3. Sequential Orchestrated Execution
-
-Clicking **Deploy Stack** executes sequential deployment for each service:
-- Services are built and started in order, preventing resource spikes on your VPS.
-- **Multi-Tab Live Pipeline**: The deployment terminal provides tabs for each service (`backend (:8003)`, `frontend (:3000)`). Switch between tabs in real-time to watch stdout/stderr streams.
-- **Real-Time Stage Indicators**: Track the 6 deployment pipeline stages per service:
-  1. Clone / Fetch Git Repository
-  2. Inject Environment Variables (`.env`)
-  3. Install Runtime Dependencies
-  4. Compile & Build Artifacts
-  5. Process Manager Startup & Port Binding
-  6. Reverse Proxy & Health Probe Verification
-- **Aggregated Stack Summary**: When all services finish, an overview card displays direct links to each deployed app along with their internal and public URLs.
+1. **`.env.example` parsing**: keys from `.env.example`, `.env.sample` or `.env.template` in the selected folder are loaded into the form with their example values.
+2. **Paste .env**: paste raw `KEY=value` text to fill the form in one go.
+3. **Written with 0600 permissions**: on deploy, the variables are written to `.env` in the app folder, readable only by its owner. Keys from the repo's `.env.example` that you did not fill in keep their example value; your values win.
+4. **Port and host defaults**: `PORT` and `HOST=0.0.0.0` (plus the Nuxt/Nitro equivalents) are added unless you set them yourself.
 
 ---
 
-## AI-Assisted Deployment & Diagnostic Recovery
+## Ports
 
-7Server bridges its autonomous AI SRE Copilot directly into the deployment workflow:
-
-### ✨ AI Pre-Flight Architecture Review
-
-Before triggering a deployment, click **✨ AI Pre-Flight Review** in the configuration modal:
-- 7Server sends repository blueprints, monorepo package configuration, port assignments, and runtime commands to Copilot.
-- Copilot analyzes potential issues (such as missing build arguments, port conflicts, database dependency order, or incompatible Node/Python versions) and advises on optimizations before you run the build.
-
-### ✨ Fix with AI Copilot (Deployment Failure Recovery)
-
-If a deployment fails at any stage:
-
-```
-[ Deployment Failed (Exit Code 1) ]
-----------------------------------------------------------------------
-🚨 Deploy Failed? Let AI Copilot Diagnose & Fix (Autonomous SRE)
-7Server AI Copilot can analyze failure logs, inspect listening sockets,
-check container status, and automatically patch the configuration.
-[ ✨ Fix with AI Copilot ]
-----------------------------------------------------------------------
-```
-
-1. **One-Click Diagnostic Context**: Clicking **Fix with AI Copilot** automatically opens the SRE Copilot drawer and injects:
-   - Target server and application name
-   - Failed deployment stage (e.g., `Process Manager & Port` or `Compile & Build Artifact`)
-   - Repository URL, branch, and target internal port
-   - The trailing 35 lines of terminal stderr and container logs
-2. **Autonomous SSH Inspection**: Copilot runs read-only commands over SSH:
-   - Verifies whether Docker containers are trapped in crash-restart loops (`docker ps -a`)
-   - Inspects application logs directly (`docker logs --tail 50 <container>` or PM2 logs)
-   - Checks listening sockets (`ss -tulpn` or `lsof -i :<port>`)
-3. **Actionable Remediation**: Copilot explains the root cause (e.g., container missing mounted source files, unmapped internal port, or database connection refused) and presents an executable, one-click patch for your approval.
+- When the wizard opens, 7Server reads the server's listening TCP ports and suggests the first free port at or above the framework default (80 and 443 are never suggested). If the port you typed is taken, a **Busy → Use :N** button offers the next free one.
+- The deploy refuses to start an app on a port that another app already holds, instead of reporting someone else's app as healthy.
 
 ---
 
-## Reverse Proxy Topology & SSL Hardening
+## Exposure: Domain, Tunnel or None
 
-Once your processes are running, 7Server connects them to the web:
+Under **Configure & Build** you choose how the app is reached:
 
-### Automated Nginx Reverse Proxy
+- **Public domain**: Nginx serves the domain and Certbot requests a certificate. While you type the domain, a [DNS pre-flight check](/workloads/cloudflare-tunnel#dns-pre-flight-check) shows whether it already points at the server.
+- **Cloudflare Tunnel**: the hostname is added to the server's `cloudflared` ingress config and routed in Cloudflare DNS. See [Cloudflare Tunnel](/workloads/cloudflare-tunnel). This mode is preselected when `cloudflared` is running and the server's address is private or a Tailscale IP.
+- **None**: no domain. The app is served directly on its port (it is started with `HOST=0.0.0.0`), and static sites get an Nginx server block on that port.
 
-- Creates dedicated virtual host configurations in `/etc/nginx/sites-available/<app-name>` and symlinks them to `/etc/nginx/sites-enabled/`.
-- Configures upstream proxying to the application's internal loopback port (`proxy_pass http://127.0.0.1:<port>`).
-- Includes WebSocket upgrade headers (`Upgrade $http_upgrade`, `Connection "upgrade"`) by default.
-- Sets client body upload limits (`client_max_body_size 64M`) and optimized proxy buffering.
+---
 
-### Automated Let's Encrypt SSL
+## What a Deploy Does
 
-- **One-Click Certificate Provisioning**: Issues free TLS certificates using Certbot over ACME HTTP-01 challenges.
-- **Auto-Renewal Verification**: Monitors expiration dates and displays warnings when certificates are within 30 days of expiring.
-- **SSL Hardening**: Automatically configures modern TLS 1.2/1.3 ciphers, HSTS headers, and HTTP-to-HTTPS redirects.
+<img class="only-light" src="/screenshots/deploy-light.png" alt="Deploy wizard, repository step">
+<img class="only-dark" src="/screenshots/deploy-dark.png" alt="Deploy wizard, repository step">
+
+The live view shows these pipeline stages with the streamed log:
+
+0. **Install Server Software** (only when something is missing): git, Node.js, PM2, Docker/Compose, Nginx, Certbot, PHP/Composer, Python or Go, depending on the app. Node.js is upgraded when it is older than the major version the repo asks for. On a non-root user, 7Server asks for the sudo password once (and can save it).
+1. **Clone Git Repository**: shallow clone into `/var/www/<app>`. A redeploy fetches the branch and resets to it. An existing folder that is not a git checkout is never overwritten.
+2. **Inject Environment (.env)**: writes `.env` as described above.
+3. **Install Dependencies**
+4. **Compile & Build Artifact**
+5. **Process Manager & Port**: PM2 (process named after the app, saved with `pm2 save`) or Docker (container `7server-<app>` with `--restart unless-stopped`, or the repo's compose stack).
+6. **Reverse Proxy & Health Check**: writes the Nginx site, requests the certificate, then checks the app answers on its port.
+
+Details that keep small servers and odd repos working:
+
+- **Low memory**: on a server with less than ~3 GB RAM and no swap, a 2 GB swap file is created before building. If the kernel kills the build for running out of memory, the log says so.
+- **No hanging builds**: install and build run without stdin and with `CI=1` and framework telemetry disabled, and print a heartbeat with free RAM every 30 seconds.
+- **Docker port mapping**: for compose stacks, the app's published port is set to the port you chose, and other host ports that are already taken (for example a second Postgres on 5432) are moved to a free port on `127.0.0.1`.
+- **Honest health check**: 7Server polls `http://127.0.0.1:<port>/` for about 30 seconds. Without a domain it also checks that a process on this server really listens on the port. If nothing answers, the log lists the listening ports and the app's recent logs, and the deploy is marked **failed**, not live.
+- **Wrong port in the app**: if a PM2 app listens on a different port than configured, 7Server bridges the configured port to it with Nginx.
+- A deploy can run for up to 30 minutes.
+
+---
+
+## Nginx & SSL
+
+When a domain is set, or the app is static/PHP without a start command:
+
+- The site is written to `/etc/nginx/sites-available/7server-<app>` and symlinked into `sites-enabled`.
+- Apps with a process (PM2/Docker) are proxied with `proxy_pass http://127.0.0.1:<port>`, including WebSocket upgrade headers (`Upgrade`, `Connection "upgrade"`) and `Host` / `X-Real-IP` / `X-Forwarded-*` headers.
+- Static and PHP apps are served from the first build folder found (`dist`, `build`, `out`, `.output/public`, `public`), with PHP-FPM when the root contains `index.php`.
+- The config is checked with `nginx -t` before Nginx is reloaded.
+- With a public domain, Certbot runs `certbot --nginx -d <domain> --redirect`, which issues the certificate and redirects HTTP to HTTPS. If the request fails (usually DNS not pointing at the server yet), the deploy logs a warning and the site stays on HTTP.
+
+The **SSL & Certificates** tab lists certificates and flags the ones that expire within 30 days.
+
+---
+
+## Monorepo Stacks (`⚡ Deploy Stack`)
+
+When the repository has deployable projects in sub-folders (any folder with a `package.json`, `composer.json`, `Dockerfile`, compose file, `requirements.txt`, `pyproject.toml`, `go.mod`, …), the wizard shows **Monorepo Detected** with two modes:
+
+- **Single App**: pick one package folder and deploy it on its own.
+- **⚡ Deploy Stack**: select several packages and configure each one separately: app name, framework preset, install/build/start commands, port (each package gets its own free port) and `.env`.
+
+**Deploy Stack** deploys the selected packages **one after another**, each through the same pipeline as a single app. If one fails, the remaining ones are not started. The live view has a tab per service (`backend (:8001)`, `frontend (:3000)`, …) with its own stages and log, and when all are done it shows a **Visit** link for each service.
+
+---
+
+## AI Assistance
+
+### ✨ AI Pre-Flight Review
+
+Before deploying, **✨ AI Pre-Flight Review** opens the [AI Copilot](/ai/copilot) with your deploy settings: app name, repository, branch, detected framework, root folder and port (or, for a stack, each package with its name, port, framework and number of env vars). It asks Copilot to look for port collisions, compose or env settings that need changing, and dependencies between services before you deploy.
+
+### ✨ Fix with AI Copilot
+
+When a deploy fails, the live view shows a **Fix with AI Copilot** button. It opens Copilot with:
+
+- the app name, repository, branch and port
+- the stage that failed
+- the last 35 lines of the deploy log
+
+Copilot then investigates the server with the deploy playbook loaded (where 7Server puts apps, PM2 and Docker names, the Nginx site path). Read-only commands run on their own in Agent mode; anything that changes the server waits for you to click **Run**.
+
+---
+
+## Managing Deployed Apps
+
+The **Apps** tab lists every folder in `/var/www` with its detected framework, Nginx domain or port, git branch and last change. Per app you can open its files, edit `.env`, open an SSH terminal in the folder, and run actions from the **Actions** menu:
+
+- git status / `git pull`, Laravel log and `artisan` helpers, PM2 restart, `npm run build` (+ restart), Docker restart, folder size
+- **Point Domain (Nginx)**: create an Nginx site for an existing app and, optionally, a Let's Encrypt certificate
+- **Point to Cloudflare Tunnel**: add a tunnel route for the app (when `cloudflared` is installed)
+- **Delete app**
+
+**Delete app** removes everything a deploy set up for that folder:
+
+1. PM2 processes running from the folder
+2. the Docker container and any compose stack in the folder
+3. Nginx sites that serve only this folder (backed up to `/root/7server-removed/` first). Configs shared with another app are kept.
+4. Certbot certificates for those sites' domains, and matching Cloudflare Tunnel ingress routes
+5. the folder itself (its `.env` is backed up to the same place first)
