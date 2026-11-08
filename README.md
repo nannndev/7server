@@ -12,7 +12,9 @@
 <p align="center">
   <a href="https://github.com/nannndev/7server/actions/workflows/ci.yml"><img src="https://github.com/nannndev/7server/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://www.npmjs.com/package/sevenserver"><img src="https://img.shields.io/npm/v/sevenserver?label=npm" alt="npm"></a>
+  <a href="https://www.npmjs.com/package/sevenserver"><img src="https://img.shields.io/npm/dm/sevenserver?label=downloads&color=06b6d4" alt="npm downloads"></a>
   <a href="https://github.com/nannndev/7server/pkgs/container/7server"><img src="https://img.shields.io/badge/docker-ghcr.io-blue" alt="Docker image"></a>
+  <a href="https://discord.gg/AF2Hc56t3N"><img src="https://img.shields.io/badge/Discord-Join%20Community-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
 </p>
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/fleet-grid-dark.png"><img alt="Fleet overview" src="docs/screenshots/fleet-grid-light.png"></picture>

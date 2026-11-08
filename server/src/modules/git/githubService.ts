@@ -226,8 +226,10 @@ export function detectFrameworkFromFiles(
   // A compose file that only runs services (postgres, redis) next to a Node/PHP app is a sidecar, not the app.
   const sidecarOnly = !!composeStr && !compose.builds && !files.has('dockerfile') && !!(packageJsonStr || composerJsonStr);
 
+  const hasCompose = files.has('docker-compose.yml') || files.has('docker-compose.yaml') || files.has('compose.yml') || files.has('compose.yaml') || files.has('docker-compose.prod.yml') || files.has('docker-compose.production.yml');
+
   // 1. Docker
-  if (!sidecarOnly && (files.has('dockerfile') || files.has('docker-compose.yml') || files.has('docker-compose.yaml') || files.has('compose.yml') || files.has('compose.yaml'))) {
+  if (!sidecarOnly && (files.has('dockerfile') || hasCompose)) {
     const exposed = readDockerfilePort(dockerfileStr);
     const rawPort = compose.ports.find((p) => ![5432, 3306, 6379, 27017].includes(p)) ?? exposed ?? 3000;
     const appPort = rawPort === 80 || rawPort === 443 ? 3000 : rawPort;
@@ -238,8 +240,8 @@ export function detectFrameworkFromFiles(
       suggested_config: {
         root_dir: '/',
         install_command: '',
-        build_command: files.has('docker-compose.yml') || files.has('docker-compose.yaml') || files.has('compose.yml') || files.has('compose.yaml') ? 'docker compose build' : 'docker build -t app .',
-        start_command: files.has('docker-compose.yml') || files.has('docker-compose.yaml') || files.has('compose.yml') || files.has('compose.yaml') ? 'docker compose up -d' : 'docker run -d -p $PORT:$PORT app',
+        build_command: hasCompose ? 'docker compose build' : 'docker build -t app .',
+        start_command: hasCompose ? 'docker compose up -d' : 'docker run -d -p $PORT:$PORT app',
         internal_port: appPort
       }
     };
@@ -490,6 +492,8 @@ const MANIFEST_FILES = new Set([
   'dockerfile',
   'docker-compose.yml',
   'docker-compose.yaml',
+  'docker-compose.prod.yml',
+  'docker-compose.production.yml',
   'compose.yml',
   'compose.yaml',
   'requirements.txt',

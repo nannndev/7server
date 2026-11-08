@@ -6,10 +6,12 @@ import { usersReady } from './http/auth.js';
 import { openSetup } from './modules/users/setup.js';
 import { attachTerminalWs } from './modules/terminal/ws.js';
 import { startMonitor } from './modules/monitoring/monitor.js';
+import { startTelemetry } from './modules/telemetry/telemetry.js';
 
 const server = http.createServer(createApp());
 attachTerminalWs(server);
 startMonitor();
+startTelemetry();
 
 const onListen = async () => {
   const url = `http://${config.host || 'localhost'}:${config.port}`;

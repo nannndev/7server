@@ -41,11 +41,15 @@ export const COPY = {
     },
     hero: {
       badge: 'self-hosted · open source · agentless',
-      title: 'Run every VPS from one dashboard. Install nothing on them.',
+      title: 'Run every server from one dashboard. Install nothing on them.',
       lead: '7Server connects to your servers over the SSH access you already have. Watch CPU, RAM and disk in 3D, deploy Git apps, open a browser terminal, manage Docker, Cloudflare Tunnels, Nginx, automated Let\'s Encrypt SSL with DNS pre-flight checks, cron, backups and databases, toggle Privacy Mode for screencasts, and use an AI copilot that inspects first and asks before changing anything.',
       ctaPrimary: 'Get started',
       ctaSecondary: 'See how it works',
       quickInstall: 'Quick start with npm (Node.js 22.13+)',
+      starsLabel: 'GitHub Stars',
+      downloadsLabel: 'npm installs',
+      communityLabel: 'Discord Community',
+      activeLabel: 'active servers',
       previewCaption: 'Live preview from the self-hosted dashboard — click any tab to switch views or click the image to zoom.',
       heroTabs: [
         { id: 'matrix', label: '3D Fleet Matrix', image: '/screenshots/fleet-matrix.png', route: 'Fleet › Matrix 3D' },
@@ -434,11 +438,15 @@ export const COPY = {
     },
     hero: {
       badge: 'self-hosted · open source · tanpa agen (agentless)',
-      title: 'Kelola semua VPS dari satu dashboard. Tanpa instal apa pun di server.',
+      title: 'Kelola semua server dari satu dashboard. Tanpa instal apa pun di dalamnya.',
       lead: '7Server terhubung ke server Anda melalui akses SSH yang sudah Anda miliki. Pantau CPU, RAM, dan disk dalam tampilan 3D, deploy aplikasi Git, buka terminal di browser, kelola Docker, Cloudflare Tunnels, Nginx, otomatisasi SSL Let\'s Encrypt dengan validasi DNS pre-flight, cron, backup, database, mode privasi sekali klik untuk screencast, serta gunakan AI Copilot yang memeriksa kondisi server terlebih dahulu sebelum meminta izin perubahan.',
       ctaPrimary: 'Mulai Sekarang',
       ctaSecondary: 'Lihat Cara Kerjanya',
       quickInstall: 'Instalasi cepat via npm (Node.js 22.13+)',
+      starsLabel: 'Bintang GitHub',
+      downloadsLabel: 'instalasi npm',
+      communityLabel: 'Komunitas Discord',
+      activeLabel: 'server aktif',
       previewCaption: 'Tampilan asli dari dashboard 7Server — klik tab di atas untuk mengganti layar atau klik gambar untuk memperbesar.',
       heroTabs: [
         { id: 'matrix', label: 'Matriks 3D Fleet', image: '/screenshots/fleet-matrix.png', route: 'Fleet › Matrix 3D' },

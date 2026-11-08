@@ -22,7 +22,7 @@ for d in /var/www/*; do
     app_type="Next.js (Node.js)"
   elif [ -f "$d/package.json" ]; then
     app_type="Node.js"
-  elif [ -f "$d/Dockerfile" ] || [ -f "$d/docker-compose.yml" ] || [ -f "$d/docker-compose.yaml" ] || [ -f "$d/compose.yml" ]; then
+  elif [ -f "$d/Dockerfile" ] || [ -f "$d/docker-compose.yml" ] || [ -f "$d/docker-compose.yaml" ] || [ -f "$d/compose.yml" ] || [ -f "$d/docker-compose.prod.yml" ] || [ -f "$d/docker-compose.production.yml" ]; then
     app_type="Docker"
   elif [ -d "$d/dist" ]; then
     app_type="Frontend (SPA / Vite)"

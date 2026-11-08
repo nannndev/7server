@@ -5,6 +5,8 @@ import { Card } from '@/shared/ui/card';
 import { Button } from '@/shared/ui/button';
 import { Badge } from '@/shared/ui/badge';
 import { BrandIcon } from '@/shared/ui/brand-icon';
+import { toast } from '@/shared/ui/toast';
+import { execOnServer } from '@/features/copilot/api';
 import { useT } from '@/shared/i18n';
 import type { ServerItem } from '@/features/servers/types';
 import type { BackgroundTask } from '@/shared/tasks/types';
@@ -92,22 +94,63 @@ export function DeployProgress({
   const currentFramework = currentSvc ? currentSvc.framework : activeFramework;
 
   const isStack = Boolean(services && services.length > 1);
+  const [manualSuccess, setManualSuccess] = useState(false);
+  const [checkingPort, setCheckingPort] = useState(false);
+
   const allCompleted = isStack ? services!.every((s) => s.status === 'completed') : currentTask?.status === 'success';
   const anyFailed = isStack ? services!.some((s) => s.status === 'failed') : currentTask?.status === 'failed';
   const stackRunning = isStack && !allCompleted && !anyFailed;
 
-  const deployFinished = !isStack ? currentTask?.status === 'success' : allCompleted;
-  const deployFailed = !isStack ? currentTask?.status === 'failed' : anyFailed;
+  const deployFinished = (!isStack ? currentTask?.status === 'success' : allCompleted) || manualSuccess;
+  const deployFailed = (!isStack ? currentTask?.status === 'failed' : anyFailed) && !manualSuccess;
   const elapsedSec = currentTask?.durationSec ?? 0;
   // Stage markers and the wrapper's exit-code marker are protocol, not output.
   const logs = useMemo(
     () => (currentTask?.logs ?? []).filter((l) => !l.startsWith('@@STAGE') && !l.startsWith('__7SERVER_')),
     [currentTask?.logs]
   );
-  const stages = useMemo(() => deriveStages(currentTask, currentStageDefs), [currentTask?.stages, currentTask?.status, currentStageDefs]);
+  const stages = useMemo(() => {
+    const derived = deriveStages(currentTask, currentStageDefs);
+    if (manualSuccess) {
+      return derived.map((s) => ({ ...s, status: 'completed' as const }));
+    }
+    return derived;
+  }, [currentTask?.stages, currentTask?.status, currentStageDefs, manualSuccess]);
   const selectedRepo = repoName ? { full_name: repoName } : null;
   const [copiedLog, setCopiedLog] = useState(false);
   const terminalRef = useRef<HTMLDivElement>(null);
+
+  const handleRecheckPort = async () => {
+    setCheckingPort(true);
+    try {
+      const curlRes = await execOnServer(
+        server.id,
+        `curl -sS -o /dev/null -w '%{http_code}' --connect-timeout 3 http://127.0.0.1:${currentPort} 2>/dev/null || true`
+      );
+      const code = curlRes.stdout.trim();
+      if (code && code !== '000' && !code.startsWith('5')) {
+        toast.success(t('gitApp.portActive', { port: currentPort, code }));
+        setManualSuccess(true);
+        return;
+      }
+
+      const ssRes = await execOnServer(
+        server.id,
+        `ss -ltnH "sport = :${currentPort}" 2>/dev/null | grep -q . && echo "LISTENING" || echo "CLOSED"`
+      );
+      if (ssRes.stdout.includes('LISTENING')) {
+        toast.success(t('gitApp.portListening', { port: currentPort }));
+        setManualSuccess(true);
+        return;
+      }
+
+      toast.error(t('gitApp.portStillDown', { port: currentPort, code: code || '000' }));
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to verify port status');
+    } finally {
+      setCheckingPort(false);
+    }
+  };
 
   useEffect(() => {
     if (terminalRef.current) terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
@@ -225,6 +268,17 @@ Tolong periksa status proses dan container di server, analisa penyebab kegagalan
           <div className="flex items-center gap-2 flex-wrap">
             <Button
               type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleRecheckPort}
+              disabled={checkingPort}
+              className="h-9 px-3.5 text-xs gap-1.5 border-emerald-500/40 text-emerald-500 hover:bg-emerald-500/10 font-medium"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${checkingPort ? 'animate-spin' : ''}`} />
+              <span>{t('gitApp.recheckPort', { port: currentPort })}</span>
+            </Button>
+            <Button
+              type="button"
               variant="default"
               size="sm"
               onClick={handleAskAi}
@@ -297,15 +351,28 @@ Tolong periksa status proses dan container di server, analisa penyebab kegagalan
               </p>
             </div>
           </div>
-          <Button
-            type="button"
-            size="sm"
-            onClick={handleAskAi}
-            className="gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold text-xs shadow-md shrink-0 h-9 px-4"
-          >
-            <Sparkles className="w-4 h-4 fill-current" />
-            <span>{t('gitApp.fixWithAi')}</span>
-          </Button>
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={handleRecheckPort}
+              disabled={checkingPort}
+              className="gap-1.5 h-9 px-3.5 text-xs font-medium border-emerald-500/40 text-emerald-500 hover:bg-emerald-500/10"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${checkingPort ? 'animate-spin' : ''}`} />
+              <span>{t('gitApp.recheckPort', { port: currentPort })}</span>
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleAskAi}
+              className="gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold text-xs shadow-md h-9 px-4"
+            >
+              <Sparkles className="w-4 h-4 fill-current" />
+              <span>{t('gitApp.fixWithAi')}</span>
+            </Button>
+          </div>
         </div>
       )}
 

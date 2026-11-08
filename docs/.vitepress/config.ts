@@ -29,7 +29,8 @@ export default defineConfig({
             text: 'Links',
             items: [
               { text: 'Dashboard App', link: 'http://localhost:3000' },
-              { text: 'GitHub Repository', link: 'https://github.com/nannndev/7server' }
+              { text: 'GitHub Repository', link: 'https://github.com/nannndev/7server' },
+              { text: 'Discord Community', link: 'https://discord.gg/AF2Hc56t3N' }
             ]
           }
         ],
@@ -157,7 +158,8 @@ export default defineConfig({
       provider: 'local'
     },
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/nannndev/7server' }
+      { icon: 'github', link: 'https://github.com/nannndev/7server' },
+      { icon: 'discord', link: 'https://discord.gg/AF2Hc56t3N' }
     ],
     footer: {
       message: 'Self-hosted, Agentless Multi-VPS Management & AI Control Plane.',

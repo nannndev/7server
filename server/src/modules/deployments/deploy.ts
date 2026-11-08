@@ -300,18 +300,26 @@ if command -v pm2 >/dev/null 2>&1; then pm2 delete ${sq(s.appName)} >/dev/null 2
 docker rm -f ${name} >/dev/null 2>&1 || true
 
 COMPOSE_FILE=""
-for cf in docker-compose.yml docker-compose.yaml compose.yml compose.yaml; do
+for cf in docker-compose.prod.yml docker-compose.production.yml docker-compose.yml docker-compose.yaml compose.yml compose.yaml; do
   if [ -f "$cf" ]; then COMPOSE_FILE="$cf"; break; fi
 done
 
 if [ -n "$COMPOSE_FILE" ]; then
+  # If compose file references .env.prod, copy .env to .env.prod
+  if [ -f .env ] && [ ! -f .env.prod ] && grep -q "env_file:.*\.env\.prod" "$COMPOSE_FILE"; then cp .env .env.prod; fi
+  # Replace deprecated / blocked quay.io MinIO images with public working images
+  sed -i 's|quay.io/minio/minio:latest|cgr.dev/chainguard/minio:latest|g' "$COMPOSE_FILE" 2>/dev/null || true
+  sed -i 's|quay.io/minio/minio|cgr.dev/chainguard/minio:latest|g' "$COMPOSE_FILE" 2>/dev/null || true
+  sed -i 's|quay.io/minio/mc:latest|cgr.dev/chainguard/minio-client:latest|g' "$COMPOSE_FILE" 2>/dev/null || true
+  sed -i 's|quay.io/minio/mc|cgr.dev/chainguard/minio-client:latest|g' "$COMPOSE_FILE" 2>/dev/null || true
+  mkdir -p data/credentials 2>/dev/null || true
   # Clean up any broken or previously half-started containers from compose
-  docker compose -p ${name} down 2>/dev/null || docker compose down 2>/dev/null || true
+  docker compose -p ${name} -f "$COMPOSE_FILE" down 2>/dev/null || docker compose down 2>/dev/null || true
 
   # Collect all host listening ports right now
   USED_PORTS=$( (
-    ss -ltnH 2>/dev/null | awk '{print $4}' | sed 's/.*://' | grep -E '^[0-9]+$'
-    docker ps --format '{{.Ports}}' 2>/dev/null | grep -oE ':[0-9]+->' | tr -d ':>-'
+    (ss -ltnH 2>/dev/null || true) | awk '{print $4}' | sed 's/.*://' | (grep -E '^[0-9]+$' || true)
+    (docker ps --format '{{.Ports}}' 2>/dev/null || true) | (grep -oE ':[0-9]+->' || true) | tr -d ':>-'
   ) | sort -un | tr '\\n' ' ' )
 
   # Rewrite compose file: map main app port to ${s.port}, and auto-resolve any host port collisions (e.g. postgres 5432)
@@ -335,7 +343,7 @@ if [ -n "$COMPOSE_FILE" ]; then
         return p;
       }
 
-      yml = yml.replace(/^(\\s*-\\s*["\\x27]?)(?:(\\d{1,3}(?:\\.\\d{1,3}){3}):)?(?:\\$\\{[^:}]+:-(\\d+)\\}|(\\d+)):(\\d+)(\\/(?:tcp|udp))?(["\\x27]?\\s*)$/gm, (m, pre, ip, defEnvPort, hPortStr, cPortStr, proto, suf) => {
+      yml = yml.replace(/^(\\s*-\\s*["\\x27]?)(?:(\\d{1,3}(?:\\.\\d{1,3}){3}):)?(?:\\$\\{[^:}]+:-(\\d+)\\}|(\\d+)):(\\d+)(\\/(?:tcp|udp))?(["\\x27]?\\s*)(?:#.*)?$/gm, (m, pre, ip, defEnvPort, hPortStr, cPortStr, proto, suf) => {
         const hPort = parseInt(defEnvPort || hPortStr, 10);
         const cPort = parseInt(cPortStr, 10);
 
@@ -358,12 +366,21 @@ if [ -n "$COMPOSE_FILE" ]; then
     ' "$COMPOSE_FILE" "${s.port}" "${bindPrefix}" "$USED_PORTS" 2>/dev/null || true
   fi
   export PORT=${s.port} HOST=0.0.0.0 NITRO_PORT=${s.port} NITRO_HOST=0.0.0.0
-  docker compose -p ${name} up -d --build || docker compose up -d --build
+  docker compose -p ${name} -f "$COMPOSE_FILE" up -d --build || docker compose -f "$COMPOSE_FILE" up -d --build
 else
-  if ! docker build --build-arg PORT=${s.port} -t ${name} .; then
+  TARGET_FLAG=""
+  if [ -f "Dockerfile" ]; then
+    for st in app production runner runtime web server main prod; do
+      if grep -iqE "^FROM\\s+.*\\s+AS\\s+\${st}\\s*$" "Dockerfile"; then
+        TARGET_FLAG="--target \${st}"
+        break
+      fi
+    done
+  fi
+  if ! docker build \${TARGET_FLAG} --build-arg PORT=${s.port} -t ${name} .; then
     if [ "$PWD" != ${sq(appDir)} ] && [ -f "$PWD/Dockerfile" ]; then
       echo "Retrying Docker build using monorepo root context (${appDir})..."
-      docker build --build-arg PORT=${s.port} -t ${name} -f "$PWD/Dockerfile" ${sq(appDir)}
+      docker build \${TARGET_FLAG} --build-arg PORT=${s.port} -t ${name} -f "$PWD/Dockerfile" ${sq(appDir)}
     else
       exit 1
     fi
@@ -484,8 +501,14 @@ function nginxSite(s: DeploySpec, site: string, workDir: string): string {
   const proxied = !!s.startCmd || s.engine === 'docker';
   if (!s.domain && proxied) return 'echo "No domain set: skipping Nginx"';
   // Static site without a domain: Nginx serves the build output on the chosen port.
-  const listen = s.domain ? 'listen 80;' : `listen ${s.port};`;
-  const serverName = s.domain || '_';
+  // Static site with a domain/tunnel: Nginx serves on both port 80 and the chosen internal port,
+  // so that the internal health check (curl 127.0.0.1:s.port) and Cloudflare tunnel routing (which targets s.port) both succeed!
+  const listen = s.domain && proxied
+    ? 'listen 80;'
+    : s.domain
+    ? `listen 80;\n  listen ${s.port};`
+    : `listen ${s.port};`;
+  const serverName = s.domain ? `${s.domain} _` : '_';
   const body = proxied
     ? `  location / {
     proxy_pass http://127.0.0.1:${s.port};
@@ -614,7 +637,7 @@ fi
 
 echo "==> Docker"
 if command -v docker >/dev/null 2>&1; then
-  find "$DIR" -maxdepth 2 \\( -name docker-compose.yml -o -name docker-compose.yaml -o -name compose.yml -o -name compose.yaml \\) 2>/dev/null | while read -r f; do
+  find "$DIR" -maxdepth 2 \\( -name docker-compose.yml -o -name docker-compose.yaml -o -name compose.yml -o -name compose.yaml -o -name docker-compose.prod.yml -o -name docker-compose.production.yml \\) 2>/dev/null | while read -r f; do
     (cd "$(dirname "$f")" && docker compose down --remove-orphans) && echo "stopped compose stack $f"
   done
   docker rm -f ${sq(site)} >/dev/null 2>&1 && echo "removed container ${site}"

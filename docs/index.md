@@ -3,7 +3,7 @@ layout: home
 
 hero:
   name: 7Server
-  text: Run every VPS from one dashboard.
+  text: Run every server from one dashboard.
   tagline: Self-hosted, agentless multi-server management & AI SRE copilot. Install nothing on target servers.
   image:
     src: /favicon.jpg
@@ -15,6 +15,9 @@ hero:
     - theme: alt
       text: Architecture & Philosophy
       link: /getting-started/architecture
+    - theme: alt
+      text: Join Discord
+      link: https://discord.gg/AF2Hc56t3N
     - theme: alt
       text: GitHub Repo
       link: https://github.com/nannndev/7server
