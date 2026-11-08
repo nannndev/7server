@@ -561,23 +561,26 @@ export default function AiCopilotDrawer({
     }
   };
 
-  // Agent mode: read-only commands from the AI run automatically and their output is fed back.
-  const [agentMode, setAgentMode] = useState<boolean>(() => {
+  // Run mode. manual: every command waits for a click. agent (default): read-only commands run by themselves.
+  // auto: every command runs by itself except destructive ones; opt-in, confirmed, never restored from storage.
+  type RunMode = 'manual' | 'agent' | 'auto';
+  const [runMode, setRunModeState] = useState<RunMode>(() => {
     try {
-      return localStorage.getItem('copilot.agent') !== '0';
+      return localStorage.getItem('copilot.agent') === '0' ? 'manual' : 'agent';
     } catch {
-      return true;
+      return 'agent';
     }
   });
-  const toggleAgent = () =>
-    setAgentMode((v) => {
-      try {
-        localStorage.setItem('copilot.agent', v ? '0' : '1');
-      } catch {
-        /* */
-      }
-      return !v;
-    });
+  const setRunMode = async (next: RunMode) => {
+    if (next === 'auto' && !(await confirmModal({
+      title: t('copilot.modeAutoTitle'),
+      message: t('copilot.modeAutoConfirm'),
+      confirmText: t('copilot.modeAutoEnable'),
+      variant: 'danger'
+    }))) return;
+    setRunModeState(next);
+    try { localStorage.setItem('copilot.agent', next === 'manual' ? '0' : '1'); } catch { /* private mode */ }
+  };
   const [wide, setWide] = useState(false);
   const [prefs, setPrefs] = useState<AgentPreferences>(loadPreferences);
   const [showSettings, setShowSettings] = useState(false);
@@ -721,7 +724,7 @@ export default function AiCopilotDrawer({
         const runs: CommandRun[] = cmds.map((code) => ({
           code,
           status: 'pending',
-          auto: agentMode && !forceManual && isReadOnlyCommand(code)
+          auto: !forceManual && ((runMode === 'agent' && isReadOnlyCommand(code)) || (runMode === 'auto' && !isRiskyCommand(code)))
         }));
         setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, runs } : m)));
       }
@@ -1639,19 +1642,17 @@ export default function AiCopilotDrawer({
                     </div>
                   )}
 
-                  <button
-                    type="button"
-                    onClick={toggleAgent}
-                    aria-pressed={agentMode}
-                    title={agentMode ? t('copilot.modeAgentHint') : t('copilot.modeManualHint')}
-                    className={`h-7 px-2 rounded-lg text-[11px] flex items-center gap-1 transition-colors ${
-                      agentMode
-                        ? 'text-[var(--foreground)] bg-[var(--foreground)]/[0.06] hover:bg-[var(--foreground)]/10'
-                        : 'text-[var(--muted-foreground)] hover:bg-[var(--muted)]'
-                    }`}
-                  >
-                    <Zap className="w-3 h-3" /> {agentMode ? t('copilot.modeAgent') : t('copilot.modeManual')}
-                  </button>
+                  <ChipSelect
+                    icon={<Zap className={`w-3 h-3 ${runMode === 'auto' ? 'text-amber-500' : ''}`} />}
+                    label={t('copilot.runMode')}
+                    value={runMode}
+                    onChange={(v) => setRunMode(v as RunMode)}
+                    options={[
+                      { value: 'manual', label: t('copilot.modeManual'), hint: t('copilot.modeManualHint') },
+                      { value: 'agent', label: t('copilot.modeAgent'), hint: t('copilot.modeAgentHint') },
+                      { value: 'auto', label: t('copilot.modeAuto'), hint: t('copilot.modeAutoHint') }
+                    ]}
+                  />
 
                   <div className="flex-1" />
 
