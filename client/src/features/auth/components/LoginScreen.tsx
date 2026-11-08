@@ -19,7 +19,7 @@ import { useTheme } from '@/shared/hooks/useTheme';
 import { useI18n, LANGS } from '@/shared/i18n';
 import SetupForm from './SetupForm';
 
-const LOGO = '/icons/icon-opt2-server-blade.jpg';
+const LOGO = '/icons/icon-opt2-server-blade.png';
 
 export default function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) {
   const { t, lang, setLang } = useI18n();

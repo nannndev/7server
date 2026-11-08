@@ -6,7 +6,7 @@ hero:
   text: Kelola semua server dari satu dashboard.
   tagline: Kontrol panel multi-server agentless & AI SRE copilot. Tanpa install software apa pun di server target.
   image:
-    src: /favicon.jpg
+    src: /favicon.png
     alt: Ikon 7Server
   actions:
     - theme: brand

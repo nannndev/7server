@@ -13,7 +13,7 @@ import { COPY, type Lang } from './i18n';
 
 const REPO = 'https://github.com/nannndev/7server';
 const DISCORD = 'https://discord.gg/AF2Hc56t3N';
-const LOGO = '/icons/icon-opt2-server-blade.jpg';
+const LOGO = '/icons/icon-opt2-server-blade.png';
 
 let cachedStats: { stars: number | null; downloads: number | null; active: number | null } = {
   stars: null,

@@ -6,7 +6,7 @@ hero:
   text: Run every server from one dashboard.
   tagline: Self-hosted, agentless multi-server management & AI SRE copilot. Install nothing on target servers.
   image:
-    src: /favicon.jpg
+    src: /favicon.png
     alt: 7Server Icon
   actions:
     - theme: brand
