@@ -16,6 +16,7 @@ import ServerPage from '@/pages/ServerPage';
 import AiGatewayPage from '@/pages/AiGatewayPage';
 import AiCopilotDrawer from '@/features/copilot/components/AiCopilotDrawer';
 import AiCopilotTrigger from '@/features/copilot/components/AiCopilotTrigger';
+import type { CopilotLiveStatus } from '@/features/copilot/types';
 import { BackgroundTasksWidget } from '@/shared/tasks/BackgroundTasksWidget';
 import UsersPage from '@/pages/UsersPage';
 import IntegrationsPage from '@/pages/IntegrationsPage';
@@ -55,6 +56,7 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
   const [filesServer, setFilesServer] = useState<ServerItem | null>(null);
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [copilotOpen, setCopilotOpen] = useState(false);
+  const [copilotStatus, setCopilotStatus] = useState<CopilotLiveStatus>({ state: 'idle' });
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const { user } = useAuth();
 
@@ -143,6 +145,7 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
           onImported={reload}
           onLogout={onLogout}
           onToggleCopilot={() => setCopilotOpen((v) => !v)}
+          copilotStatus={copilotStatus}
           onOpenUsers={() => navigate({ page: 'users', tab: 'users' })}
           onOpenSessions={() => navigate({ page: 'users', tab: 'sessions' })}
           onOpenChangePassword={() => setShowChangePasswordModal(true)}
@@ -264,6 +267,7 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
         servers={servers}
         activeServer={managedServer}
         activeTab={route.page === 'server' ? route.tab : undefined}
+        onStatusChange={setCopilotStatus}
         onRunInTerminal={(cmd, srv) => {
           setTerminalInitialCommand(cmd);
           setTerminalServer(srv);
@@ -272,6 +276,7 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
       <AiCopilotTrigger
         open={copilotOpen}
         onClick={() => setCopilotOpen(true)}
+        status={copilotStatus}
       />
       <BackgroundTasksWidget />
     </div>

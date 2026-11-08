@@ -52,7 +52,7 @@ import { loadPreferences, savePreferences, preferencesPayload, type AgentPrefere
 import { fetchAccounts, fetchCombos, fetchGatewayConfig } from '@/features/ai-gateway/api';
 import { PROVIDERS_META } from '@/pages/AiGatewayPage';
 import { useCan } from '@/features/auth/AuthContext';
-import type { ChatMessage, CommandRun, CopilotContext } from '../types';
+import type { ChatMessage, CommandRun, CopilotContext, CopilotLiveStatus } from '../types';
 import type { ServerItem } from '@/features/servers/types';
 
 interface AiCopilotDrawerProps {
@@ -62,6 +62,7 @@ interface AiCopilotDrawerProps {
   activeServer: ServerItem | null;
   activeTab?: string;
   onRunInTerminal: (command: string, server: ServerItem) => void;
+  onStatusChange?: (status: CopilotLiveStatus) => void;
 }
 
 const QUICK_ACTIONS = [
@@ -479,7 +480,8 @@ export default function AiCopilotDrawer({
   servers,
   activeServer,
   activeTab,
-  onRunInTerminal
+  onRunInTerminal,
+  onStatusChange
 }: AiCopilotDrawerProps) {
   const { t, locale } = useI18n();
   const canExecute = useCan('copilot.execute') && useCan('terminal.open');
@@ -1017,6 +1019,71 @@ export default function AiCopilotDrawer({
     }
     return 1;
   }, [messages]);
+
+  // Track when background work finishes while drawer is closed
+  const [unreadDone, setUnreadDone] = useState(false);
+  const prevBusyRef = useRef(false);
+  useEffect(() => {
+    if (open) {
+      setUnreadDone(false);
+    } else if (prevBusyRef.current && !agentBusy) {
+      setUnreadDone(true);
+    }
+    prevBusyRef.current = agentBusy;
+  }, [agentBusy, open]);
+
+  // Report live agent status for the floating character bubble & top bar
+  useEffect(() => {
+    if (!onStatusChange) return;
+    const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant');
+    const activeRunMsg = [...messages].reverse().find((m) => m.role === 'assistant' && m.runs && !m.fed);
+    const runningRun = activeRunMsg?.runs?.find((r) => r.status === 'running' || (r.status === 'pending' && r.auto));
+    const approvalRun = activeRunMsg?.runs?.find((r) => r.status === 'pending' && !r.auto);
+
+    const cleanPreview = lastAssistant?.content
+      ?.replace(/```[\s\S]*?```/g, '')
+      .replace(/[#*_`>]/g, '')
+      .trim()
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .pop()
+      ?.slice(0, 65);
+
+    if (runningRun) {
+      onStatusChange({
+        state: 'executing',
+        step: activeStep,
+        serverName: targetServer?.name,
+        command: runningRun.code.trim().split('\n')[0]?.slice(0, 52),
+        preview: cleanPreview
+      });
+    } else if (isStreaming) {
+      onStatusChange({
+        state: 'thinking',
+        step: activeStep,
+        serverName: targetServer?.name,
+        preview: cleanPreview
+      });
+    } else if (approvalRun) {
+      onStatusChange({
+        state: 'approval',
+        step: activeStep,
+        serverName: targetServer?.name,
+        command: approvalRun.code.trim().split('\n')[0]?.slice(0, 52),
+        preview: cleanPreview
+      });
+    } else if (unreadDone && !open) {
+      onStatusChange({
+        state: 'done',
+        step: activeStep,
+        serverName: targetServer?.name,
+        preview: cleanPreview
+      });
+    } else {
+      onStatusChange({ state: 'idle', serverName: targetServer?.name });
+    }
+  }, [isStreaming, messages, activeStep, targetServer?.name, unreadDone, open, onStatusChange]);
 
   // Slash command filtering when input starts with `/`
   const matchingSlashCommands = useMemo(() => {

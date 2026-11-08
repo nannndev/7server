@@ -65,9 +65,9 @@ export function BackgroundTasksWidget() {
 
   return (
     <>
-      {/* Floating Bottom Task Pill */}
+      {/* Floating Bottom Task Pill (placed on bottom-left/center-right so it never collides with AI Copilot bubble) */}
       {!isDrawerOpen && (
-        <div className="fixed bottom-20 right-6 z-40 animate-in slide-in-from-bottom duration-300">
+        <div className="fixed bottom-6 right-56 z-40 animate-in slide-in-from-bottom duration-300 hidden sm:block">
           <button
             type="button"
             onClick={() => setIsDrawerOpen(true)}

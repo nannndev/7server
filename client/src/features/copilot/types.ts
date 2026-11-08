@@ -45,3 +45,12 @@ export interface CopilotContext {
   preferences?: ReturnType<typeof import('./preferences').preferencesPayload>;
 }
 
+export interface CopilotLiveStatus {
+  state: 'idle' | 'thinking' | 'executing' | 'approval' | 'done';
+  step?: number;
+  serverName?: string;
+  command?: string;
+  preview?: string;
+}
+
+

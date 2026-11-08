@@ -9,6 +9,7 @@ import { usePrivacy } from '@/shared/hooks/usePrivacy';
 import { useAuth, useCan } from '@/features/auth/AuthContext';
 import type { ServerItem } from '@/features/servers/types';
 import type { Route } from '@/app/router';
+import type { CopilotLiveStatus } from '@/features/copilot/types';
 import { sectionLabel } from '@/app/serverNav';
 import { exportServers, importServers } from '@/features/servers/api';
 import { Button } from '@/shared/ui/button';
@@ -31,6 +32,7 @@ interface TopBarProps {
   onImported: () => void;
   onLogout: () => void;
   onToggleCopilot?: () => void;
+  copilotStatus?: CopilotLiveStatus;
   onOpenUsers?: () => void;
   onOpenSessions?: () => void;
   onOpenChangePassword?: () => void;
@@ -52,6 +54,7 @@ export default function TopBar({
   onImported,
   onLogout,
   onToggleCopilot,
+  copilotStatus,
   onOpenUsers,
   onOpenSessions,
   onOpenChangePassword
@@ -291,11 +294,45 @@ export default function TopBar({
           variant="outline"
           size="sm"
           onClick={onToggleCopilot}
-          className="gap-1.5 border-[var(--rim)] text-[var(--foreground)] hover:text-[var(--foreground)] hover:bg-[var(--foreground)]/[0.06] transition-colors"
+          className={`relative gap-1.5 transition-colors ${
+            copilotStatus?.state === 'approval'
+              ? 'border-amber-500/60 text-amber-400 bg-amber-500/10'
+              : copilotStatus?.state === 'executing' || copilotStatus?.state === 'thinking'
+              ? 'border-sky-500/50 text-[var(--foreground)] bg-sky-500/10'
+              : 'border-[var(--rim)] text-[var(--foreground)] hover:text-[var(--foreground)] hover:bg-[var(--foreground)]/[0.06]'
+          }`}
           title="7Server AI Copilot (⌘J)"
         >
-          <Sparkles className="w-3.5 h-3.5 text-[var(--foreground)] animate-pulse" />
-          <span className="hidden md:inline font-medium">Copilot</span>
+          <Sparkles
+            className={`w-3.5 h-3.5 ${
+              copilotStatus?.state === 'executing' || copilotStatus?.state === 'thinking'
+                ? 'text-sky-400 animate-spin'
+                : copilotStatus?.state === 'approval'
+                ? 'text-amber-400 animate-bounce'
+                : 'text-[var(--foreground)] animate-pulse'
+            }`}
+            style={{ animationDuration: copilotStatus?.state === 'executing' || copilotStatus?.state === 'thinking' ? '2.5s' : undefined }}
+          />
+          <span className="hidden md:inline font-medium">
+            {copilotStatus?.state === 'executing'
+              ? 'Copilot · SSH...'
+              : copilotStatus?.state === 'thinking'
+              ? 'Copilot · Thinking...'
+              : copilotStatus?.state === 'approval'
+              ? 'Copilot · Needs Approval'
+              : 'Copilot'}
+          </span>
+          {copilotStatus && copilotStatus.state !== 'idle' && (
+            <span
+              className={`w-2 h-2 rounded-full ${
+                copilotStatus.state === 'approval'
+                  ? 'bg-amber-400 animate-ping'
+                  : copilotStatus.state === 'done'
+                  ? 'bg-emerald-400'
+                  : 'bg-sky-400 animate-pulse'
+              }`}
+            />
+          )}
         </Button>
 
         {canManageServer && (
