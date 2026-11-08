@@ -50,3 +50,4 @@ Seluruh pembaruan penting pada **7Server** (`sevenserver` di npm dan `ghcr.io/na
 - **Terminal Browser Multi-Tab & Manajer File SFTP**: Shell WebSocket `xterm.js` lengkap dengan pintasan perintah cepat dan editor file visual.
 - **Manajemen Workload & Operasional**: Kontrol Docker container/image/Compose, layanan systemd & PM2, penjadwal Crontab visual, firewall UFW, dan backup terjadwal.
 - **RBAC & Log Audit Keamanan**: Peran Admin, Operator, dan Viewer dengan pembatasan akses per VPS, pencabutan sesi aktif, notifikasi webhook Discord, dan ekspor Audit Log ke CSV.
+

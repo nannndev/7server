@@ -51,3 +51,4 @@ All notable changes to **7Server** (`sevenserver` on npm and `ghcr.io/nannndev/7
 - **Multi-Tab Browser Terminal & SFTP File Manager**: Full `xterm.js` WebSocket shell with command shortcuts and visual file editor.
 - **Workloads & Operations**: Docker containers/images/Compose management, PM2 & systemd service control, visual Crontab scheduler, UFW firewall manager, and scheduled backups.
 - **RBAC & Security Audit Trail**: Admin, Operator, and Viewer roles with per-server access scopes, active session revocation, Discord webhook alerts, and CSV audit log export.
+

@@ -254,7 +254,7 @@ function Nav({ lang, toggleLang }: { lang: Lang; toggleLang: () => void }) {
             ['#ai', t.ai],
             ['#security', t.security],
             ['#/changelog', 'Changelog'],
-            ['http://localhost:3002', t.docs],
+            ['https://nannndev.github.io/7server/', t.docs],
             ['#start', t.start],
           ].map(([href, label]) => (
             <a

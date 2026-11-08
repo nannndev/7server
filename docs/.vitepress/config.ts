@@ -1,14 +1,15 @@
 import { defineConfig } from 'vitepress';
 
 export default defineConfig({
+  base: '/7server/',
   title: '7Server',
   description: 'Self-hosted, agentless multi-server control plane & AI SRE copilot documentation',
   cleanUrls: true,
   lastUpdated: true,
   ignoreDeadLinks: true,
   head: [
-    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }],
-    ['link', { rel: 'alternate icon', type: 'image/png', href: '/favicon.png' }],
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/7server/favicon.svg' }],
+    ['link', { rel: 'alternate icon', type: 'image/png', href: '/7server/favicon.png' }],
     ['meta', { name: 'theme-color', content: '#09090b' }],
     ['meta', { name: 'og:site_name', content: '7Server Documentation' }],
   ],
