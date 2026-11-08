@@ -6,6 +6,7 @@ import {
   Expand, EyeOff, FileText, GitBranch, Globe, HardDrive, KeyRound, Languages, Layers, Lock, Moon, Network, Server,
   ShieldCheck, Sparkles, Sun, Terminal, X
 } from 'lucide-react';
+import { Analytics } from '@vercel/analytics/react';
 import { AgentlessBench } from './figure/AgentlessBench';
 import { GithubIcon } from './components/BrandIcons';
 import { ContributorsPage, PrivacyPage, SupportPage } from './pages';
@@ -1043,6 +1044,7 @@ export default function App() {
         onClose={() => setLightbox(null)}
         closeLabel={COPY[lang].showcase.closeHint}
       />
+      <Analytics />
     </>
   );
 }
