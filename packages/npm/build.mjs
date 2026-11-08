@@ -44,6 +44,7 @@ const pkgFile = path.join(PKG, 'package.json');
 const pkg = JSON.parse(fs.readFileSync(pkgFile, 'utf8'));
 pkg.dependencies = { ssh2: serverPkg.dependencies.ssh2 };
 fs.writeFileSync(pkgFile, JSON.stringify(pkg, null, 2) + '\n');
+fs.copyFileSync(path.join(ROOT, 'LICENSE'), path.join(PKG, 'LICENSE'));
 
 // 4. sanity: nothing secret or local ended up in dist
 const bad = [];

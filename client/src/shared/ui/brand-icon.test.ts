@@ -26,6 +26,21 @@ assert.equal(t('Ubuntu 22.04.4 LTS'), 'Ubuntu');
 assert.equal(t('Redis / Valkey'), 'Redis');
 assert.equal(t('MySQL / MariaDB'), 'MariaDB', 'combined label: either logo is right; first match wins');
 
+// AI Gateway OAuth & API-Key providers
+assert.equal(t('Claude Pro/Max'), 'Claude');
+assert.equal(t('ChatGPT / Codex'), 'OpenAI');
+assert.equal(t('GitHub Copilot'), 'GitHub Copilot');
+assert.equal(t('Gemini CLI'), 'Google Gemini');
+assert.equal(t('Kimi Code'), 'Kimi');
+assert.equal(t('Kilo Code'), 'Kilo Code');
+assert.equal(t('Muse (Koda)'), 'Meta');
+assert.equal(t('Nous Portal'), 'Nous Research');
+assert.equal(t('Groq'), 'Groq');
+assert.equal(t('Together AI'), 'Together AI');
+assert.equal(t('Fireworks'), 'Fireworks AI');
+assert.equal(t('Cerebras'), 'Cerebras');
+assert.equal(t('GLM (Z.AI)'), 'Z.ai GLM');
+
 // No false positives on generic words
 assert.equal(t('my-app'), undefined);
 assert.equal(t('github-runner'), undefined, 'git only matches the exact id');

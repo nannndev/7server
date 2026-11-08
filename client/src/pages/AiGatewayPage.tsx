@@ -27,7 +27,9 @@ import {
   Plug,
   Unplug,
   Zap,
-  Globe
+  Globe,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import { Card } from '@/shared/ui/card';
 import { Button } from '@/shared/ui/button';
@@ -53,7 +55,8 @@ import {
   fetchGatewayStats,
   verifyProvider,
   connectProviderApi,
-  disconnectProviderApi
+  disconnectProviderApi,
+  reorderProviderKeysApi
 } from '@/features/ai-gateway/api';
 import type {
   VirtualApiKey,
@@ -83,7 +86,7 @@ interface ProviderMeta {
   docsUrl: string;
 }
 
-const PROVIDERS_META: ProviderMeta[] = [
+export const PROVIDERS_META: ProviderMeta[] = [
   {
     id: 'anthropic',
     name: 'Anthropic Claude',
@@ -123,7 +126,7 @@ const PROVIDERS_META: ProviderMeta[] = [
     tagline: 'aiGw.p.openrouter.tagline',
     badge: 'aiGw.p.openrouter.badge',
     color: 'from-[var(--foreground)]/10 to-pink-500/10 text-[var(--foreground)] border-[var(--rim)]',
-    models: ['anthropic/claude-3.7-sonnet', 'openai/gpt-4o', 'deepseek/deepseek-r1'],
+    models: ['openrouter/anthropic/claude-sonnet-4', 'openrouter/openai/gpt-4o-mini'],
     defaultUrl: 'https://openrouter.ai/api/v1',
     keyPlaceholder: 'sk-or-v1-...',
     docsUrl: 'https://openrouter.ai/keys'
@@ -149,6 +152,150 @@ const PROVIDERS_META: ProviderMeta[] = [
     defaultUrl: 'http://localhost:11434',
     keyPlaceholder: 'aiGw.ollamaNoKey',
     docsUrl: 'https://ollama.com'
+  },
+  // OpenAI-compatible API-key providers; requests use a "<id>/<model>" prefix (server: compatProviders.ts)
+  {
+    id: 'groq',
+    name: 'Groq',
+    tagline: 'aiGw.p.groq.tagline',
+    badge: 'aiGw.p.groq.badge',
+    color: 'from-orange-500/20 to-red-500/10 text-orange-500 border-orange-500/30',
+    models: ['groq/llama-3.3-70b-versatile', 'groq/qwen/qwen3-32b'],
+    defaultUrl: 'https://api.groq.com/openai/v1',
+    keyPlaceholder: 'gsk_...',
+    docsUrl: 'https://console.groq.com/keys'
+  },
+  {
+    id: 'mistral',
+    name: 'Mistral AI',
+    tagline: 'aiGw.p.mistral.tagline',
+    badge: 'aiGw.p.mistral.badge',
+    color: 'from-orange-500/20 to-amber-500/10 text-orange-400 border-orange-500/30',
+    models: ['mistral/mistral-large-latest', 'mistral/codestral-latest'],
+    defaultUrl: 'https://api.mistral.ai/v1',
+    keyPlaceholder: '...',
+    docsUrl: 'https://console.mistral.ai/api-keys'
+  },
+  {
+    id: 'xai',
+    name: 'xAI Grok',
+    tagline: 'aiGw.p.xai.tagline',
+    badge: 'aiGw.p.xai.badge',
+    color: 'from-zinc-500/20 to-zinc-500/10 text-[var(--foreground)] border-[var(--rim)]',
+    models: ['xai/grok-4', 'xai/grok-3-mini'],
+    defaultUrl: 'https://api.x.ai/v1',
+    keyPlaceholder: 'xai-...',
+    docsUrl: 'https://console.x.ai'
+  },
+  {
+    id: 'together',
+    name: 'Together AI',
+    tagline: 'aiGw.p.together.tagline',
+    badge: 'aiGw.p.together.badge',
+    color: 'from-blue-500/20 to-indigo-500/10 text-blue-400 border-blue-500/30',
+    models: ['together/meta-llama/Llama-3.3-70B-Instruct-Turbo'],
+    defaultUrl: 'https://api.together.xyz/v1',
+    keyPlaceholder: '...',
+    docsUrl: 'https://api.together.ai/settings/api-keys'
+  },
+  {
+    id: 'fireworks',
+    name: 'Fireworks AI',
+    tagline: 'aiGw.p.fireworks.tagline',
+    badge: 'aiGw.p.fireworks.badge',
+    color: 'from-violet-500/20 to-fuchsia-500/10 text-violet-400 border-violet-500/30',
+    models: ['fireworks/accounts/fireworks/models/llama-v3p3-70b-instruct'],
+    defaultUrl: 'https://api.fireworks.ai/inference/v1',
+    keyPlaceholder: 'fw_...',
+    docsUrl: 'https://fireworks.ai/account/api-keys'
+  },
+  {
+    id: 'cerebras',
+    name: 'Cerebras',
+    tagline: 'aiGw.p.cerebras.tagline',
+    badge: 'aiGw.p.cerebras.badge',
+    color: 'from-orange-500/20 to-rose-500/10 text-orange-400 border-orange-500/30',
+    models: ['cerebras/llama-3.3-70b', 'cerebras/qwen-3-32b'],
+    defaultUrl: 'https://api.cerebras.ai/v1',
+    keyPlaceholder: 'csk-...',
+    docsUrl: 'https://cloud.cerebras.ai'
+  },
+  {
+    id: 'perplexity',
+    name: 'Perplexity',
+    tagline: 'aiGw.p.perplexity.tagline',
+    badge: 'aiGw.p.perplexity.badge',
+    color: 'from-teal-500/20 to-cyan-500/10 text-teal-400 border-teal-500/30',
+    models: ['perplexity/sonar', 'perplexity/sonar-pro'],
+    defaultUrl: 'https://api.perplexity.ai',
+    keyPlaceholder: 'pplx-...',
+    docsUrl: 'https://www.perplexity.ai/settings/api'
+  },
+  {
+    id: 'moonshot',
+    name: 'Moonshot Kimi',
+    tagline: 'aiGw.p.moonshot.tagline',
+    badge: 'aiGw.p.moonshot.badge',
+    color: 'from-slate-500/20 to-zinc-500/10 text-[var(--foreground)] border-[var(--rim)]',
+    models: ['moonshot/kimi-k2-0711-preview'],
+    defaultUrl: 'https://api.moonshot.ai/v1',
+    keyPlaceholder: 'sk-...',
+    docsUrl: 'https://platform.moonshot.ai/console/api-keys'
+  },
+  {
+    id: 'dashscope',
+    name: 'Alibaba Qwen (DashScope)',
+    tagline: 'aiGw.p.dashscope.tagline',
+    badge: 'aiGw.p.dashscope.badge',
+    color: 'from-orange-500/20 to-amber-500/10 text-orange-400 border-orange-500/30',
+    models: ['dashscope/qwen-plus', 'dashscope/qwen3-coder-plus'],
+    defaultUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
+    keyPlaceholder: 'sk-...',
+    docsUrl: 'https://bailian.console.alibabacloud.com'
+  },
+  {
+    id: 'zai',
+    name: 'Z.ai GLM',
+    tagline: 'aiGw.p.zai.tagline',
+    badge: 'aiGw.p.zai.badge',
+    color: 'from-blue-500/20 to-sky-500/10 text-blue-400 border-blue-500/30',
+    models: ['zai/glm-4.5', 'zai/glm-4.5-air'],
+    defaultUrl: 'https://api.z.ai/api/paas/v4',
+    keyPlaceholder: '...',
+    docsUrl: 'https://z.ai/manage-apikey/apikey-list'
+  },
+  {
+    id: 'minimax',
+    name: 'MiniMax',
+    tagline: 'aiGw.p.minimax.tagline',
+    badge: 'aiGw.p.minimax.badge',
+    color: 'from-rose-500/20 to-pink-500/10 text-rose-400 border-rose-500/30',
+    models: ['minimax/MiniMax-M1'],
+    defaultUrl: 'https://api.minimax.io/v1',
+    keyPlaceholder: '...',
+    docsUrl: 'https://www.minimax.io/platform'
+  },
+  {
+    id: 'nvidia',
+    name: 'NVIDIA NIM',
+    tagline: 'aiGw.p.nvidia.tagline',
+    badge: 'aiGw.p.nvidia.badge',
+    color: 'from-lime-500/20 to-green-500/10 text-lime-500 border-lime-500/30',
+    models: ['nvidia/meta/llama-3.3-70b-instruct'],
+    defaultUrl: 'https://integrate.api.nvidia.com/v1',
+    keyPlaceholder: 'nvapi-...',
+    docsUrl: 'https://build.nvidia.com'
+  },
+  {
+    id: 'custom',
+    name: 'Custom (OpenAI-compatible)',
+    tagline: 'aiGw.p.custom.tagline',
+    badge: 'aiGw.p.custom.badge',
+    color: 'from-zinc-500/20 to-stone-500/10 text-[var(--muted-foreground)] border-[var(--border)]',
+    models: ['custom/<model-name>'],
+    defaultUrl: '',
+    keyPlaceholder: 'sk-... (optional)',
+    docsUrl: 'https://platform.openai.com/docs/api-reference/chat'
   }
 ];
 
@@ -189,6 +336,8 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
   // Provider Connection Modal
   const [connectingProvider, setConnectingProvider] = useState<ProviderMeta | null>(null);
   const [connectApiKey, setConnectApiKey] = useState('');
+  const [connectKeyLabel, setConnectKeyLabel] = useState('');
+  const [connectAddNew, setConnectAddNew] = useState(false);
   const [connectBaseUrl, setConnectBaseUrl] = useState('');
   const [revealedKey, setRevealedKey] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -197,6 +346,10 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
   // Usage tab filters
   const [usageSearch, setUsageSearch] = useState('');
   const [providerFilter, setProviderFilter] = useState<string>('all');
+
+  // Providers tab search & filter
+  const [apiSearch, setApiSearch] = useState('');
+  const [apiFilter, setApiFilter] = useState<'all' | 'connected' | 'native' | 'compat'>('all');
 
   const loadData = async () => {
     try {
@@ -235,10 +388,12 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
     }, 2000);
   };
 
-  const openConnectModal = (p: ProviderMeta) => {
+  const openConnectModal = (p: ProviderMeta, addNew = false) => {
     const existing = config?.providers?.[p.id];
     setConnectingProvider(p);
-    setConnectApiKey(existing?.apiKey || '');
+    setConnectAddNew(addNew);
+    setConnectKeyLabel('');
+    setConnectApiKey(addNew ? '' : (existing?.apiKey || ''));
     setConnectBaseUrl(existing?.baseUrl || p.defaultUrl);
     setRevealedKey(false);
     setVerificationResult(null);
@@ -255,11 +410,15 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
       const res = await connectProviderApi(
         connectingProvider.id,
         connectApiKey.trim(),
-        connectBaseUrl.trim() || connectingProvider.defaultUrl
+        connectBaseUrl.trim() || connectingProvider.defaultUrl,
+        { label: connectKeyLabel.trim() || undefined, addNew: connectAddNew }
       );
 
       setVerificationResult(res.verification);
       setConfig(res.config);
+      setConnectApiKey('');
+      setConnectKeyLabel('');
+      setConnectAddNew(false);
       toast.success(t('aiGateway.connectionVerified'));
       setTimeout(() => {
         setConnectingProvider(null);
@@ -273,6 +432,30 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
       toast.error(err.message || t('aiGateway.connectionFailed'));
     } finally {
       setIsVerifying(false);
+    }
+  };
+
+  const handleMoveProviderKey = async (providerId: AiProviderId, index: number, delta: -1 | 1) => {
+    const list = config?.providers?.[providerId]?.apiKeys || [];
+    const targetIdx = index + delta;
+    if (targetIdx < 0 || targetIdx >= list.length) return;
+    const ids = list.map((k) => k.id);
+    const [moved] = ids.splice(index, 1);
+    ids.splice(targetIdx, 0, moved);
+    try {
+      const updated = await reorderProviderKeysApi(providerId, ids);
+      setConfig(updated);
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleRemoveProviderKey = async (providerId: AiProviderId, keyId: string) => {
+    try {
+      const updated = await disconnectProviderApi(providerId, keyId);
+      setConfig(updated);
+    } catch (err: any) {
+      toast.error(err.message);
     }
   };
 
@@ -493,141 +676,219 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
 
       {/* ----------------- TAB 1: PROVIDERS & ACCOUNTS (9ROUTER STYLE) ----------------- */}
       {currentTab === 'providers' && (
-        <div className="space-y-6">
-          {/* Workflow callout */}
-          <div className="p-4 rounded-xl bg-[var(--foreground)]/[0.03] border border-[var(--rim)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-[var(--foreground)]/[0.06] text-[var(--foreground)] flex items-center justify-center shrink-0 mt-0.5">
-                <Zap className="w-4 h-4" />
+        <div className="space-y-5">
+          {/* Compact Workflow Callout */}
+          <div className="px-3.5 py-2.5 rounded-xl bg-[var(--foreground)]/[0.03] border border-[var(--rim)] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-[var(--foreground)]/[0.06] text-[var(--foreground)] flex items-center justify-center shrink-0">
+                <Zap className="w-3.5 h-3.5" />
               </div>
-              <div className="space-y-0.5">
-                <div className="text-xs font-semibold text-[var(--foreground)]">
+              <div className="min-w-0">
+                <div className="text-xs font-semibold text-[var(--foreground)] truncate">
                   {t('aiGw.step1Title')}
                 </div>
-                <div className="text-[11px] text-[var(--muted-foreground)]">
+                <div className="text-[11px] text-[var(--muted-foreground)] truncate">
                   {t('aiGw.step1Desc')}
                 </div>
               </div>
             </div>
             {connectedCount > 0 ? (
-              <Button size="sm" onClick={() => onTabChange('keys')} className="btn-metal shrink-0">
+              <Button size="sm" onClick={() => onTabChange('keys')} className="btn-metal h-7 text-xs shrink-0">
                 {t('aiGw.step1Next')}
               </Button>
             ) : null}
           </div>
 
-          <div className="space-y-1">
-            <h3 className="text-sm font-semibold text-[var(--foreground)]">{t('aiGw.subsTitle')}</h3>
-            <p className="text-[11px] text-[var(--muted-foreground)]">{t('aiGw.subsDesc')} <code className="font-mono">alias/model</code> · <code className="font-mono">cc/claude-sonnet-5</code> · <code className="font-mono">/v1/chat/completions</code></p>
+          <div className="space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
+              <h3 className="text-sm font-semibold text-[var(--foreground)]">{t('aiGw.subsTitle')}</h3>
+              <p className="text-[11px] text-[var(--muted-foreground)]">
+                {t('aiGw.subsDesc')} <code className="font-mono">alias/model</code> · <code className="font-mono">cc/claude-sonnet-4-6</code> · <code className="font-mono">/v1/chat/completions</code>
+              </p>
+            </div>
+            <SubscriptionAccounts />
           </div>
-          <SubscriptionAccounts />
+
           <Combos />
 
-          <h3 className="text-sm font-semibold text-[var(--foreground)] pt-2">{t('aiGw.apiKeyTitle')}</h3>
-          {/* Providers Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {PROVIDERS_META.map((p) => {
-              const provConfig = config?.providers?.[p.id];
-              const isConnected = provConfig?.connected === true && (provConfig?.apiKey || p.id === 'ollama');
+          {/* API-Key Providers Section with Search & Filter Pills */}
+          <div className="space-y-3 pt-1">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-[var(--foreground)]">{t('aiGw.apiKeyTitle')}</h3>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--muted)] text-[var(--muted-foreground)]">
+                  {connectedCount}/{PROVIDERS_META.length}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-[var(--muted-foreground)] absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={apiSearch}
+                    onChange={(e) => setApiSearch(e.target.value)}
+                    placeholder="Filter providers or models…"
+                    className="h-7 pl-7 pr-2.5 rounded-lg border border-[var(--border)] bg-[var(--background)] text-xs text-[var(--foreground)] placeholder-[var(--muted-foreground)] outline-none focus:border-[var(--rim)] w-44 sm:w-52"
+                  />
+                </div>
+                {([
+                  { id: 'all', label: 'All' },
+                  { id: 'connected', label: `Connected (${connectedCount})` },
+                  { id: 'native', label: 'Core (6)' },
+                  { id: 'compat', label: 'OpenAI-Compat (13)' }
+                ] as const).map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setApiFilter(f.id)}
+                    className={`h-7 px-2.5 rounded-lg text-[11px] font-medium transition-colors border ${
+                      apiFilter === f.id
+                        ? 'bg-[var(--foreground)] text-[var(--background)] border-transparent'
+                        : 'border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]/50'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-              return (
-                <Card
-                  key={p.id}
-                  className={`p-4 bg-[var(--card)] border transition-all duration-200 flex flex-col justify-between ${
-                    isConnected
-                      ? 'border-emerald-500/40 shadow-sm'
-                      : 'border-[var(--border)] hover:border-[var(--border)]/80'
-                  }`}
-                >
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
-                        <div className={`w-9 h-9 rounded-xl border flex items-center justify-center font-bold text-sm shadow-sm bg-gradient-to-br ${p.color}`}>
-                          <BrandIcon name={p.id} className="w-[18px] h-[18px]" fallback={p.name.slice(0, 1)} />
+            {/* Compact High-Density Providers Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {[...PROVIDERS_META]
+                .filter((p) => {
+                  const provConfig = config?.providers?.[p.id];
+                  const isConnected = provConfig?.connected === true && (provConfig?.apiKey || p.id === 'ollama' || p.id === 'custom');
+                  const isNative = ['anthropic', 'openai', 'deepseek', 'openrouter', 'gemini', 'ollama'].includes(p.id);
+                  if (apiFilter === 'connected' && !isConnected) return false;
+                  if (apiFilter === 'native' && !isNative) return false;
+                  if (apiFilter === 'compat' && isNative) return false;
+                  if (!apiSearch.trim()) return true;
+                  const q = apiSearch.toLowerCase();
+                  return (
+                    p.name.toLowerCase().includes(q) ||
+                    p.id.toLowerCase().includes(q) ||
+                    p.models.some((m) => m.toLowerCase().includes(q))
+                  );
+                })
+                .sort((a, b) => {
+                  const aConn = config?.providers?.[a.id]?.connected ? 1 : 0;
+                  const bConn = config?.providers?.[b.id]?.connected ? 1 : 0;
+                  return bConn - aConn;
+                })
+                .map((p) => {
+                  const provConfig = config?.providers?.[p.id];
+                  const isConnected = provConfig?.connected === true && (provConfig?.apiKey || p.id === 'ollama' || p.id === 'custom');
+
+                  return (
+                    <Card
+                      key={p.id}
+                      className={`p-3 bg-[var(--card)] border transition-all duration-150 flex flex-col justify-between gap-2.5 ${
+                        isConnected
+                          ? 'border-emerald-500/40 shadow-sm'
+                          : 'border-[var(--border)] hover:border-[var(--rim)]'
+                      }`}
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className={`w-8 h-8 rounded-lg border flex items-center justify-center font-bold text-xs shadow-sm shrink-0 bg-gradient-to-br ${p.color}`}>
+                              <BrandIcon name={p.id} className="w-4 h-4" fallback={p.name.slice(0, 1)} />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-semibold text-xs text-[var(--foreground)] truncate">{p.name}</div>
+                              <div className="text-[10px] text-[var(--muted-foreground)] font-mono truncate">{t(p.badge)}</div>
+                            </div>
+                          </div>
+
+                          {isConnected ? (
+                            <span
+                              title={provConfig?.latencyMs ? `${provConfig.latencyMs}ms` : t('aiGw.connected')}
+                              className="text-[9.5px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 flex items-center gap-1 font-mono shrink-0"
+                            >
+                              <CheckCircle2 className="w-2.5 h-2.5 text-emerald-500" />
+                              {(provConfig?.apiKeys?.length || 0) > 1
+                                ? `${provConfig!.apiKeys!.length} keys`
+                                : provConfig?.latencyMs
+                                ? `${provConfig.latencyMs}ms`
+                                : t('aiGw.connected')}
+                            </span>
+                          ) : (
+                            <span className="w-2 h-2 rounded-full bg-[var(--muted)] mt-1.5 shrink-0" title={t('aiGw.disconnected')} />
+                          )}
                         </div>
-                        <div>
-                          <div className="font-semibold text-xs text-[var(--foreground)]">{p.name}</div>
-                          <div className="text-[10px] text-[var(--muted-foreground)] font-mono">{t(p.badge)}</div>
+
+                        <p className="text-[11px] text-[var(--muted-foreground)] line-clamp-1" title={t(p.tagline)}>
+                          {t(p.tagline)}
+                        </p>
+
+                        <div className="flex flex-wrap gap-1">
+                          {p.models.slice(0, 2).map((m) => {
+                            const fullModel = m.includes('/') ? m : `${p.id}/${m}`;
+                            return (
+                              <button
+                                key={m}
+                                type="button"
+                                onClick={() => copyToClipboard(m, `model-${m}`)}
+                                title={`Click to copy ${fullModel}`}
+                                className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--muted)]/80 hover:bg-[var(--muted)] text-[var(--foreground)] truncate max-w-[165px] transition-colors"
+                              >
+                                {m}
+                              </button>
+                            );
+                          })}
+                          {p.models.length > 2 && (
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--muted)]/50 text-[var(--muted-foreground)]">
+                              +{p.models.length - 2}
+                            </span>
+                          )}
                         </div>
                       </div>
 
-                      {isConnected ? (
-                        <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-500 border-emerald-500/30 flex items-center gap-1 font-mono">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                          {t('aiGw.connected')}
-                          {provConfig?.latencyMs ? ` (${provConfig.latencyMs}ms)` : ''}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-[10px] text-[var(--muted-foreground)] bg-[var(--muted)]/50">
-                          {t('aiGw.disconnected')}
-                        </Badge>
-                      )}
-                    </div>
-
-                    <p className="text-[11px] text-[var(--muted-foreground)] line-clamp-2 min-h-[32px]">
-                      {t(p.tagline)}
-                    </p>
-
-                    <div className="space-y-1 pt-1">
-                      <div className="text-[10px] font-medium text-[var(--muted-foreground)] uppercase">{t('aiGw.supportedModels')}</div>
-                      <div className="flex flex-wrap gap-1">
-                        {p.models.slice(0, 2).map((m) => (
-                          <span key={m} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--muted)] text-[var(--foreground)]">
-                            {m}
-                          </span>
-                        ))}
-                        {p.models.length > 2 && (
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--muted)] text-[var(--muted-foreground)]">
-                            {t('aiGw.nMore', { n: p.models.length - 2 })}
-                          </span>
+                      <div className="pt-2 border-t border-[var(--border)]/60 flex items-center justify-between gap-2">
+                        {isConnected ? (
+                          <>
+                            <button
+                              onClick={() => handleDisconnect(p.id)}
+                              className="text-[10.5px] text-red-500 hover:text-red-400 transition-colors flex items-center gap-1"
+                            >
+                              <Unplug className="w-3 h-3" />
+                              {t('aiGw.disconnect')}
+                            </button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openConnectModal(p)}
+                              className="h-6 px-2.5 text-[11px] border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10"
+                            >
+                              {t('aiGw.configure')}
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <a
+                              href={p.docsUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[10.5px] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors flex items-center gap-1"
+                            >
+                              {t('aiGw.getKey')} <ExternalLink className="w-2.5 h-2.5" />
+                            </a>
+                            <Button
+                              size="sm"
+                              onClick={() => openConnectModal(p)}
+                              className="h-6 px-2.5 text-[11px] btn-metal"
+                            >
+                              <Plug className="w-2.5 h-2.5 mr-1" />
+                              {t('aiGw.connect')}
+                            </Button>
+                          </>
                         )}
                       </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t border-[var(--border)] mt-4 flex items-center justify-between gap-2">
-                    {isConnected ? (
-                      <>
-                        <button
-                          onClick={() => handleDisconnect(p.id)}
-                          className="text-[11px] text-red-500 hover:text-red-600 transition-colors flex items-center gap-1"
-                        >
-                          <Unplug className="w-3 h-3" />
-                          {t('aiGw.disconnect')}
-                        </button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openConnectModal(p)}
-                          className="h-7 text-xs border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10"
-                        >
-                          {t('aiGw.configure')}
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <a
-                          href={p.docsUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-[11px] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors flex items-center gap-1"
-                        >
-                          {t('aiGw.getKey')} <ExternalLink className="w-2.5 h-2.5" />
-                        </a>
-                        <Button
-                          size="sm"
-                          onClick={() => openConnectModal(p)}
-                          className="h-7 text-xs btn-metal"
-                        >
-                          <Plug className="w-3 h-3 mr-1" />
-                          {t('aiGw.connect')}
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </Card>
-              );
-            })}
+                    </Card>
+                  );
+                })}
+            </div>
           </div>
         </div>
       )}
@@ -916,11 +1177,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                 className="h-8 px-2.5 text-xs rounded-lg bg-[var(--background)] border border-[var(--border)] text-[var(--foreground)]"
               >
                 <option value="all">{t('aiGw.allProviders')}</option>
-                <option value="anthropic">Anthropic</option>
-                <option value="openai">OpenAI</option>
-                <option value="deepseek">DeepSeek</option>
-                <option value="openrouter">OpenRouter</option>
-                <option value="ollama">Ollama</option>
+                {PROVIDERS_META.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
 
@@ -1031,38 +1288,122 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
             </div>
 
             {connectingProvider.id !== 'ollama' && (
-              <div>
-                <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">
-                  {t('aiGw.apiKeyLabel')}
-                </label>
-                <div className="relative">
-                  <Input
-                    required
-                    type={revealedKey ? 'text' : 'password'}
-                    value={connectApiKey}
-                    onChange={(e) => setConnectApiKey(e.target.value)}
-                    placeholder={connectingProvider.keyPlaceholder.startsWith('aiGw.') ? t(connectingProvider.keyPlaceholder as MessageKey) : connectingProvider.keyPlaceholder}
-                    className="font-mono text-xs pr-8"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setRevealedKey(!revealedKey)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-                  >
-                    {revealedKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                  </button>
+              <div className="space-y-3">
+                {/* Connected Multi-Account API Keys Rotation Queue */}
+                {(config?.providers?.[connectingProvider.id]?.apiKeys?.length || 0) > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-semibold text-[var(--foreground)]">
+                        Connected Accounts / Keys ({config!.providers![connectingProvider.id]!.apiKeys!.length})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setConnectAddNew(true);
+                          setConnectApiKey('');
+                          setConnectKeyLabel('');
+                        }}
+                        className="text-[11px] font-medium text-emerald-500 hover:underline flex items-center gap-1"
+                      >
+                        <Plus className="w-3 h-3" /> Add Another Key
+                      </button>
+                    </div>
+                    <div className="space-y-1 max-h-36 overflow-y-auto pr-0.5">
+                      {config!.providers![connectingProvider.id]!.apiKeys!.map((k, idx, arr) => (
+                        <div
+                          key={k.id}
+                          className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--background)] border border-[var(--border)] text-xs"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--muted)] text-[var(--foreground)]">
+                              #{idx + 1}
+                            </span>
+                            <span className="font-mono text-[11px] text-[var(--foreground)] truncate">
+                              {k.label ? `${k.label} (${k.apiKey})` : k.apiKey}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {arr.length > 1 && (
+                              <>
+                                <button
+                                  type="button"
+                                  disabled={idx === 0}
+                                  onClick={() => handleMoveProviderKey(connectingProvider.id, idx, -1)}
+                                  title="Move up in rotation order"
+                                  className="p-1 rounded hover:bg-[var(--muted)] disabled:opacity-30"
+                                >
+                                  <ArrowUp className="w-3 h-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={idx === arr.length - 1}
+                                  onClick={() => handleMoveProviderKey(connectingProvider.id, idx, 1)}
+                                  title="Move down in rotation order"
+                                  className="p-1 rounded hover:bg-[var(--muted)] disabled:opacity-30"
+                                >
+                                  <ArrowDown className="w-3 h-3" />
+                                </button>
+                              </>
+                            )}
+                            {arr.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveProviderKey(connectingProvider.id, k.id)}
+                                title="Remove key"
+                                className="p-1 rounded text-red-500 hover:bg-red-500/10"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">
+                    {connectAddNew ? 'New Account / Key Label (optional)' : t('aiGw.apiKeyLabel')}
+                  </label>
+                  {connectAddNew && (
+                    <Input
+                      value={connectKeyLabel}
+                      onChange={(e) => setConnectKeyLabel(e.target.value)}
+                      placeholder="e.g. Backup Key #2, Team Account"
+                      className="text-xs mb-2"
+                    />
+                  )}
+                  <div className="relative">
+                    <Input
+                      required
+                      type={revealedKey ? 'text' : 'password'}
+                      value={connectApiKey}
+                      onChange={(e) => setConnectApiKey(e.target.value)}
+                      placeholder={connectingProvider.keyPlaceholder.startsWith('aiGw.') ? t(connectingProvider.keyPlaceholder as MessageKey) : connectingProvider.keyPlaceholder}
+                      className="font-mono text-xs pr-8"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setRevealedKey(!revealedKey)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                    >
+                      {revealedKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
 
             <div>
               <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1">
-                {t('aiGw.baseUrlLabel')}
+                {connectingProvider.defaultUrl ? t('aiGw.baseUrlLabel') : t('aiGw.baseUrlRequired')}
               </label>
               <Input
                 value={connectBaseUrl}
                 onChange={(e) => setConnectBaseUrl(e.target.value)}
-                placeholder={connectingProvider.defaultUrl}
+                placeholder={connectingProvider.defaultUrl || 'http://localhost:4000/v1'}
+                required={!connectingProvider.defaultUrl}
                 className="font-mono text-xs"
               />
             </div>

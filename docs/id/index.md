@@ -3,10 +3,10 @@ layout: home
 
 hero:
   name: 7Server
-  text: Kelola seluruh server VPS dari satu dashboard.
+  text: Kelola semua server dari satu dashboard.
   tagline: Kontrol panel multi-server agentless & AI SRE copilot. Tanpa install software apa pun di server target.
   image:
-    src: /favicon.jpg
+    src: /favicon.png
     alt: Ikon 7Server
   actions:
     - theme: brand
@@ -15,6 +15,9 @@ hero:
     - theme: alt
       text: Arsitektur & Keamanan
       link: /id/getting-started/architecture
+    - theme: alt
+      text: Komunitas Discord
+      link: https://discord.gg/AF2Hc56t3N
     - theme: alt
       text: Repositori GitHub
       link: https://github.com/nannndev/7server

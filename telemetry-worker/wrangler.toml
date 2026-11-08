@@ -1,0 +1,11 @@
+name = "sevenserver-telemetry"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# KV Namespace for tracking anonymous instances
+# Create with: npx wrangler kv:namespace create STATS_KV
+# Then paste the generated id below:
+# [[kv_namespaces]]
+# binding = "STATS_KV"
+# id = "<YOUR_KV_NAMESPACE_ID>"
+

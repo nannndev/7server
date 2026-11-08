@@ -58,6 +58,40 @@ When an application deployment or monorepo stack service fails (for example, exi
 
 ---
 
+## Built-in DevOps Engineer Skill & Custom Skills (`SKILL.md`)
+
+7Server's AI SRE Copilot ships with a rich library of operational skills and lets you extend it with your own playbooks:
+
+### 1. Built-in `devops-engineer` Baseline & Domain Playbooks
+- **DevOps Engineer Baseline (`devops-engineer`)**: Enabled by default. Uses the **Build / Deploy / Ops Hats** methodology and a 7-step operational loop (*Observe → Correlate → Root Cause → Minimal Fix → Verify → Harden*) across systemd, Docker, Nginx, TLS, and Linux kernel diagnostics.
+- **Context-Triggered SRE Skills**: Automatically injects specialized playbooks based on your active dashboard tab or question—covering **Web Apps & PM2**, **Docker & Compose**, **Nginx & Reverse Proxy**, **SSL & Certbot**, **Firewall & SSH Hardening**, **Databases (Postgres/MySQL/Redis/Mongo)**, **Performance Triage**, and **Disk Cleanup**.
+
+### 2. Custom Skills (`SKILL.md`) in Agent Settings
+Open **Copilot Drawer → Agent Settings (⚙️) → Custom Skills (`SKILL.md`)** to add your own domain playbooks or import skills from community repositories (such as `skills.sh` or `claude-skills`):
+- **Paste Raw `SKILL.md`**: Paste any markdown file with YAML frontmatter (`name`, `triggers`)—7Server automatically parses the frontmatter and registers the playbook.
+- **Keyword Triggers or Always Active**: Specify comma-separated trigger keywords (e.g. `k8s, kubectl, helm, pod`) so the skill only loads when relevant, or leave triggers empty so the skill is always active.
+
+---
+
+## Context Compaction (`/compact`) & Slash Commands
+
+Long troubleshooting sessions with large SSH log outputs can quickly fill a model's context window. 7Server includes dual-layer **Context Compaction**:
+
+- **Interactive `/compact` Command & Pill Button**: Type `/compact` in the chat input (or click the **Compact** pill button once a conversation has 6+ messages) to condense older messages and terminal outputs into a single expandable **Context Compacted** summary card while keeping the latest turns intact.
+- **Automatic Backend Compaction**: Before forwarding conversation history to the upstream AI provider, 7Server automatically compacts older `UNTRUSTED_OUTPUT` terminal blocks and summarizes older turns when history exceeds the token budget.
+- **Built-in Slash Commands**: Type `/` in the Copilot input to access quick operational playbooks:
+  - `/compact` — Compact older messages & SSH outputs to save context tokens
+  - `/diagnose` — Full server health triage (CPU, RAM, disk, load, failed units)
+  - `/docker` — Inspect containers, restart loops, and resource usage
+  - `/logs` — Analyze recent systemd & application error logs
+  - `/nginx` — Audit Nginx configs, upstream 502/504 errors, and active vhosts
+  - `/ssl` — Check TLS certificates and Certbot renewal timers
+  - `/ports` — List all listening TCP/UDP sockets and owning processes
+  - `/disk` — Find largest directories, Docker volumes, and log growth
+  - `/security` — Audit SSH logins, firewall rules, and open ports
+
+---
+
 ## Safety Rails & Injection Hardening
 
 1. **Strict Read-Only Allowlist**: Commands like `systemctl status`, `docker ps`, `docker stats`, `docker logs`, `ss`, `netstat`, `df`, `free`, and `journalctl` run automatically without interrupting you.

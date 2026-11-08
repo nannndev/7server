@@ -2,12 +2,13 @@ import { defineConfig } from 'vitepress';
 
 export default defineConfig({
   title: '7Server',
-  description: 'Self-hosted, agentless multi-VPS control plane & AI SRE copilot documentation',
+  description: 'Self-hosted, agentless multi-server control plane & AI SRE copilot documentation',
   cleanUrls: true,
   lastUpdated: true,
   ignoreDeadLinks: true,
   head: [
-    ['link', { rel: 'icon', href: '/favicon.jpg' }],
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }],
+    ['link', { rel: 'alternate icon', type: 'image/png', href: '/favicon.png' }],
     ['meta', { name: 'theme-color', content: '#09090b' }],
     ['meta', { name: 'og:site_name', content: '7Server Documentation' }],
   ],
@@ -17,7 +18,7 @@ export default defineConfig({
       label: 'English',
       lang: 'en',
       title: '7Server Docs',
-      description: 'Run every VPS from one dashboard. Install nothing on them.',
+      description: 'Run every server from one dashboard. Install nothing on them.',
       themeConfig: {
         nav: [
           { text: 'Guide', link: '/getting-started/introduction' },
@@ -29,7 +30,8 @@ export default defineConfig({
             text: 'Links',
             items: [
               { text: 'Dashboard App', link: 'http://localhost:3000' },
-              { text: 'GitHub Repository', link: 'https://github.com/nannndev/7server' }
+              { text: 'GitHub Repository', link: 'https://github.com/nannndev/7server' },
+              { text: 'Discord Community', link: 'https://discord.gg/AF2Hc56t3N' }
             ]
           }
         ],
@@ -151,17 +153,18 @@ export default defineConfig({
   },
 
   themeConfig: {
-    logo: '/favicon.jpg',
+    logo: '/favicon.png',
     siteTitle: '7Server',
     search: {
       provider: 'local'
     },
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/nannndev/7server' }
+      { icon: 'github', link: 'https://github.com/nannndev/7server' },
+      { icon: 'discord', link: 'https://discord.gg/AF2Hc56t3N' }
     ],
     footer: {
-      message: 'Self-hosted, Agentless Multi-VPS Management & AI Control Plane.',
-      copyright: 'Copyright © 2026 7Server. Licensed under MIT.'
+      message: 'Self-hosted, Agentless Multi-Server Management & AI Control Plane.',
+      copyright: 'Copyright © 2026 Nandang Eka Prasetya (nannndev). All rights reserved.'
     }
   }
 });

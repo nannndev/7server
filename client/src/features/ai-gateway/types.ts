@@ -1,4 +1,5 @@
-export type AiProviderId = 'anthropic' | 'openai' | 'gemini' | 'deepseek' | 'ollama' | 'openrouter';
+export type AiProviderId = 'anthropic' | 'openai' | 'gemini' | 'deepseek' | 'ollama' | 'openrouter'
+  | 'groq' | 'mistral' | 'xai' | 'together' | 'fireworks' | 'cerebras' | 'perplexity' | 'moonshot' | 'dashscope' | 'zai' | 'minimax' | 'nvidia' | 'custom';
 
 export interface VirtualApiKey {
   id: string;
@@ -16,8 +17,16 @@ export interface VirtualApiKey {
   totalOutputTokens: number;
 }
 
+export interface ProviderApiKeyAccount {
+  id: string;
+  label?: string;
+  apiKey: string;
+  addedAt: string;
+}
+
 export interface ProviderConfig {
   apiKey?: string;
+  apiKeys?: ProviderApiKeyAccount[];
   baseUrl?: string;
   enabled: boolean;
   connected?: boolean;
@@ -68,9 +77,11 @@ export interface AiGatewayStats {
 }
 
 // Subscription accounts logged in via OAuth (9Router style). Model ids are `alias/model`.
-export type OAuthProviderId = 'claude' | 'codex' | 'copilot' | 'gemini-cli';
+export type OAuthProviderId = 'claude' | 'codex' | 'copilot' | 'gemini-cli' | 'kimi' | 'kilocode' | 'muse' | 'nous';
 export interface SubscriptionAccount {
+  id: string;
   provider: OAuthProviderId;
+  label?: string;
   email?: string;
   connectedAt: string;
   refreshedAt?: string;
@@ -82,4 +93,4 @@ export type LoginStart =
   | { kind: 'device'; sessionId: string; userCode: string; verificationUri: string; interval: number; expiresIn: number };
 
 export interface QuotaWindow { name: string; usedPercent: number; resetsAt?: string; used?: number; total?: number }
-export interface AccountUsage { provider: OAuthProviderId; plan?: string; windows: QuotaWindow[]; exhausted: boolean; checkedAt: string; error?: string }
+export interface AccountUsage { accountId?: string; provider: OAuthProviderId; plan?: string; windows: QuotaWindow[]; exhausted: boolean; checkedAt: string; error?: string }

@@ -248,7 +248,7 @@ export default function Sidebar(p: SidebarProps) {
             className="metal w-8 h-8 rounded-[9px] overflow-hidden border p-px shrink-0 transition-transform hover:scale-105 active:scale-95"
             aria-label={t('nav.toFleet')}
           >
-            <img src="/icons/icon-opt2-server-blade.jpg" alt="7Server" className="w-full h-full object-cover rounded-[8px]" />
+            <img src="/icons/icon-opt2-server-blade.png" alt="7Server" className="w-full h-full object-cover rounded-[8px]" />
           </button>
           {!rail && (
             <div className="min-w-0 flex-1">

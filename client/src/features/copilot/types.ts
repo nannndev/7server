@@ -10,19 +10,29 @@ export interface CommandRun {
   durationMs?: number;
 }
 
+export interface CopilotError {
+  title: string;
+  items: { provider: string; reason: string; detail?: string }[];
+  hint?: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;
-  /** 'tool' = command output fed back to the AI (sent as a user turn, rendered compactly) */
-  kind?: 'tool';
+  /** 'tool' = command output fed back to the AI; 'compact' = summarized earlier conversation context */
+  kind?: 'tool' | 'compact';
   runs?: CommandRun[];
   serverId?: string;
   /** agent loop depth for this user prompt */
   step?: number;
   /** outputs already sent back to the AI (loop guard) */
   fed?: boolean;
+  /** request failure: rendered as an error card, never sent back to the model */
+  error?: CopilotError;
+  /** resolved model that generated this assistant reply (e.g. "cc/claude-sonnet-4-6" or "groq/llama-3.3-70b-versatile") */
+  model?: string;
 }
 
 export interface CopilotContext {

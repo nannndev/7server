@@ -1802,7 +1802,18 @@ Periksa apakah ada konfigurasi port, Docker compose, atau variabel environment y
           }
           onBackToConfig={() => setStep('config')}
           onRetry={() => (isStackMode ? handleStartDeploy() : retryDeploy())}
-          onDone={onClose}
+          onDone={() => {
+            onAppCreated?.({
+              name: appName,
+              type: inspectResult?.framework || 'Node.js',
+              domain: exposureMode === 'none' ? '' : customDomain || '',
+              ports: String(internalPort),
+              gitBranch: selectedBranch,
+              path: `/var/www/${appName}`,
+              modified: t('gitApp.justNow')
+            });
+            onClose();
+          }}
         />
       )}
       <SudoPasswordModal

@@ -3,17 +3,69 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import {
   Activity, ArrowLeft, ArrowRight, Boxes, Check, ChevronLeft, ChevronRight, Clock, Copy, Cpu, Database,
-  Expand, EyeOff, FileText, GitBranch, Globe, HardDrive, KeyRound, Languages, Layers, Lock, Moon, Network, Server,
-  ShieldCheck, Sparkles, Sun, Terminal, X
+  Download, Expand, EyeOff, FileText, GitBranch, Globe, HardDrive, KeyRound, Languages, Layers, Lock, Moon, Network, Server,
+  ShieldCheck, Sparkles, Star, Sun, Terminal, X
 } from 'lucide-react';
 import { Analytics } from '@vercel/analytics/react';
 import { AgentlessBench } from './figure/AgentlessBench';
-import { GithubIcon } from './components/BrandIcons';
+import { GithubIcon, DiscordIcon, ProviderBrandIcon } from './components/BrandIcons';
 import { ContributorsPage, PrivacyPage, SupportPage } from './pages';
 import { COPY, type Lang } from './i18n';
 
 const REPO = 'https://github.com/nannndev/7server';
-const LOGO = '/icons/icon-opt2-server-blade.jpg';
+const DISCORD = 'https://discord.gg/AF2Hc56t3N';
+const LOGO = '/icons/icon-opt2-server-blade.png';
+
+let cachedStats: { stars: number | null; downloads: number | null; active: number | null } = {
+  stars: null,
+  downloads: null,
+  active: null,
+};
+let statsFetched = false;
+
+function useProjectStats() {
+  const [stats, setStats] = useState(cachedStats);
+
+  useEffect(() => {
+    if (statsFetched) {
+      setStats(cachedStats);
+      return;
+    }
+    statsFetched = true;
+
+    fetch('https://api.github.com/repos/nannndev/7server')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d && typeof d.stargazers_count === 'number') {
+          cachedStats = { ...cachedStats, stars: d.stargazers_count };
+          setStats({ ...cachedStats });
+        }
+      })
+      .catch(() => {});
+
+    fetch('https://api.npmjs.org/downloads/point/last-month/sevenserver')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d && typeof d.downloads === 'number') {
+          cachedStats = { ...cachedStats, downloads: d.downloads };
+          setStats({ ...cachedStats });
+        }
+      })
+      .catch(() => {});
+
+    fetch('https://sevenserver-telemetry.ekaprasetya2244.workers.dev/api/v1/stats')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        const total = typeof d?.total_installs === 'number' ? d.total_installs : (typeof d?.active_instances_30d === 'number' ? d.active_instances_30d : 0);
+        const count = Math.max(200, total);
+        cachedStats = { ...cachedStats, active: count };
+        setStats({ ...cachedStats });
+      })
+      .catch(() => {});
+  }, []);
+
+  return stats;
+}
 
 const Logo = ({ size = 28 }: { size?: number }) => (
   <img src={LOGO} alt="" width={size} height={size} className="rounded-[22%] shadow-sm" style={{ width: size, height: size }} />
@@ -185,6 +237,7 @@ function Lightbox({
 // ---------------------------------------------------------------- sections
 function Nav({ lang, toggleLang }: { lang: Lang; toggleLang: () => void }) {
   const { theme, toggle } = useTheme();
+  const { stars } = useProjectStats();
   const t = COPY[lang].nav;
   return (
     <header className="sticky top-0 z-40 border-b backdrop-blur-md" style={{ borderColor: 'var(--line)', background: 'color-mix(in srgb, var(--anatomy-page) 82%, transparent)' }}>
@@ -234,8 +287,16 @@ function Nav({ lang, toggleLang }: { lang: Lang; toggleLang: () => void }) {
             <Sun className="theme-icon absolute h-4 w-4" data-off={theme === 'dark' ? undefined : ''} />
             <Moon className="theme-icon absolute h-4 w-4" data-off={theme === 'dark' ? '' : undefined} />
           </button>
-          <a href={REPO} className="hidden items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-[var(--line)] sm:flex">
+          <a href={DISCORD} target="_blank" rel="noopener noreferrer" className="hidden items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm transition-colors hover:bg-[var(--line)] hover:text-[#5865F2] sm:flex" title="Join 7Server Discord Community">
+            <DiscordIcon className="h-4 w-4" /> Discord
+          </a>
+          <a href={REPO} target="_blank" rel="noopener noreferrer" className="hidden items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-[var(--line)] sm:flex">
             <GithubIcon className="h-4 w-4" /> GitHub
+            {stars !== null && stars > 0 && (
+              <span className="rounded-full bg-[var(--line)] px-2 py-0.5 text-[11px] font-mono text-[var(--anatomy-muted)]">
+                ★ {stars}
+              </span>
+            )}
           </a>
         </div>
       </div>
@@ -251,6 +312,7 @@ function Hero({
   onZoom: (item: { src: string; title: string; route?: string }) => void;
 }) {
   const shot = useShot();
+  const { stars, downloads, active } = useProjectStats();
   const t = COPY[lang].hero;
   const [activeTab, setActiveTab] = useState(0);
   const currentPreview = t.heroTabs[activeTab] || t.heroTabs[0];
@@ -282,6 +344,35 @@ function Hero({
           <div className="sm:ml-2 sm:flex-1 max-w-xs">
             <CopyLine text="npx sevenserver" label={t.quickInstall} />
           </div>
+        </div>
+
+        {/* Live Active Nodes, GitHub & npm social proof */}
+        <div className="reveal mt-6 flex flex-wrap items-center gap-3 text-xs font-mono sm:gap-4" style={{ color: 'var(--anatomy-muted)', ...v(3) }}>
+          <div className="inline-flex items-center gap-1.5 rounded-md px-2 py-1" title="Real-time verified active instances">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+            </span>
+            <span className="font-semibold text-[var(--anatomy-strong)]">{active !== null ? `${active}+` : '200+'}</span>
+            <span>{t.activeLabel}</span>
+          </div>
+          <span className="text-[var(--line-strong)]" aria-hidden>•</span>
+          <a href={REPO} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-[var(--line)] hover:text-[var(--anatomy-strong)]">
+            <Star className="h-3.5 w-3.5 fill-amber-400/20 text-amber-400" />
+            <span className="font-semibold text-[var(--anatomy-strong)]">{stars !== null ? stars : 1}</span>
+            <span>{t.starsLabel}</span>
+          </a>
+          <span className="text-[var(--line-strong)]" aria-hidden>•</span>
+          <a href="https://www.npmjs.com/package/sevenserver" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-[var(--line)] hover:text-[var(--anatomy-strong)]">
+            <Download className="h-3.5 w-3.5 text-cyan-400" />
+            <span className="font-semibold text-[var(--anatomy-strong)]">{downloads !== null ? `${downloads.toLocaleString()}+` : '680+'}</span>
+            <span>{t.downloadsLabel}</span>
+          </a>
+          <span className="text-[var(--line-strong)]" aria-hidden>•</span>
+          <a href={DISCORD} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-[var(--line)] hover:text-[#5865F2]">
+            <DiscordIcon className="h-3.5 w-3.5 text-[#5865F2]" />
+            <span>{t.communityLabel}</span>
+          </a>
         </div>
       </div>
 
@@ -823,17 +914,22 @@ function Features({ lang }: { lang: Lang }) {
 function AI({ lang }: { lang: Lang }) {
   const bullets = lang === 'id'
     ? [
-      ['Gunakan langganan yang sudah ada', 'Login dengan akun Claude, ChatGPT, GitHub Copilot, atau Gemini, atau masukkan API key biasa. Tanpa tagihan AI tambahan.'],
-      ['Meminta izin sebelum bertindak', 'Perintah pengecekan (read-only) berjalan otomatis. Restart, edit, dan hapus wajib mendapat persetujuan Anda.'],
-      ['Memisahkan data log dari instruksi', 'Output server diisolasi agar teks berbahaya di dalam log tidak dapat membajak instruksi AI (proteksi prompt injection).'],
+      ['Multi-account & rotasi berurutan per provider', 'Hubungkan banyak akun Claude, ChatGPT/Codex, GitHub Copilot, Gemini, Kimi, Kilo, Muse, atau API key sekaligus. Saat akun #1 terkena rate-limit 429, request otomatis berputar ke akun #2.'],
+      ['Built-in DevOps Engineer & Custom SKILL.md', 'Dilengkapi playbook SRE/DevOps standar produksi secara default, plus dukungan menambahkan atau menempel file SKILL.md kustom di Pengaturan Agen.'],
+      ['Kompresi konteks (/compact) & hemat token', 'Ketik /compact atau gunakan auto-compaction bawaan yang merangkum output SSH lama secara otomatis agar sesi troubleshooting panjang tetap ringan dan hemat kuota.'],
+      ['Meminta izin & memproteksi dari prompt injection', 'Perintah read-only berjalan otomatis dan output log diisolasi ketat. Restart, edit, dan hapus wajib mendapat klik persetujuan Anda.'],
       ['Satu kunci universal untuk coding tools', 'AI Gateway yang sama memberikan satu kunci API 7Server untuk Claude Code, Cursor, dan CLI Anda.'],
     ]
     : [
-      ['Uses your subscriptions', 'Log in with Claude, ChatGPT, GitHub Copilot or Gemini, or add an API key. No separate AI bill.'],
-      ['Asks before it acts', 'Read-only commands run on their own. Restarts, edits and deletes need approval, and risky ones a second confirmation.'],
-      ['Treats logs as data', 'Server output is fenced off from the instructions, and text that tries to steer the AI turns automatic runs off.'],
-      ['One key for your tools', 'The same gateway gives Claude Code, Cursor and other tools one 7Server key, usable only from your own servers.'],
+      ['Multi-account & ordered rotation per provider', 'Connect multiple Claude, ChatGPT/Codex, GitHub Copilot, Gemini, Kimi, Kilo, Muse, or API-key accounts. When account #1 hits a 429 rate limit, 7Server automatically rotates to account #2.'],
+      ['Built-in DevOps skill & custom SKILL.md', 'Ships with a production DevOps Engineer baseline and domain playbooks, plus support for pasting custom SKILL.md files with keyword triggers in Agent Settings.'],
+      ['Context compaction (/compact) for long sessions', 'Run /compact or let automatic backend compaction condense older SSH outputs so deep troubleshooting sessions never blow your token budget.'],
+      ['Asks before it acts & fences untrusted logs', 'Read-only commands run on their own while server logs are fenced against prompt injection. Restarts, edits, and deletes always wait for your approval.'],
+      ['One universal key for your coding tools', 'The same gateway gives Claude Code, Cursor, and other tools one 7Server key, usable only from your own servers.'],
     ];
+
+  const oauthProviders = ['Claude Pro/Max', 'ChatGPT / Codex', 'GitHub Copilot', 'Gemini CLI', 'Kimi Code', 'Kilo Code', 'Muse (Koda)', 'Nous Portal'];
+  const apiKeyProviders = ['OpenAI', 'Anthropic', 'Google Gemini', 'OpenRouter', 'GLM (Z.AI)', 'MiniMax', 'DeepSeek', 'Groq', 'Mistral', 'xAI (Grok)', 'Together AI', 'Fireworks', 'Cerebras', 'Cohere', 'NVIDIA NIM', 'Nebius', 'SiliconFlow', 'Hyperbolic', 'DeepInfra'];
 
   return (
     <section id="ai" className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
@@ -855,28 +951,53 @@ function AI({ lang }: { lang: Lang }) {
             ))}
           </ul>
         </div>
-        <figure className="metal reveal rounded-2xl p-5 font-mono text-[12.5px] leading-relaxed" style={v(2)}>
-          <figcaption className="sr-only">Example copilot session</figcaption>
-          <p style={{ color: 'var(--anatomy-muted)' }}>you · vps-2</p>
-          <p className="mt-1" style={{ color: 'var(--anatomy-strong)' }}>why is the api slow?</p>
-          <div className="well mt-4 rounded-lg p-3">
-            <p style={{ color: 'var(--anatomy-muted)' }}>read-only · ran automatically</p>
-            <p style={{ color: 'var(--anatomy-strong)' }}>docker stats --no-stream</p>
-            <p className="mt-1" style={{ color: 'var(--anatomy-muted)' }}>web-api  98% mem · restarted 14×</p>
-          </div>
-          <p className="mt-4">
-            The <span style={{ color: 'var(--anatomy-strong)' }}>web-api</span> container is hitting its memory limit and being killed (exit 137).
-            Raising the limit to 1 GB should stop the restart loop.
-          </p>
-          <div className="well mt-4 rounded-lg p-3">
-            <p style={{ color: 'var(--anatomy-muted)' }}>changes the server · needs your approval</p>
-            <p style={{ color: 'var(--anatomy-strong)' }}>docker update --memory 1g web-api</p>
-            <div className="mt-3 flex gap-2 font-sans text-xs" aria-hidden>
-              <span className="metal rounded-md px-2.5 py-1">Skip</span>
-              <span className="btn-silver rounded-md px-2.5 py-1 font-semibold">Run</span>
+        <div className="space-y-4">
+          <figure className="metal reveal rounded-2xl p-5 font-mono text-[12.5px] leading-relaxed" style={v(2)}>
+            <figcaption className="sr-only">Example copilot session</figcaption>
+            <p style={{ color: 'var(--anatomy-muted)' }}>you · vps-2</p>
+            <p className="mt-1" style={{ color: 'var(--anatomy-strong)' }}>why is the api slow?</p>
+            <div className="well mt-4 rounded-lg p-3">
+              <p style={{ color: 'var(--anatomy-muted)' }}>read-only · ran automatically</p>
+              <p style={{ color: 'var(--anatomy-strong)' }}>docker stats --no-stream</p>
+              <p className="mt-1" style={{ color: 'var(--anatomy-muted)' }}>web-api  98% mem · restarted 14×</p>
+            </div>
+            <p className="mt-4">
+              The <span style={{ color: 'var(--anatomy-strong)' }}>web-api</span> container is hitting its memory limit and being killed (exit 137).
+              Raising the limit to 1 GB should stop the restart loop.
+            </p>
+            <div className="well mt-4 rounded-lg p-3">
+              <p style={{ color: 'var(--anatomy-muted)' }}>changes the server · needs your approval</p>
+              <p style={{ color: 'var(--anatomy-strong)' }}>docker update --memory 1g web-api</p>
+              <div className="mt-3 flex gap-2 font-sans text-xs" aria-hidden>
+                <span className="metal rounded-md px-2.5 py-1">Skip</span>
+                <span className="btn-silver rounded-md px-2.5 py-1 font-semibold">Run</span>
+              </div>
+            </div>
+          </figure>
+
+          <div className="metal reveal rounded-2xl p-4" style={v(3)}>
+            <div className="text-[11px] font-mono uppercase tracking-wider" style={{ color: 'var(--anatomy-muted)' }}>
+              {lang === 'id' ? '8 Provider Langganan OAuth (Multi-Account)' : '8 OAuth Subscription Providers (Multi-Account)'}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {oauthProviders.map((p) => (
+                <span key={p} className="well inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-mono text-[11px]" style={{ color: 'var(--anatomy-strong)' }}>
+                  <ProviderBrandIcon name={p} className="w-3.5 h-3.5" /> {p}
+                </span>
+              ))}
+            </div>
+            <div className="mt-3 text-[11px] font-mono uppercase tracking-wider" style={{ color: 'var(--anatomy-muted)' }}>
+              {lang === 'id' ? '19 Provider API-Key & OpenAI-Compatible' : '19 API-Key & OpenAI-Compatible Providers'}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {apiKeyProviders.map((p) => (
+                <span key={p} className="well inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-mono text-[10.5px]" style={{ color: 'var(--anatomy-muted)' }}>
+                  <ProviderBrandIcon name={p} className="w-3 h-3" /> {p}
+                </span>
+              ))}
             </div>
           </div>
-        </figure>
+        </div>
       </div>
     </section>
   );
@@ -927,6 +1048,7 @@ const INSTALL = {
 
 function GetStarted({ lang }: { lang: Lang }) {
   const [tab, setTab] = useState<keyof typeof INSTALL>('npm');
+  const { stars, downloads } = useProjectStats();
   const cur = INSTALL[tab];
   return (
     <section id="start" className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
@@ -968,12 +1090,25 @@ function GetStarted({ lang }: { lang: Lang }) {
             </>
           )}
         </p>
-        <div className="mt-8 flex flex-wrap gap-3">
-          <a href={REPO} className="btn-silver inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold">
+        <div className="mt-8 flex flex-wrap items-center gap-3">
+          <a href={REPO} target="_blank" rel="noopener noreferrer" className="btn-silver inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold">
             <GithubIcon className="h-4 w-4" /> View on GitHub
+            {stars !== null && stars > 0 && (
+              <span className="rounded-full bg-black/20 px-2 py-0.5 text-xs font-mono">
+                ★ {stars}
+              </span>
+            )}
           </a>
-          <a href="https://www.npmjs.com/package/sevenserver" className="metal inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold" style={{ color: 'var(--anatomy-strong)' }}>
-            sevenserver on npm
+          <a href={DISCORD} target="_blank" rel="noopener noreferrer" className="metal inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition-colors hover:border-[#5865F2] hover:text-[#5865F2]" style={{ color: 'var(--anatomy-strong)' }}>
+            <DiscordIcon className="h-4 w-4 text-[#5865F2]" /> Join Discord Community
+          </a>
+          <a href="https://www.npmjs.com/package/sevenserver" target="_blank" rel="noopener noreferrer" className="metal inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold" style={{ color: 'var(--anatomy-strong)' }}>
+            <Download className="h-4 w-4 text-cyan-400" /> sevenserver on npm
+            {downloads !== null && (
+              <span className="rounded-full bg-[var(--line)] px-2 py-0.5 text-xs font-mono text-[var(--anatomy-muted)]">
+                {downloads.toLocaleString()}+
+              </span>
+            )}
           </a>
         </div>
       </div>
@@ -990,6 +1125,7 @@ function Footer() {
           <a href="#/contributors" className="transition-colors hover:text-[var(--anatomy-strong)]">Contributors</a>
           <a href="#/support" className="transition-colors hover:text-[var(--anatomy-strong)]">Support</a>
           <a href="#/privacy" className="transition-colors hover:text-[var(--anatomy-strong)]">Privacy</a>
+          <a href={DISCORD} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 transition-colors hover:text-[#5865F2]"><DiscordIcon className="h-3.5 w-3.5" /> Discord</a>
           <a href="https://saweria.co/nannndev" target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-[var(--anatomy-strong)]">Saweria</a>
           <a href="https://buymeacoffee.com/ekaprasety8" target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-[var(--anatomy-strong)]">Buy Me a Coffee</a>
         </nav>

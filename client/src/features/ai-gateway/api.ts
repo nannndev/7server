@@ -100,28 +100,34 @@ export async function verifyProvider(
 export async function connectProviderApi(
   providerId: AiProviderId,
   apiKey: string,
-  baseUrl?: string
+  baseUrl?: string,
+  opts?: { label?: string; addNew?: boolean; keyId?: string }
 ): Promise<{ config: AiGatewayConfig; verification: ProviderVerificationResult }> {
   const res = await apiFetch(
     `${API_BASE}/ai-gateway/providers/${encodeURIComponent(providerId)}/connect`,
-    jsonPost({ apiKey, baseUrl })
+    jsonPost({ apiKey, baseUrl, ...opts })
   );
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to connect provider');
   return data;
 }
 
-export async function disconnectProviderApi(providerId: AiProviderId): Promise<AiGatewayConfig> {
-  const res = await apiFetch(`${API_BASE}/ai-gateway/providers/${encodeURIComponent(providerId)}/disconnect`, {
-    method: 'POST'
-  });
+export async function disconnectProviderApi(providerId: AiProviderId, keyId?: string): Promise<AiGatewayConfig> {
+  const res = await apiFetch(`${API_BASE}/ai-gateway/providers/${encodeURIComponent(providerId)}/disconnect`, jsonPost({ keyId }));
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to disconnect provider');
   return data.config;
 }
 
+export async function reorderProviderKeysApi(providerId: AiProviderId, keyIds: string[]): Promise<AiGatewayConfig> {
+  const res = await apiFetch(`${API_BASE}/ai-gateway/providers/${encodeURIComponent(providerId)}/reorder`, jsonPost({ keyIds }));
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to reorder provider keys');
+  return data.config;
+}
 
-// ---- Subscription accounts (OAuth login per provider)
+
+// ---- Subscription accounts (OAuth login per provider, multi-account + ordered rotation)
 
 const acct = (p: OAuthProviderId, action = '') => `${API_BASE}/ai-gateway/accounts/${encodeURIComponent(p)}${action ? `/${action}` : ''}`;
 async function body<T>(res: Response, fallback: string): Promise<T> {
@@ -131,16 +137,22 @@ async function body<T>(res: Response, fallback: string): Promise<T> {
 }
 
 export const fetchAccounts = async () =>
-  body<{ accounts: SubscriptionAccount[]; models: Record<OAuthProviderId, string[]> }>(await apiFetch(`${API_BASE}/ai-gateway/accounts`), 'Failed to fetch accounts');
-export const startAccountLogin = async (p: OAuthProviderId) => body<LoginStart>(await apiFetch(acct(p, 'start'), jsonPost({})), 'Failed to start login');
-export const completeAccountLogin = async (p: OAuthProviderId, sessionId: string, callback: string) =>
-  (await body<{ accounts: SubscriptionAccount[] }>(await apiFetch(acct(p, 'complete'), jsonPost({ sessionId, callback })), 'Login failed')).accounts;
-export const pollAccountLogin = async (p: OAuthProviderId, sessionId: string) =>
-  body<{ status: 'pending' | 'done'; accounts?: SubscriptionAccount[] }>(await apiFetch(acct(p, 'poll'), jsonPost({ sessionId })), 'Login failed');
-export const testAccount = async (p: OAuthProviderId) =>
-  (await body<{ accounts: SubscriptionAccount[] }>(await apiFetch(acct(p, 'test'), jsonPost({})), 'Token invalid')).accounts;
-export const disconnectAccount = async (p: OAuthProviderId) =>
-  (await body<{ accounts: SubscriptionAccount[] }>(await apiFetch(acct(p), { method: 'DELETE' }), 'Failed to disconnect')).accounts;
+  body<{ accounts: SubscriptionAccount[]; models: Record<OAuthProviderId, string[]>; aliases?: Partial<Record<OAuthProviderId, string>> }>(await apiFetch(`${API_BASE}/ai-gateway/accounts`), 'Failed to fetch accounts');
+export const startAccountLogin = async (p: OAuthProviderId, accountId?: string) =>
+  body<LoginStart>(await apiFetch(acct(p, 'start'), jsonPost({ accountId })), 'Failed to start login');
+export const completeAccountLogin = async (p: OAuthProviderId, sessionId: string, callback: string, accountId?: string) =>
+  (await body<{ accounts: SubscriptionAccount[] }>(await apiFetch(acct(p, 'complete'), jsonPost({ sessionId, callback, accountId })), 'Login failed')).accounts;
+export const pollAccountLogin = async (p: OAuthProviderId, sessionId: string, accountId?: string) =>
+  body<{ status: 'pending' | 'done'; accounts?: SubscriptionAccount[] }>(await apiFetch(acct(p, 'poll'), jsonPost({ sessionId, accountId })), 'Login failed');
+export const testAccount = async (p: OAuthProviderId, accountId?: string) =>
+  (await body<{ accounts: SubscriptionAccount[] }>(await apiFetch(acct(p, 'test'), jsonPost({ accountId })), 'Token invalid')).accounts;
+export const disconnectAccount = async (p: OAuthProviderId, accountId?: string) =>
+  (await body<{ accounts: SubscriptionAccount[] }>(
+    await apiFetch(`${acct(p)}${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ''}`, { method: 'DELETE' }),
+    'Failed to disconnect'
+  )).accounts;
+export const reorderAccountsApi = async (p: OAuthProviderId, accountIds: string[]) =>
+  (await body<{ accounts: SubscriptionAccount[] }>(await apiFetch(acct(p, 'reorder'), jsonPost({ accountIds })), 'Failed to reorder accounts')).accounts;
 
 // ---- Quota and combos
 export const fetchAccountUsage = async (fresh = false) =>

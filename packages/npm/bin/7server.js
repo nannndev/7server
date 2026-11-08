@@ -39,6 +39,7 @@ ${c.bold('Options')}
   -d, --data <dir>     data directory ${c.dim('(default ~/.7server, or $VPSHUB_DATA_DIR)')}
       --no-open        don't open the browser
       --no-update-check  don't check npm for a newer version
+      --no-telemetry   don't send anonymous heartbeat ping (or DO_NOT_TRACK=1)
   -v, --version        print the version
   -h, --help           this help
 
@@ -57,7 +58,8 @@ const opts = {
   host: process.env.HOST || '127.0.0.1',
   data: process.env.VPSHUB_DATA_DIR || path.join(os.homedir(), '.7server'),
   open: true,
-  updateCheck: !process.env.SEVENSERVER_NO_UPDATE_CHECK && !process.env.CI
+  updateCheck: !process.env.SEVENSERVER_NO_UPDATE_CHECK && !process.env.CI,
+  telemetry: process.env.SEVENSERVER_TELEMETRY !== '0' && process.env.DO_NOT_TRACK !== '1'
 };
 const positional = [];
 for (let i = 0; i < args.length; i++) {
@@ -74,6 +76,7 @@ for (let i = 0; i < args.length; i++) {
   else if (a === '-d' || a === '--data') opts.data = path.resolve(val());
   else if (a === '--no-open') opts.open = false;
   else if (a === '--no-update-check') opts.updateCheck = false;
+  else if (a === '--no-telemetry') opts.telemetry = false;
   else if (!a.startsWith('-')) positional.push(a);
   else { err(`${c.red('✗')} Unknown option ${a}. See 7server --help`); process.exit(2); }
 }
@@ -89,7 +92,8 @@ const env = {
   VPSHUB_DATA_DIR: opts.data,
   STATIC_DIR: path.join(here, '..', 'dist', 'client'),
   NODE_NO_WARNINGS: '1', // node:sqlite prints an ExperimentalWarning on some versions
-  SEVENSERVER_CLI: '1'
+  SEVENSERVER_CLI: '1',
+  SEVENSERVER_TELEMETRY: opts.telemetry ? '1' : '0'
 };
 
 // ---------------------------------------------------------------- reset-password

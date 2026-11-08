@@ -1,6 +1,8 @@
 export type AiProviderId = 'anthropic' | 'openai' | 'gemini' | 'deepseek' | 'ollama' | 'openrouter'
+  // OpenAI-compatible API-key providers (see compatProviders.ts)
+  | 'groq' | 'mistral' | 'xai' | 'together' | 'fireworks' | 'cerebras' | 'perplexity' | 'moonshot' | 'dashscope' | 'zai' | 'minimax' | 'nvidia' | 'custom'
   // logged-in subscription accounts (OAuth)
-  | 'claude' | 'codex' | 'copilot' | 'gemini-cli';
+  | 'claude' | 'codex' | 'copilot' | 'gemini-cli' | 'kimi' | 'kilocode' | 'muse' | 'nous';
 
 export interface VirtualApiKey {
   id: string;
@@ -20,14 +22,24 @@ export interface VirtualApiKey {
   totalOutputTokens: number;
 }
 
+export interface ProviderApiKeyAccount {
+  id: string;
+  label?: string;
+  apiKey: string;          // Encrypted at rest, masked in UI
+  addedAt: string;
+}
+
 export interface ProviderConfig {
   apiKey?: string;          // Encrypted at rest, masked in UI
+  apiKeys?: ProviderApiKeyAccount[]; // Ordered multi-account API keys for rotation
   baseUrl?: string;         // Custom base URL
   enabled: boolean;
   connected?: boolean;      // Verified and active
   verifiedAt?: string;      // ISO timestamp of last successful check
   latencyMs?: number;
   defaultModel?: string;
+  /** Models the key could list when it was verified (OpenAI-compatible providers), "<id>/<model>". */
+  models?: string[];
   error?: string;
 }
 

@@ -103,3 +103,9 @@ html.dark .only-light {
   box-shadow: 0 0 8px #10b981;
 }
 
+/* Clean floating squircle hero logo with zero box background */
+.VPHero .VPImage {
+  filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.55));
+}
+
+

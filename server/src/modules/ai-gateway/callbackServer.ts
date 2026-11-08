@@ -13,7 +13,7 @@ const page = (ok: boolean, msg: string) =>
   `${ok ? '<script>setTimeout(()=>window.close(),1500)</script>' : ''}</div>`;
 
 /** Listens once on the redirect URI's port; resolves false if the port can't be bound (fall back to paste). */
-export function listenForCallback(sessionId: string, redirectUri: string): Promise<boolean> {
+export function listenForCallback(sessionId: string, redirectUri: string, accountId?: string): Promise<boolean> {
   const u = new URL(redirectUri);
   const port = Number(u.port);
   servers.get(port)?.close(); // a newer login replaces an older pending one on the same port
@@ -25,7 +25,7 @@ export function listenForCallback(sessionId: string, redirectUri: string): Promi
       if (url.pathname !== u.pathname) { res.writeHead(404).end(); return; }
       try {
         const { provider, cred } = await completeLogin(sessionId, url.toString());
-        saveAccount(provider, cred);
+        saveAccount(provider, cred, accountId);
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(page(true, 'Akun terhubung. Tab ini bisa ditutup dan kembali ke 7Server.'));
       } catch (e: any) {
         res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' }).end(page(false, e.message));
