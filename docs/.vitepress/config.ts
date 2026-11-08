@@ -26,6 +26,7 @@ export default defineConfig({
           { text: 'Workloads', link: '/workloads/docker' },
           { text: 'AI Gateway', link: '/ai/gateway' },
           { text: 'Security & RBAC', link: '/security/rbac' },
+          { text: 'Changelog', link: '/changelog' },
           {
             text: 'Links',
             items: [
@@ -43,6 +44,7 @@ export default defineConfig({
               { text: 'Introduction', link: '/getting-started/introduction' },
               { text: 'Quick Start', link: '/getting-started/quick-start' },
               { text: 'Architecture & Security', link: '/getting-started/architecture' },
+              { text: 'Changelog', link: '/changelog' },
             ]
           },
           {
@@ -108,7 +110,8 @@ export default defineConfig({
           { text: 'Panduan', link: '/id/getting-started/introduction' },
           { text: 'Manajemen Server', link: '/id/servers/overview' },
           { text: 'AI Gateway', link: '/id/ai/gateway' },
-          { text: 'Keamanan & RBAC', link: '/id/security/rbac' }
+          { text: 'Keamanan & RBAC', link: '/id/security/rbac' },
+          { text: 'Changelog', link: '/id/changelog' }
         ],
         sidebar: [
           {
@@ -118,6 +121,7 @@ export default defineConfig({
               { text: 'Pengenalan', link: '/id/getting-started/introduction' },
               { text: 'Mulai Cepat', link: '/id/getting-started/quick-start' },
               { text: 'Arsitektur & Keamanan', link: '/id/getting-started/architecture' },
+              { text: 'Catatan Rilis (Changelog)', link: '/id/changelog' },
             ]
           },
           {

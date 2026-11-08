@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { AgentlessBench } from './figure/AgentlessBench';
 import { GithubIcon, DiscordIcon, ProviderBrandIcon } from './components/BrandIcons';
-import { ContributorsPage, PrivacyPage, SupportPage } from './pages';
+import { ChangelogPage, ContributorsPage, PrivacyPage, SupportPage } from './pages';
 import { COPY, type Lang } from './i18n';
 
 const REPO = 'https://github.com/nannndev/7server';
@@ -252,6 +252,7 @@ function Nav({ lang, toggleLang }: { lang: Lang; toggleLang: () => void }) {
             ['#features', t.features],
             ['#ai', t.ai],
             ['#security', t.security],
+            ['#/changelog', 'Changelog'],
             ['http://localhost:3002', t.docs],
             ['#start', t.start],
           ].map(([href, label]) => (
@@ -1121,6 +1122,7 @@ function Footer() {
       <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-8 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <span className="inline-flex items-center gap-2.5"><Logo size={22} /> 7Server · self-hosted server management</span>
         <nav className="flex gap-5" aria-label="More">
+          <a href="#/changelog" className="transition-colors hover:text-[var(--anatomy-strong)]">Changelog</a>
           <a href="#/contributors" className="transition-colors hover:text-[var(--anatomy-strong)]">Contributors</a>
           <a href="#/support" className="transition-colors hover:text-[var(--anatomy-strong)]">Support</a>
           <a href="#/privacy" className="transition-colors hover:text-[var(--anatomy-strong)]">Privacy</a>
@@ -1161,7 +1163,7 @@ export default function App() {
     <>
       <Nav lang={lang} toggleLang={toggleLang} />
       <main key={route}>
-        {route === 'contributors' ? <ContributorsPage /> : route === 'support' ? <SupportPage /> : route === 'privacy' ? <PrivacyPage /> : (
+        {route === 'changelog' ? <ChangelogPage /> : route === 'contributors' ? <ContributorsPage /> : route === 'support' ? <SupportPage /> : route === 'privacy' ? <PrivacyPage /> : (
           <>
             <Hero lang={lang} onZoom={setLightbox} />
             <HowItWorks lang={lang} onZoom={setLightbox} />
