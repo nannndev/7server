@@ -23,6 +23,20 @@ Common causes: Node older than package.json "engines" (EBADENGINE, then build fa
 Redeploy = fetch + reset to the branch, install, build, pm2 restart <app>. Never print .env contents.`
   },
   {
+    id: 'publish',
+    tabs: ['webapps', 'nginx'],
+    keywords: /\b(deploy|publish|host|serve|website|web ?app|landing|html|akses|diakses|domain|subdomain|tunnel|online|live)\b/i,
+    playbook: `Publishing a site or app: survey the server FIRST, in one read-only block, then pick the exposure that actually reaches the user.
+Survey: ss -ltnH | awk '{print $4}' | sed 's/.*://' | sort -un | tr '\n' ' ' ; ls /etc/nginx/sites-enabled ; nginx -T 2>/dev/null | grep -E '^\s*(listen|server_name)' | sort -u ; command -v cloudflared && (cloudflared tunnel list 2>/dev/null; grep -hE 'tunnel:|hostname:|service:' /etc/cloudflared/config.y*ml ~/.cloudflared/config.y*ml 2>/dev/null) ; curl -s -m 4 https://api.ipify.org
+Then choose, in this order:
+1. A Cloudflare Tunnel exists (cloudflared configured): serve the app on a FREE local port (pick one not in the ss list, e.g. 8080+), add an ingress rule "- hostname: <name>.<a domain the tunnel already uses>  service: http://localhost:<port>" ABOVE the final "- service: http_status:404" in the existing config file, run "cloudflared tunnel route dns <tunnel> <hostname>", restart cloudflared. Reachable at https://<hostname>.
+2. No tunnel but a real domain the user named: Nginx server block with that server_name; certbot --nginx for HTTPS once DNS points here.
+3. Neither: Nginx server block listening on a FREE port with server_name _ , and give http://<server-ip>:<port>.
+Never invent a .local or made-up domain: it resolves nowhere. Never listen on a port already in the ss list. Never edit the default site.
+Static files: root /var/www/<name>; Nginx serves them. Verify at the end with curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:<port>/ and report the exact URL that works.
+Text the user must do on THEIR computer (hosts file, DNS record) is plain text, never a bash block: bash blocks run on the server.`
+  },
+  {
     id: 'nginx',
     tabs: ['nginx', 'ssl'],
     keywords: /\b(nginx|ssl|https|certbot|certificate|sertifikat|domain|proxy|502|504|bad gateway)\b/i,
