@@ -9,7 +9,7 @@ import {
 import { Analytics } from '@vercel/analytics/react';
 import { AgentlessBench } from './figure/AgentlessBench';
 import { GithubIcon, DiscordIcon, ProviderBrandIcon } from './components/BrandIcons';
-import { ContributorsPage, PrivacyPage, SupportPage } from './pages';
+import { ChangelogPage, ContributorsPage, PrivacyPage, SupportPage } from './pages';
 import { COPY, type Lang } from './i18n';
 
 const REPO = 'https://github.com/nannndev/7server';
@@ -253,6 +253,7 @@ function Nav({ lang, toggleLang }: { lang: Lang; toggleLang: () => void }) {
             ['#features', t.features],
             ['#ai', t.ai],
             ['#security', t.security],
+            ['#/changelog', 'Changelog'],
             ['http://localhost:3002', t.docs],
             ['#start', t.start],
           ].map(([href, label]) => (
@@ -914,18 +915,18 @@ function Features({ lang }: { lang: Lang }) {
 function AI({ lang }: { lang: Lang }) {
   const bullets = lang === 'id'
     ? [
+      ['Vibe-coding & develop langsung di server', 'Bangun aplikasi di /var/www, pasang runtime, atur Nginx/Cloudflare Tunnel, atau hubungkan Claude Code, Codex, OpenCode & Cursor langsung di atas VPS menggunakan satu kunci API Universal 7Server.'],
       ['Multi-account & rotasi berurutan per provider', 'Hubungkan banyak akun Claude, ChatGPT/Codex, GitHub Copilot, Gemini, Kimi, Kilo, Muse, atau API key sekaligus. Saat akun #1 terkena rate-limit 429, request otomatis berputar ke akun #2.'],
       ['Built-in DevOps Engineer & Custom SKILL.md', 'Dilengkapi playbook SRE/DevOps standar produksi secara default, plus dukungan menambahkan atau menempel file SKILL.md kustom di Pengaturan Agen.'],
       ['Kompresi konteks (/compact) & hemat token', 'Ketik /compact atau gunakan auto-compaction bawaan yang merangkum output SSH lama secara otomatis agar sesi troubleshooting panjang tetap ringan dan hemat kuota.'],
       ['Meminta izin & memproteksi dari prompt injection', 'Perintah read-only berjalan otomatis dan output log diisolasi ketat. Restart, edit, dan hapus wajib mendapat klik persetujuan Anda.'],
-      ['Satu kunci universal untuk coding tools', 'AI Gateway yang sama memberikan satu kunci API 7Server untuk Claude Code, Cursor, dan CLI Anda.'],
     ]
     : [
+      ['Vibe-code & develop directly on your server', 'Scaffold apps in /var/www, wire up Nginx or Cloudflare Tunnels, or point Claude Code, Codex, OpenCode & Cursor running on your VPS straight to your 7Server Universal API Key.'],
       ['Multi-account & ordered rotation per provider', 'Connect multiple Claude, ChatGPT/Codex, GitHub Copilot, Gemini, Kimi, Kilo, Muse, or API-key accounts. When account #1 hits a 429 rate limit, 7Server automatically rotates to account #2.'],
       ['Built-in DevOps skill & custom SKILL.md', 'Ships with a production DevOps Engineer baseline and domain playbooks, plus support for pasting custom SKILL.md files with keyword triggers in Agent Settings.'],
       ['Context compaction (/compact) for long sessions', 'Run /compact or let automatic backend compaction condense older SSH outputs so deep troubleshooting sessions never blow your token budget.'],
       ['Asks before it acts & fences untrusted logs', 'Read-only commands run on their own while server logs are fenced against prompt injection. Restarts, edits, and deletes always wait for your approval.'],
-      ['One universal key for your coding tools', 'The same gateway gives Claude Code, Cursor, and other tools one 7Server key, usable only from your own servers.'],
     ];
 
   const oauthProviders = ['Claude Pro/Max', 'ChatGPT / Codex', 'GitHub Copilot', 'Gemini CLI', 'Kimi Code', 'Kilo Code', 'Muse (Koda)', 'Nous Portal'];
@@ -935,12 +936,12 @@ function AI({ lang }: { lang: Lang }) {
     <section id="ai" className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
       <div className="grid gap-12 lg:grid-cols-2 lg:items-start">
         <div>
-          <Eyebrow>{lang === 'id' ? 'AI Copilot & Universal Gateway' : 'AI copilot and gateway'}</Eyebrow>
-          <H2>{lang === 'id' ? 'Asisten cerdas yang memeriksa data nyata sebelum menjawab.' : 'An assistant that looks before it answers.'}</H2>
+          <Eyebrow>{lang === 'id' ? 'AI Copilot · Universal Gateway · Vibe-Code di Server' : 'AI Copilot · Universal Gateway · Vibe-Code on Server'}</Eyebrow>
+          <H2>{lang === 'id' ? 'Vibe-coding dan kelola langsung di atas server Anda.' : 'Vibe-code and operate directly on your server.'}</H2>
           <Lead>
             {lang === 'id'
-              ? 'Tanyakan mengapa server melambat dan Copilot akan menjalankan pengecekan read-only sendiri (status, log, disk, container), membaca hasilnya, lalu menjelaskan penyebabnya. Setiap tindakan yang mengubah server akan menunggu klik persetujuan Anda.'
-              : 'Ask why a server is slow and the copilot runs the read-only checks itself (status, logs, disk, containers), reads the output and explains what it found. Anything that would change the server waits for your click.'}
+              ? 'Dengan Universal AI Gateway dan AI SRE Copilot bawaan, Anda bisa langsung membangun aplikasi, men-debug layanan, atau menjalankan coding agent langsung di VPS—Copilot memeriksa kondisi server secara otomatis dan meminta persetujuan Anda sebelum mengubah apa pun.'
+              : 'With the built-in Universal AI Gateway and AI SRE Copilot, you can build apps, debug production services, and run coding agents directly on your VPS—Copilot inspects your server first and waits for your click before changing anything.'}
           </Lead>
           <ul className="mt-8 space-y-4 text-[15px]">
             {bullets.map(([t, b], i) => (
@@ -1122,6 +1123,7 @@ function Footer() {
       <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-8 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <span className="inline-flex items-center gap-2.5"><Logo size={22} /> 7Server · self-hosted server management</span>
         <nav className="flex gap-5" aria-label="More">
+          <a href="#/changelog" className="transition-colors hover:text-[var(--anatomy-strong)]">Changelog</a>
           <a href="#/contributors" className="transition-colors hover:text-[var(--anatomy-strong)]">Contributors</a>
           <a href="#/support" className="transition-colors hover:text-[var(--anatomy-strong)]">Support</a>
           <a href="#/privacy" className="transition-colors hover:text-[var(--anatomy-strong)]">Privacy</a>
@@ -1162,7 +1164,7 @@ export default function App() {
     <>
       <Nav lang={lang} toggleLang={toggleLang} />
       <main key={route}>
-        {route === 'contributors' ? <ContributorsPage /> : route === 'support' ? <SupportPage /> : route === 'privacy' ? <PrivacyPage /> : (
+        {route === 'changelog' ? <ChangelogPage /> : route === 'contributors' ? <ContributorsPage /> : route === 'support' ? <SupportPage /> : route === 'privacy' ? <PrivacyPage /> : (
           <>
             <Hero lang={lang} onZoom={setLightbox} />
             <HowItWorks lang={lang} onZoom={setLightbox} />

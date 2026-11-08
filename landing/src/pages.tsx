@@ -213,3 +213,105 @@ export function PrivacyPage() {
     </PageShell>
   );
 }
+
+interface ReleaseEntry {
+  version: string;
+  date: string;
+  tag: string;
+  title: string;
+  highlights: string[];
+}
+
+const RELEASES: ReleaseEntry[] = [
+  {
+    version: 'v0.3.0',
+    date: '2026-11-08',
+    tag: 'Latest Release',
+    title: 'Universal AI Gateway 2.0, Multi-Account Rotation, Custom SKILL.md & /compact',
+    highlights: [
+      '27 Built-In AI Providers: 8 OAuth Subscription providers (Claude, ChatGPT/Codex, GitHub Copilot, Gemini CLI, Kimi Code, Kilo Code, Muse/Koda, Nous Portal) + 19 API-Key & OpenAI-compatible providers.',
+      'Multi-Account Ordered Rotation (#1 → #2 → #3): Connect multiple OAuth accounts or API keys per provider with priority reordering, per-account quota bars, and automatic 429 rate-limit rotation.',
+      'Built-In DevOps Engineer Skill & Custom SKILL.md: Default production SRE baseline (Build/Deploy/Ops Hats) plus support for pasting custom SKILL.md playbooks with keyword triggers in Agent Settings.',
+      'Context Compaction (/compact & Auto-Compaction): Condense long SSH troubleshooting sessions with /compact or automatic backend compaction of older UNTRUSTED_OUTPUT blocks.',
+      'Vibe-Code on Server: Approved sudo password execution, pre-publish port/Nginx/Cloudflare Tunnel survey, and opt-in Auto-Run mode.',
+      'Brand Icons & Deploy Fixes: Crisp SVG brand icons for all 27 AI providers across Dashboard, Landing & Docs, plus Docker multi-stage build detection fixes.'
+    ]
+  },
+  {
+    version: 'v0.2.0',
+    date: '2026-11-07',
+    tag: 'Feature Release',
+    title: 'Cloudflare Tunnels, Git Deployment Studio, 3D Fleet Views & Privacy Mode',
+    highlights: [
+      'Zero-Trust Cloudflare Tunnels: 1-click Zero Trust token connector and visual ingress route map to expose local webapps behind NAT without opening public firewall ports.',
+      'Full-Width Git Deployment Studio: Connect a GitHub token to browse repositories, branches, and monorepo root folders, install missing runtimes, and stream live build & health-check logs.',
+      'Automated Let\'s Encrypt SSL with DNS Pre-Flight: Verifies DNS A-records before running Certbot to prevent rate-limit lockouts.',
+      '3D Fleet Matrix, Rack & Topology: Interactive 3D Server Rack, 3D Isometric Resource Matrix, and 4-Layer Service Topology Graph.',
+      'Database Workbench & ER Diagrams: Inspect tables, run queries, and view ER diagrams for PostgreSQL, MySQL/MariaDB, MongoDB, Redis, and SQLite.',
+      'Screencast Privacy Mode: 1-click top-bar toggle blurs server IPs, domains, paths, local ports, and tokens for safe streaming and demos.'
+    ]
+  },
+  {
+    version: 'v0.1.1',
+    date: '2026-11-05',
+    tag: 'Initial Release',
+    title: 'Initial Open-Source Release — Agentless Multi-VPS Control Plane',
+    highlights: [
+      'Pure Agentless SSH Architecture: Manage any Linux VPS over standard OpenSSH (port 22) with zero background agents installed on target servers.',
+      'Encrypted Local Vault: SQLite storage (7server.db) with AES-256-GCM encryption (secret.key) for SSH keys, passwords, and provider tokens.',
+      'Multi-Tab Browser Terminal & SFTP File Manager: Full xterm.js WebSocket terminal with command shortcuts and visual file editor.',
+      'Docker, PM2, Systemd, Cron & Backups: Full container/image/Compose control, service management, crontab scheduler, UFW firewall, and scheduled backups.',
+      'Granular RBAC & Security Audit Log: Admin, Operator, and Viewer roles with per-VPS access scopes, active session revocation, Discord alerts, and CSV audit export.'
+    ]
+  }
+];
+
+export function ChangelogPage() {
+  return (
+    <PageShell
+      eyebrow="Changelog & Releases"
+      title="What's new in 7Server."
+      lead="Every release of sevenserver on npm and ghcr.io/nannndev/7server. Upgrade anytime with npm install -g sevenserver@latest or docker compose pull."
+    >
+      <div className="space-y-6">
+        {RELEASES.map((rel, i) => (
+          <article key={rel.version} className="metal reveal rounded-2xl p-6 sm:p-8" style={v(i)}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-3">
+                <span className="btn-silver rounded-lg px-3 py-1 font-mono text-sm font-semibold">
+                  {rel.version}
+                </span>
+                <span className="well rounded-md px-2.5 py-0.5 font-mono text-xs" style={{ color: 'var(--accent)' }}>
+                  {rel.tag}
+                </span>
+              </div>
+              <time className="font-mono text-xs" style={{ color: 'var(--anatomy-muted)' }}>
+                {rel.date}
+              </time>
+            </div>
+            <h2 className="mt-4 text-xl font-semibold" style={{ color: 'var(--anatomy-strong)' }}>
+              {rel.title}
+            </h2>
+            <ul className="mt-4 space-y-2.5 text-[15px] leading-relaxed">
+              {rel.highlights.map((item) => (
+                <li key={item} className="flex gap-2.5">
+                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: 'var(--accent)' }} aria-hidden />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </article>
+        ))}
+      </div>
+
+      <div className="mt-8 flex flex-wrap gap-3">
+        <a href={`${REPO}/releases`} target="_blank" rel="noopener noreferrer" className="btn-silver inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold">
+          <GithubIcon className="h-4 w-4" /> View GitHub Releases
+        </a>
+        <a href="https://www.npmjs.com/package/sevenserver?activeTab=versions" target="_blank" rel="noopener noreferrer" className="metal inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold" style={{ color: 'var(--anatomy-strong)' }}>
+          npm Version History
+        </a>
+      </div>
+    </PageShell>
+  );
+}
