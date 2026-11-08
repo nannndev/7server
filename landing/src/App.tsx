@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { AgentlessBench } from './figure/AgentlessBench';
 import { GithubIcon, DiscordIcon } from './components/BrandIcons';
+import { BrandIcon } from '../../client/src/shared/ui/brand-icon';
 import { ContributorsPage, PrivacyPage, SupportPage } from './pages';
 import { COPY, type Lang } from './i18n';
 
@@ -980,8 +981,8 @@ function AI({ lang }: { lang: Lang }) {
             </div>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {oauthProviders.map((p) => (
-                <span key={p} className="well inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 font-mono text-[11px]" style={{ color: 'var(--anatomy-strong)' }}>
-                  <span className="led h-1.5 w-1.5 rounded-full" /> {p}
+                <span key={p} className="well inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-mono text-[11px]" style={{ color: 'var(--anatomy-strong)' }}>
+                  <BrandIcon name={p} className="w-3.5 h-3.5" /> {p}
                 </span>
               ))}
             </div>
@@ -990,8 +991,8 @@ function AI({ lang }: { lang: Lang }) {
             </div>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {apiKeyProviders.map((p) => (
-                <span key={p} className="well rounded-md px-2 py-0.5 font-mono text-[10.5px]" style={{ color: 'var(--anatomy-muted)' }}>
-                  {p}
+                <span key={p} className="well inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-mono text-[10.5px]" style={{ color: 'var(--anatomy-muted)' }}>
+                  <BrandIcon name={p} className="w-3 h-3" /> {p}
                 </span>
               ))}
             </div>
