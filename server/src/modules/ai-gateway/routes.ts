@@ -8,7 +8,7 @@ import { handleCopilotChat } from './copilot.js';
 import { verifyProviderConnection } from './verifier.js';
 import { internalOnly } from './internalOnly.js';
 import { startLogin, completeLogin, pollDeviceLogin, isOAuthProvider } from './oauth.js';
-import { listAccounts, saveAccount, removeAccount, getCredential } from './accounts.js';
+import { listAccounts, saveAccount, removeAccount, reorderAccounts, getCredential } from './accounts.js';
 import { accountModels, ALIAS_OF, MODELS, resolveModel } from './subscription.js';
 import { usageOf } from './usage.js';
 import { listenForCallback } from './callbackServer.js';
@@ -23,6 +23,7 @@ import {
   getInternalConfig,
   connectProvider,
   disconnectProvider,
+  reorderProviderKeys,
   getUsageLogs,
   clearUsageLogs,
   getGatewayStats
@@ -122,19 +123,27 @@ aiGatewayManagementRoutes.post('/ai-gateway/providers/:providerId/verify', async
 
 aiGatewayManagementRoutes.post('/ai-gateway/providers/:providerId/connect', async (req: Request, res: Response) => {
   const providerId = String(req.params.providerId) as any;
-  const { apiKey, baseUrl } = req.body || {};
+  const { apiKey, baseUrl, label, addNew, keyId } = req.body || {};
   const verifyResult = await verifyProviderConnection(providerId, apiKey, baseUrl);
   if (!verifyResult.valid) {
     res.status(400).json({ error: verifyResult.error || 'Connection verification failed' });
     return;
   }
-  const updatedConfig = connectProvider(providerId, apiKey, baseUrl, verifyResult.latencyMs, verifyResult.models);
+  const updatedConfig = connectProvider(providerId, apiKey, baseUrl, verifyResult.latencyMs, verifyResult.models, { label, addNew: !!addNew, keyId });
   res.json({ config: updatedConfig, verification: verifyResult });
 });
 
 aiGatewayManagementRoutes.post('/ai-gateway/providers/:providerId/disconnect', (req: Request, res: Response) => {
   const providerId = String(req.params.providerId) as any;
-  const updatedConfig = disconnectProvider(providerId);
+  const keyId = req.body?.keyId ? String(req.body.keyId) : (req.query.keyId ? String(req.query.keyId) : undefined);
+  const updatedConfig = disconnectProvider(providerId, keyId);
+  res.json({ config: updatedConfig });
+});
+
+aiGatewayManagementRoutes.post('/ai-gateway/providers/:providerId/reorder', (req: Request, res: Response) => {
+  const providerId = String(req.params.providerId) as any;
+  const keyIds = Array.isArray(req.body?.keyIds) ? req.body.keyIds.map(String) : [];
+  const updatedConfig = reorderProviderKeys(providerId, keyIds);
   res.json({ config: updatedConfig });
 });
 
@@ -168,46 +177,58 @@ aiGatewayManagementRoutes.get('/ai-gateway/accounts', async (_req: Request, res:
 
 aiGatewayManagementRoutes.post('/ai-gateway/accounts/:provider/start', async (req: Request, res: Response) => {
   const p = oauthProvider(req, res); if (!p) return;
+  const accountId = req.body?.accountId ? String(req.body.accountId) : undefined;
   try {
     const r = await startLogin(p);
-    const autoCallback = r.kind === 'redirect' ? await listenForCallback(r.sessionId, r.redirectUri) : false;
+    const autoCallback = r.kind === 'redirect' ? await listenForCallback(r.sessionId, r.redirectUri, accountId) : false;
     res.json({ ...r, autoCallback });
   } catch (e: any) { res.status(502).json({ error: e.message }); }
 });
 
 aiGatewayManagementRoutes.post('/ai-gateway/accounts/:provider/complete', async (req: Request, res: Response) => {
   const p = oauthProvider(req, res); if (!p) return;
+  const accountId = req.body?.accountId ? String(req.body.accountId) : undefined;
+  const label = req.body?.label ? String(req.body.label) : undefined;
   try {
     const { provider, cred } = await completeLogin(String(req.body?.sessionId || ''), String(req.body?.callback || ''));
     if (provider !== p) { res.status(400).json({ error: 'Sesi login milik provider lain' }); return; }
-    saveAccount(provider, cred);
+    saveAccount(provider, cred, accountId, label);
     res.json({ accounts: listAccounts() });
   } catch (e: any) { res.status(400).json({ error: e.message }); }
 });
 
 aiGatewayManagementRoutes.post('/ai-gateway/accounts/:provider/poll', async (req: Request, res: Response) => {
   const p = oauthProvider(req, res); if (!p) return;
+  const accountId = req.body?.accountId ? String(req.body.accountId) : undefined;
   try {
     const r = await pollDeviceLogin(String(req.body?.sessionId || ''));
-    if (r.status === 'done') { saveAccount(p, r.cred); res.json({ status: 'done', accounts: listAccounts() }); }
+    if (r.status === 'done') { saveAccount(p, r.cred, accountId); res.json({ status: 'done', accounts: listAccounts() }); }
     else res.json({ status: 'pending' });
   } catch (e: any) { res.status(400).json({ error: e.message }); }
 });
 
 aiGatewayManagementRoutes.post('/ai-gateway/accounts/:provider/test', async (req: Request, res: Response) => {
   const p = oauthProvider(req, res); if (!p) return;
-  try { await getCredential(p); res.json({ ok: true, accounts: listAccounts() }); } catch (e: any) { res.status(400).json({ error: e.message }); }
+  const accountId = req.body?.accountId ? String(req.body.accountId) : undefined;
+  try { await getCredential(p, accountId); res.json({ ok: true, accounts: listAccounts() }); } catch (e: any) { res.status(400).json({ error: e.message }); }
+});
+
+aiGatewayManagementRoutes.post('/ai-gateway/accounts/:provider/reorder', (req: Request, res: Response) => {
+  const p = oauthProvider(req, res); if (!p) return;
+  const accountIds = Array.isArray(req.body?.accountIds) ? req.body.accountIds.map(String) : [];
+  res.json({ accounts: reorderAccounts(p, accountIds) });
 });
 
 aiGatewayManagementRoutes.delete('/ai-gateway/accounts/:provider', (req: Request, res: Response) => {
   const p = oauthProvider(req, res); if (!p) return;
-  removeAccount(p);
+  const accountId = req.query.accountId ? String(req.query.accountId) : (req.body?.accountId ? String(req.body.accountId) : undefined);
+  removeAccount(p, accountId);
   res.json({ accounts: listAccounts() });
 });
 
 aiGatewayManagementRoutes.get('/ai-gateway/accounts/usage', async (req: Request, res: Response) => {
   const fresh = req.query.fresh === '1';
-  const usage = await Promise.all(listAccounts().map((a) => usageOf(a.provider, fresh)));
+  const usage = await Promise.all(listAccounts().map((a) => usageOf(a.provider, fresh, a.id)));
   res.json({ usage });
 });
 

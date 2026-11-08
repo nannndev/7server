@@ -105,11 +105,20 @@ export async function handleAnthropicMessages(req: Request, res: Response): Prom
   }
 
   try {
-    const upstreamRes = await fetch(targetUrl, {
-      method: 'POST',
-      headers: upstreamHeaders,
-      body: JSON.stringify(req.body)
-    });
+    const keyList = provider.apiKeys?.length ? provider.apiKeys.map((k) => k.apiKey) : [provider.apiKey];
+    let upstreamRes: globalThis.Response | undefined;
+    for (let i = 0; i < keyList.length; i++) {
+      upstreamHeaders['x-api-key'] = keyList[i]!;
+      upstreamRes = await fetch(targetUrl, {
+        method: 'POST',
+        headers: upstreamHeaders,
+        body: JSON.stringify(req.body)
+      });
+      if (upstreamRes.ok || i + 1 >= keyList.length || ![401, 402, 403, 429, 500, 502, 503, 504].includes(upstreamRes.status)) {
+        break;
+      }
+    }
+    upstreamRes = upstreamRes!;
 
     if (!isStreaming) {
       const rawText = await upstreamRes.text();
@@ -392,11 +401,20 @@ export async function handleOpenAiChatCompletions(req: Request, res: Response): 
   }
 
   try {
-    const upstreamRes = await fetch(targetUrl, {
-      method: 'POST',
-      headers: upstreamHeaders,
-      body: JSON.stringify(upstreamBody)
-    });
+    const keyList = provider.apiKeys?.length ? provider.apiKeys.map((k) => k.apiKey) : (provider.apiKey ? [provider.apiKey] : ['']);
+    let upstreamRes: globalThis.Response | undefined;
+    for (let i = 0; i < keyList.length; i++) {
+      if (keyList[i]) upstreamHeaders['authorization'] = `Bearer ${keyList[i]}`;
+      upstreamRes = await fetch(targetUrl, {
+        method: 'POST',
+        headers: upstreamHeaders,
+        body: JSON.stringify(upstreamBody)
+      });
+      if (upstreamRes.ok || i + 1 >= keyList.length || ![401, 402, 403, 429, 500, 502, 503, 504].includes(upstreamRes.status)) {
+        break;
+      }
+    }
+    upstreamRes = upstreamRes!;
 
     if (!isStreaming) {
       const rawText = await upstreamRes.text();

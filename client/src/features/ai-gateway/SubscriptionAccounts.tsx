@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
   CheckCircle2,
   ChevronDown,
   Copy,
   ExternalLink,
   LogIn,
+  Plus,
   RefreshCw,
   Unplug,
   XCircle
@@ -23,7 +26,8 @@ import {
   completeAccountLogin,
   pollAccountLogin,
   testAccount,
-  disconnectAccount
+  disconnectAccount,
+  reorderAccountsApi
 } from './api';
 import type { AccountUsage, LoginStart, OAuthProviderId, SubscriptionAccount } from './types';
 import { useI18n, type MessageKey } from '@/shared/i18n';
@@ -40,8 +44,8 @@ const PROVIDERS: { id: OAuthProviderId; alias: string; name: string; plan: strin
   { id: 'nous', alias: 'ns', name: 'Nous Research', plan: 'subs.planNous', color: 'text-zinc-300 bg-zinc-500/10 border-zinc-500/20' }
 ];
 
-/** Login flow state for one provider card. */
-type Flow = { provider: OAuthProviderId; start: LoginStart; pasted: string; busy: boolean };
+/** Login flow state for one provider card (accountId is set when re-authenticating an existing account). */
+type Flow = { provider: OAuthProviderId; accountId?: string; start: LoginStart; pasted: string; busy: boolean };
 
 /** Remaining quota per window: a thin gauge per limit, red when nearly used up. */
 function QuotaBars({ usage, onRefresh }: { usage?: AccountUsage; onRefresh: () => void }) {
@@ -110,16 +114,23 @@ export function SubscriptionAccounts({ onChange }: { onChange?: (accounts: Subsc
   };
   const [accounts, setAccounts] = useState<SubscriptionAccount[]>([]);
   const [models, setModels] = useState<Partial<Record<OAuthProviderId, string[]>>>({});
-  const [usage, setUsage] = useState<Partial<Record<OAuthProviderId, AccountUsage>>>({});
+  const [usage, setUsage] = useState<Record<string, AccountUsage>>({});
   const [expandedModels, setExpandedModels] = useState<Partial<Record<OAuthProviderId, boolean>>>({});
   const [showRiskDetails, setShowRiskDetails] = useState(false);
 
   const loadUsage = (fresh = false) =>
     fetchAccountUsage(fresh)
-      .then((list) => setUsage(Object.fromEntries(list.map((u) => [u.provider, u]))))
+      .then((list) => {
+        const map: Record<string, AccountUsage> = {};
+        for (const u of list) {
+          map[u.accountId || u.provider] = u;
+          if (!map[u.provider]) map[u.provider] = u;
+        }
+        setUsage(map);
+      })
       .catch(() => {});
   const [flow, setFlow] = useState<Flow | null>(null);
-  const [busy, setBusy] = useState<OAuthProviderId | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
   const pollTimer = useRef<number | undefined>(undefined);
 
   const apply = (a: SubscriptionAccount[]) => {
@@ -139,17 +150,18 @@ export function SubscriptionAccounts({ onChange }: { onChange?: (accounts: Subsc
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Device flow (GitHub, Kimi): poll until the user approves the code on the provider site.
+  // Device flow (GitHub, Kimi, Kilo, Muse, Nous): poll until the user approves the code on the provider site.
   useEffect(() => {
     if (!flow || flow.start.kind !== 'device') return;
-    const { provider, start } = flow;
+    const { provider, accountId, start } = flow;
     const tick = async () => {
       try {
-        const r = await pollAccountLogin(provider, start.sessionId);
+        const r = await pollAccountLogin(provider, start.sessionId, accountId);
         if (r.status === 'done') {
           const fresh = await fetchAccounts().catch(() => null);
           if (fresh) setModels(fresh.models);
           apply(r.accounts || fresh?.accounts || []);
+          loadUsage(true);
           setFlow(null);
           toast.success(t('subs.connected'));
           return;
@@ -172,11 +184,16 @@ export function SubscriptionAccounts({ onChange }: { onChange?: (accounts: Subsc
     const id = window.setInterval(async () => {
       try {
         const r = await fetchAccounts();
-        const acc = r.accounts.find((a) => a.provider === provider);
-        if (acc && new Date(acc.connectedAt).getTime() > startedAt.current) {
+        const touched = r.accounts.some(
+          (a) =>
+            a.provider === provider &&
+            Math.max(new Date(a.connectedAt).getTime(), a.refreshedAt ? new Date(a.refreshedAt).getTime() : 0) > startedAt.current
+        );
+        if (touched) {
           window.clearInterval(id);
           apply(r.accounts);
           setModels(r.models);
+          loadUsage(true);
           setFlow(null);
           toast.success(t('subs.connected'));
         }
@@ -189,12 +206,12 @@ export function SubscriptionAccounts({ onChange }: { onChange?: (accounts: Subsc
   }, [flow?.start.sessionId]);
   const startedAt = useRef(0);
 
-  const begin = async (provider: OAuthProviderId) => {
-    setBusy(provider);
+  const begin = async (provider: OAuthProviderId, accountId?: string) => {
+    setBusy(accountId || provider);
     try {
       startedAt.current = Date.now();
-      const start = await startAccountLogin(provider);
-      setFlow({ provider, start, pasted: '', busy: false });
+      const start = await startAccountLogin(provider, accountId);
+      setFlow({ provider, accountId, start, pasted: '', busy: false });
       window.open(start.kind === 'redirect' ? start.authUrl : start.verificationUri, '_blank', 'noopener');
     } catch (e: any) {
       toast.error(e.message);
@@ -207,9 +224,10 @@ export function SubscriptionAccounts({ onChange }: { onChange?: (accounts: Subsc
     if (!flow || flow.start.kind !== 'redirect') return;
     setFlow({ ...flow, busy: true });
     try {
-      const updated = await completeAccountLogin(flow.provider, flow.start.sessionId, flow.pasted);
+      const updated = await completeAccountLogin(flow.provider, flow.start.sessionId, flow.pasted, flow.accountId);
       apply(updated);
       fetchAccounts().then((r) => setModels(r.models)).catch(() => {});
+      loadUsage(true);
       setFlow(null);
       toast.success(t('subs.connected'));
     } catch (e: any) {
@@ -218,10 +236,11 @@ export function SubscriptionAccounts({ onChange }: { onChange?: (accounts: Subsc
     }
   };
 
-  const test = async (p: OAuthProviderId) => {
-    setBusy(p);
+  const test = async (p: OAuthProviderId, accountId?: string) => {
+    const key = accountId || p;
+    setBusy(key);
     try {
-      apply(await testAccount(p));
+      apply(await testAccount(p, accountId));
       toast.success(t('subs.tokenValid'));
     } catch (e: any) {
       toast.error(e.message);
@@ -230,10 +249,23 @@ export function SubscriptionAccounts({ onChange }: { onChange?: (accounts: Subsc
     }
   };
 
-  const disconnect = async (p: OAuthProviderId, name: string) => {
+  const disconnect = async (p: OAuthProviderId, name: string, accountId?: string) => {
     if (!(await confirmModal({ title: t('subs.disconnectTitle', { name }), message: t('subs.disconnectMsg'), variant: 'danger' }))) return;
     try {
-      apply(await disconnectAccount(p));
+      apply(await disconnectAccount(p, accountId));
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  };
+
+  const moveAccount = async (p: OAuthProviderId, provAccounts: SubscriptionAccount[], index: number, delta: -1 | 1) => {
+    const targetIdx = index + delta;
+    if (targetIdx < 0 || targetIdx >= provAccounts.length) return;
+    const ids = provAccounts.map((a) => a.id);
+    const [moved] = ids.splice(index, 1);
+    ids.splice(targetIdx, 0, moved);
+    try {
+      apply(await reorderAccountsApi(p, ids));
     } catch (e: any) {
       toast.error(e.message);
     }
@@ -267,7 +299,8 @@ export function SubscriptionAccounts({ onChange }: { onChange?: (accounts: Subsc
       {connectedProviders.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {connectedProviders.map((p) => {
-            const acc = accounts.find((a) => a.provider === p.id);
+            const provAccounts = accounts.filter((a) => a.provider === p.id);
+            const hasError = provAccounts.some((a) => a.lastError);
             const f = flow?.provider === p.id ? flow : null;
             const provModels = models[p.id] || [];
             const isExpanded = !!expandedModels[p.id];
@@ -277,7 +310,11 @@ export function SubscriptionAccounts({ onChange }: { onChange?: (accounts: Subsc
               <Card
                 key={p.id}
                 className={`p-3.5 bg-[var(--card)] border space-y-2.5 ${
-                  acc ? (acc.lastError ? 'border-red-500/35' : 'border-emerald-500/40') : 'border-[var(--rim)]'
+                  provAccounts.length > 0
+                    ? hasError && provAccounts.every((a) => a.lastError)
+                      ? 'border-red-500/35'
+                      : 'border-emerald-500/40'
+                    : 'border-[var(--rim)]'
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
@@ -293,67 +330,128 @@ export function SubscriptionAccounts({ onChange }: { onChange?: (accounts: Subsc
                         </code>
                       </div>
                       <div className="text-[10px] text-[var(--muted-foreground)] truncate">
-                        {acc?.email || (p.plan.startsWith('subs.') ? t(p.plan as MessageKey) : p.plan)}
-                        {acc?.expiresAt ? ` · ${fmtExpiry(acc.expiresAt)}` : ''}
+                        {p.plan.startsWith('subs.') ? t(p.plan as MessageKey) : p.plan}
+                        {provAccounts.length > 1 ? ` · ${provAccounts.length} accounts (ordered rotation)` : ''}
                       </div>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-1.5 shrink-0">
-                    {acc && (
+                    {provAccounts.length > 0 && (
                       <Badge
                         variant="outline"
-                        className={`text-[10px] px-1.5 py-0.5 ${
-                          acc.lastError
-                            ? 'text-red-500 border-red-500/30 bg-red-500/10'
-                            : 'text-emerald-500 border-emerald-500/30 bg-emerald-500/10'
-                        }`}
+                        className="text-[10px] px-1.5 py-0.5 text-emerald-500 border-emerald-500/30 bg-emerald-500/10"
                       >
-                        {acc.lastError ? <XCircle className="w-2.5 h-2.5 mr-1" /> : <CheckCircle2 className="w-2.5 h-2.5 mr-1" />}
-                        {acc.lastError ? t('subs.error') : t('aiGw.connected')}
+                        <CheckCircle2 className="w-2.5 h-2.5 mr-1" />
+                        {provAccounts.length > 1 ? `${provAccounts.length} active` : t('aiGw.connected')}
                       </Badge>
                     )}
-                    {!f && acc && (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={busy === p.id}
-                          onClick={() => test(p.id)}
-                          title={t('subs.test')}
-                          className="h-7 px-2 text-[11px]"
-                        >
-                          <RefreshCw className={`w-3 h-3 mr-1 ${busy === p.id ? 'animate-spin' : ''}`} />
-                          {t('subs.test')}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={busy === p.id || !!flow}
-                          onClick={() => begin(p.id)}
-                          title={t('subs.relogin')}
-                          className="h-7 px-2 text-[11px]"
-                        >
-                          <LogIn className="w-3 h-3" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => disconnect(p.id, p.name)}
-                          title={t('aiGw.disconnect')}
-                          className="h-7 px-2 text-[11px] text-red-500 hover:bg-red-500/10"
-                        >
-                          <Unplug className="w-3 h-3" />
-                        </Button>
-                      </>
-                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!!busy || !!flow}
+                      onClick={() => begin(p.id)}
+                      title="Add another account to rotation"
+                      className="h-7 px-2 text-[11px]"
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      Add Account
+                    </Button>
                   </div>
                 </div>
 
-                {acc && (
-                  <div className="text-[11px] space-y-1.5 text-[var(--muted-foreground)]">
-                    <QuotaBars usage={usage[p.id]} onRefresh={() => loadUsage(true)} />
-                    {acc.lastError && <div className="text-red-500 text-[10px] break-words">{acc.lastError}</div>}
+                {/* Ordered Accounts List inside Provider Card */}
+                {provAccounts.length > 0 && (
+                  <div className="space-y-2">
+                    {provAccounts.map((acc, idx) => {
+                      const accUsage = usage[acc.id] || (idx === 0 ? usage[p.id] : undefined);
+                      const accLabel = acc.email || acc.label || `${p.name} #${idx + 1}`;
+                      return (
+                        <div
+                          key={acc.id}
+                          className={`rounded-lg border px-2.5 py-2 space-y-1.5 bg-[var(--background)]/40 ${
+                            acc.lastError ? 'border-red-500/30' : 'border-[var(--border)]/80'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span
+                                title={`Rotation priority #${idx + 1}`}
+                                className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-[var(--muted)] text-[var(--foreground)] shrink-0"
+                              >
+                                #{idx + 1}
+                              </span>
+                              <span className="text-[11px] font-medium text-[var(--foreground)] truncate">
+                                {accLabel}
+                              </span>
+                              {acc.expiresAt && (
+                                <span className="text-[10px] text-[var(--muted-foreground)] shrink-0">
+                                  · {fmtExpiry(acc.expiresAt)}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-1 shrink-0">
+                              {provAccounts.length > 1 && (
+                                <>
+                                  <button
+                                    type="button"
+                                    disabled={idx === 0}
+                                    onClick={() => moveAccount(p.id, provAccounts, idx, -1)}
+                                    title="Move up in rotation order"
+                                    className="p-1 rounded hover:bg-[var(--muted)] disabled:opacity-30 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                                  >
+                                    <ArrowUp className="w-3 h-3" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={idx === provAccounts.length - 1}
+                                    onClick={() => moveAccount(p.id, provAccounts, idx, 1)}
+                                    title="Move down in rotation order"
+                                    className="p-1 rounded hover:bg-[var(--muted)] disabled:opacity-30 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                                  >
+                                    <ArrowDown className="w-3 h-3" />
+                                  </button>
+                                </>
+                              )}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={busy === acc.id}
+                                onClick={() => test(p.id, acc.id)}
+                                title={t('subs.test')}
+                                className="h-6 px-1.5 text-[10px]"
+                              >
+                                <RefreshCw className={`w-2.5 h-2.5 ${busy === acc.id ? 'animate-spin' : ''}`} />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={!!busy || !!flow}
+                                onClick={() => begin(p.id, acc.id)}
+                                title={t('subs.relogin')}
+                                className="h-6 px-1.5 text-[10px]"
+                              >
+                                <LogIn className="w-2.5 h-2.5" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => disconnect(p.id, accLabel, acc.id)}
+                                title={t('aiGw.disconnect')}
+                                className="h-6 px-1.5 text-[10px] text-red-500 hover:bg-red-500/10"
+                              >
+                                <Unplug className="w-2.5 h-2.5" />
+                              </Button>
+                            </div>
+                          </div>
+
+                          <QuotaBars usage={accUsage} onRefresh={() => loadUsage(true)} />
+                          {acc.lastError && <div className="text-red-500 text-[10px] break-words">{acc.lastError}</div>}
+                        </div>
+                      );
+                    })}
+
                     {provModels.length > 0 && (
                       <div className="flex flex-wrap items-center gap-1 pt-0.5">
                         {visibleModels.map((m) => {

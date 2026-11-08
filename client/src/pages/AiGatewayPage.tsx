@@ -27,7 +27,9 @@ import {
   Plug,
   Unplug,
   Zap,
-  Globe
+  Globe,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import { Card } from '@/shared/ui/card';
 import { Button } from '@/shared/ui/button';
@@ -53,7 +55,8 @@ import {
   fetchGatewayStats,
   verifyProvider,
   connectProviderApi,
-  disconnectProviderApi
+  disconnectProviderApi,
+  reorderProviderKeysApi
 } from '@/features/ai-gateway/api';
 import type {
   VirtualApiKey,
@@ -333,6 +336,8 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
   // Provider Connection Modal
   const [connectingProvider, setConnectingProvider] = useState<ProviderMeta | null>(null);
   const [connectApiKey, setConnectApiKey] = useState('');
+  const [connectKeyLabel, setConnectKeyLabel] = useState('');
+  const [connectAddNew, setConnectAddNew] = useState(false);
   const [connectBaseUrl, setConnectBaseUrl] = useState('');
   const [revealedKey, setRevealedKey] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -383,10 +388,12 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
     }, 2000);
   };
 
-  const openConnectModal = (p: ProviderMeta) => {
+  const openConnectModal = (p: ProviderMeta, addNew = false) => {
     const existing = config?.providers?.[p.id];
     setConnectingProvider(p);
-    setConnectApiKey(existing?.apiKey || '');
+    setConnectAddNew(addNew);
+    setConnectKeyLabel('');
+    setConnectApiKey(addNew ? '' : (existing?.apiKey || ''));
     setConnectBaseUrl(existing?.baseUrl || p.defaultUrl);
     setRevealedKey(false);
     setVerificationResult(null);
@@ -403,11 +410,15 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
       const res = await connectProviderApi(
         connectingProvider.id,
         connectApiKey.trim(),
-        connectBaseUrl.trim() || connectingProvider.defaultUrl
+        connectBaseUrl.trim() || connectingProvider.defaultUrl,
+        { label: connectKeyLabel.trim() || undefined, addNew: connectAddNew }
       );
 
       setVerificationResult(res.verification);
       setConfig(res.config);
+      setConnectApiKey('');
+      setConnectKeyLabel('');
+      setConnectAddNew(false);
       toast.success(t('aiGateway.connectionVerified'));
       setTimeout(() => {
         setConnectingProvider(null);
@@ -421,6 +432,30 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
       toast.error(err.message || t('aiGateway.connectionFailed'));
     } finally {
       setIsVerifying(false);
+    }
+  };
+
+  const handleMoveProviderKey = async (providerId: AiProviderId, index: number, delta: -1 | 1) => {
+    const list = config?.providers?.[providerId]?.apiKeys || [];
+    const targetIdx = index + delta;
+    if (targetIdx < 0 || targetIdx >= list.length) return;
+    const ids = list.map((k) => k.id);
+    const [moved] = ids.splice(index, 1);
+    ids.splice(targetIdx, 0, moved);
+    try {
+      const updated = await reorderProviderKeysApi(providerId, ids);
+      setConfig(updated);
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleRemoveProviderKey = async (providerId: AiProviderId, keyId: string) => {
+    try {
+      const updated = await disconnectProviderApi(providerId, keyId);
+      setConfig(updated);
+    } catch (err: any) {
+      toast.error(err.message);
     }
   };
 
@@ -772,7 +807,11 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                               className="text-[9.5px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 flex items-center gap-1 font-mono shrink-0"
                             >
                               <CheckCircle2 className="w-2.5 h-2.5 text-emerald-500" />
-                              {provConfig?.latencyMs ? `${provConfig.latencyMs}ms` : t('aiGw.connected')}
+                              {(provConfig?.apiKeys?.length || 0) > 1
+                                ? `${provConfig!.apiKeys!.length} keys`
+                                : provConfig?.latencyMs
+                                ? `${provConfig.latencyMs}ms`
+                                : t('aiGw.connected')}
                             </span>
                           ) : (
                             <span className="w-2 h-2 rounded-full bg-[var(--muted)] mt-1.5 shrink-0" title={t('aiGw.disconnected')} />
@@ -1249,26 +1288,109 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
             </div>
 
             {connectingProvider.id !== 'ollama' && (
-              <div>
-                <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">
-                  {t('aiGw.apiKeyLabel')}
-                </label>
-                <div className="relative">
-                  <Input
-                    required
-                    type={revealedKey ? 'text' : 'password'}
-                    value={connectApiKey}
-                    onChange={(e) => setConnectApiKey(e.target.value)}
-                    placeholder={connectingProvider.keyPlaceholder.startsWith('aiGw.') ? t(connectingProvider.keyPlaceholder as MessageKey) : connectingProvider.keyPlaceholder}
-                    className="font-mono text-xs pr-8"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setRevealedKey(!revealedKey)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-                  >
-                    {revealedKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                  </button>
+              <div className="space-y-3">
+                {/* Connected Multi-Account API Keys Rotation Queue */}
+                {(config?.providers?.[connectingProvider.id]?.apiKeys?.length || 0) > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-semibold text-[var(--foreground)]">
+                        Connected Accounts / Keys ({config!.providers![connectingProvider.id]!.apiKeys!.length})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setConnectAddNew(true);
+                          setConnectApiKey('');
+                          setConnectKeyLabel('');
+                        }}
+                        className="text-[11px] font-medium text-emerald-500 hover:underline flex items-center gap-1"
+                      >
+                        <Plus className="w-3 h-3" /> Add Another Key
+                      </button>
+                    </div>
+                    <div className="space-y-1 max-h-36 overflow-y-auto pr-0.5">
+                      {config!.providers![connectingProvider.id]!.apiKeys!.map((k, idx, arr) => (
+                        <div
+                          key={k.id}
+                          className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--background)] border border-[var(--border)] text-xs"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--muted)] text-[var(--foreground)]">
+                              #{idx + 1}
+                            </span>
+                            <span className="font-mono text-[11px] text-[var(--foreground)] truncate">
+                              {k.label ? `${k.label} (${k.apiKey})` : k.apiKey}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {arr.length > 1 && (
+                              <>
+                                <button
+                                  type="button"
+                                  disabled={idx === 0}
+                                  onClick={() => handleMoveProviderKey(connectingProvider.id, idx, -1)}
+                                  title="Move up in rotation order"
+                                  className="p-1 rounded hover:bg-[var(--muted)] disabled:opacity-30"
+                                >
+                                  <ArrowUp className="w-3 h-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={idx === arr.length - 1}
+                                  onClick={() => handleMoveProviderKey(connectingProvider.id, idx, 1)}
+                                  title="Move down in rotation order"
+                                  className="p-1 rounded hover:bg-[var(--muted)] disabled:opacity-30"
+                                >
+                                  <ArrowDown className="w-3 h-3" />
+                                </button>
+                              </>
+                            )}
+                            {arr.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveProviderKey(connectingProvider.id, k.id)}
+                                title="Remove key"
+                                className="p-1 rounded text-red-500 hover:bg-red-500/10"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">
+                    {connectAddNew ? 'New Account / Key Label (optional)' : t('aiGw.apiKeyLabel')}
+                  </label>
+                  {connectAddNew && (
+                    <Input
+                      value={connectKeyLabel}
+                      onChange={(e) => setConnectKeyLabel(e.target.value)}
+                      placeholder="e.g. Backup Key #2, Team Account"
+                      className="text-xs mb-2"
+                    />
+                  )}
+                  <div className="relative">
+                    <Input
+                      required
+                      type={revealedKey ? 'text' : 'password'}
+                      value={connectApiKey}
+                      onChange={(e) => setConnectApiKey(e.target.value)}
+                      placeholder={connectingProvider.keyPlaceholder.startsWith('aiGw.') ? t(connectingProvider.keyPlaceholder as MessageKey) : connectingProvider.keyPlaceholder}
+                      className="font-mono text-xs pr-8"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setRevealedKey(!revealedKey)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                    >
+                      {revealedKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

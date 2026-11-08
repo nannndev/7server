@@ -127,12 +127,27 @@ export function getInternalConfig(): AiGatewayConfig {
   // Decrypt API keys for internal proxy use
   for (const p of Object.keys(cfg.providers) as AiProviderId[]) {
     const prov = cfg.providers[p];
-    if (prov && prov.apiKey) {
+    if (!prov) continue;
+    if (prov.apiKey) {
       prov.apiKey = decrypt(prov.apiKey);
+    }
+    if (Array.isArray(prov.apiKeys) && prov.apiKeys.length > 0) {
+      prov.apiKeys = prov.apiKeys
+        .map((k) => ({ ...k, apiKey: decrypt(k.apiKey) }))
+        .filter((k) => !!k.apiKey);
+      if (prov.apiKeys.length > 0) prov.apiKey = prov.apiKeys[0]!.apiKey;
+    } else if (prov.apiKey) {
+      prov.apiKeys = [{ id: `${p}:default`, apiKey: prov.apiKey, addedAt: prov.verifiedAt || new Date().toISOString() }];
     }
   }
   return cfg;
 }
+
+const maskSecret = (decrypted: string): string => {
+  if (!decrypted) return '';
+  if (decrypted.length <= 11) return `${decrypted.slice(0, 3)}...${decrypted.slice(-2)}`;
+  return `${decrypted.slice(0, 7)}...${decrypted.slice(-4)}`;
+};
 
 export function getClientConfig(): AiGatewayConfig {
   const stored = readConfig();
@@ -145,15 +160,17 @@ export function getClientConfig(): AiGatewayConfig {
   // Mask API keys for safe UI presentation
   for (const p of Object.keys(cfg.providers) as AiProviderId[]) {
     const prov = cfg.providers[p];
-    if (prov && prov.apiKey) {
-      const decrypted = decrypt(prov.apiKey);
-      if (decrypted) {
-        const prefix = decrypted.slice(0, 7);
-        const suffix = decrypted.slice(-4);
-        prov.apiKey = `${prefix}...${suffix}`;
-      } else {
-        prov.apiKey = '';
-      }
+    if (!prov) continue;
+    if (prov.apiKey) {
+      prov.apiKey = maskSecret(decrypt(prov.apiKey));
+    }
+    if (Array.isArray(prov.apiKeys) && prov.apiKeys.length > 0) {
+      prov.apiKeys = prov.apiKeys
+        .map((k) => ({ ...k, apiKey: maskSecret(decrypt(k.apiKey)) }))
+        .filter((k) => !!k.apiKey);
+      if (prov.apiKeys.length > 0) prov.apiKey = prov.apiKeys[0]!.apiKey;
+    } else if (prov.apiKey) {
+      prov.apiKeys = [{ id: `${p}:default`, apiKey: prov.apiKey, addedAt: prov.verifiedAt || new Date().toISOString() }];
     }
   }
   return cfg;
@@ -199,7 +216,8 @@ export function connectProvider(
   apiKey: string,
   baseUrl?: string,
   latencyMs?: number,
-  models?: string[]
+  models?: string[],
+  opts?: { label?: string; addNew?: boolean; keyId?: string }
 ): AiGatewayConfig {
   const currentStored = readConfig();
   const target = currentStored.providers[providerId] || {
@@ -208,15 +226,48 @@ export function connectProvider(
     baseUrl: ''
   };
 
-  const encryptedKey = apiKey.trim() ? encrypt(apiKey.trim()) : (target.apiKey || '');
+  const trimmed = apiKey.trim();
+  const encryptedKey = trimmed ? encrypt(trimmed) : (target.apiKey || '');
+  const now = new Date().toISOString();
+
+  let apiKeys = Array.isArray(target.apiKeys) ? [...target.apiKeys] : [];
+  if (apiKeys.length === 0 && target.apiKey) {
+    apiKeys.push({ id: `${providerId}:default`, apiKey: target.apiKey, addedAt: target.verifiedAt || now });
+  }
+
+  if (trimmed) {
+    const existingIdx = apiKeys.findIndex((k) => {
+      if (opts?.keyId) return k.id === opts.keyId;
+      try { return decrypt(k.apiKey) === trimmed; } catch { return false; }
+    });
+    if (existingIdx >= 0) {
+      apiKeys[existingIdx] = {
+        ...apiKeys[existingIdx]!,
+        apiKey: encryptedKey,
+        label: opts?.label !== undefined ? opts.label : apiKeys[existingIdx]!.label
+      };
+    } else if (opts?.addNew && apiKeys.length > 0) {
+      apiKeys.push({
+        id: `${providerId}:${crypto.randomUUID().slice(0, 8)}`,
+        label: opts?.label,
+        apiKey: encryptedKey,
+        addedAt: now
+      });
+    } else if (apiKeys.length === 0) {
+      apiKeys = [{ id: `${providerId}:default`, label: opts?.label, apiKey: encryptedKey, addedAt: now }];
+    } else {
+      apiKeys[0] = { ...apiKeys[0]!, label: opts?.label ?? apiKeys[0]!.label, apiKey: encryptedKey };
+    }
+  }
 
   currentStored.providers[providerId] = {
     ...target,
-    apiKey: encryptedKey,
+    apiKey: apiKeys[0]?.apiKey || encryptedKey,
+    apiKeys: apiKeys.length > 0 ? apiKeys : undefined,
     baseUrl: baseUrl || target.baseUrl || '',
     enabled: true,
     connected: true,
-    verifiedAt: new Date().toISOString(),
+    verifiedAt: now,
     latencyMs,
     ...(models ? { models } : {}),
     error: undefined
@@ -226,18 +277,52 @@ export function connectProvider(
   return getClientConfig();
 }
 
-export function disconnectProvider(providerId: AiProviderId): AiGatewayConfig {
+export function disconnectProvider(providerId: AiProviderId, keyId?: string): AiGatewayConfig {
   const currentStored = readConfig();
-  if (currentStored.providers[providerId]) {
-    currentStored.providers[providerId] = {
-      ...currentStored.providers[providerId]!,
-      apiKey: '',
-      connected: false,
-      enabled: false,
-      error: undefined
-    };
+  const target = currentStored.providers[providerId];
+  if (target) {
+    if (keyId && Array.isArray(target.apiKeys) && target.apiKeys.length > 1) {
+      const nextKeys = target.apiKeys.filter((k) => k.id !== keyId);
+      currentStored.providers[providerId] = {
+        ...target,
+        apiKeys: nextKeys,
+        apiKey: nextKeys[0]?.apiKey || '',
+        connected: nextKeys.length > 0,
+        enabled: nextKeys.length > 0
+      };
+    } else {
+      currentStored.providers[providerId] = {
+        ...target,
+        apiKey: '',
+        apiKeys: undefined,
+        connected: false,
+        enabled: false,
+        error: undefined
+      };
+    }
   }
   writeConfig(currentStored);
+  return getClientConfig();
+}
+
+export function reorderProviderKeys(providerId: AiProviderId, keyIds: string[]): AiGatewayConfig {
+  const currentStored = readConfig();
+  const target = currentStored.providers[providerId];
+  if (target && Array.isArray(target.apiKeys) && target.apiKeys.length > 1) {
+    const byId = new Map(target.apiKeys.map((k) => [k.id, k]));
+    const ordered = [];
+    for (const id of keyIds) {
+      const found = byId.get(id);
+      if (found) { ordered.push(found); byId.delete(id); }
+    }
+    for (const rest of byId.values()) ordered.push(rest);
+    currentStored.providers[providerId] = {
+      ...target,
+      apiKeys: ordered,
+      apiKey: ordered[0]?.apiKey || target.apiKey
+    };
+    writeConfig(currentStored);
+  }
   return getClientConfig();
 }
 

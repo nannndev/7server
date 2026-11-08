@@ -22,8 +22,16 @@ export interface VirtualApiKey {
   totalOutputTokens: number;
 }
 
+export interface ProviderApiKeyAccount {
+  id: string;
+  label?: string;
+  apiKey: string;          // Encrypted at rest, masked in UI
+  addedAt: string;
+}
+
 export interface ProviderConfig {
   apiKey?: string;          // Encrypted at rest, masked in UI
+  apiKeys?: ProviderApiKeyAccount[]; // Ordered multi-account API keys for rotation
   baseUrl?: string;         // Custom base URL
   enabled: boolean;
   connected?: boolean;      // Verified and active

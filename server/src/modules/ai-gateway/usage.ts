@@ -1,7 +1,7 @@
 // Remaining quota of each logged-in subscription account, read from the provider's own usage
 // endpoint with the account's token. Normalised to windows of "% used" with a reset time.
 // shortcut: Gemini CLI has no stable quota endpoint we can read; it reports "unknown". Add it when one is confirmed.
-import { getCredential, isConnected } from './accounts.js';
+import { getCredential, isConnected, listAccountsFor, type PublicAccount } from './accounts.js';
 import { COPILOT, type OAuthProviderId } from './oauth.js';
 
 export interface QuotaWindow {
@@ -13,6 +13,7 @@ export interface QuotaWindow {
   total?: number;
 }
 export interface AccountUsage {
+  accountId?: string;
   provider: OAuthProviderId;
   plan?: string;
   windows: QuotaWindow[];
@@ -83,17 +84,18 @@ async function fetchJson(url: string, headers: Record<string, string>) {
 }
 
 // Usage endpoints are rate-limited too: cache each account's answer for a minute.
-const cache = new Map<OAuthProviderId, { at: number; value: AccountUsage }>();
+const cache = new Map<string, { at: number; value: AccountUsage }>();
 const TTL = 60_000;
 
-export async function usageOf(provider: OAuthProviderId, fresh = false): Promise<AccountUsage> {
-  const hit = cache.get(provider);
+export async function usageOf(provider: OAuthProviderId, fresh = false, accountId?: string): Promise<AccountUsage> {
+  const key = accountId || provider;
+  const hit = cache.get(key);
   if (!fresh && hit && Date.now() - hit.at < TTL) return hit.value;
-  const base = { provider, windows: [] as QuotaWindow[], exhausted: false, checkedAt: new Date().toISOString() };
+  const base: AccountUsage = { accountId: key, provider, windows: [] as QuotaWindow[], exhausted: false, checkedAt: new Date().toISOString() };
   let value: AccountUsage;
   try {
     if (!isConnected(provider)) throw new Error('not logged in');
-    const cred = await getCredential(provider);
+    const cred = await getCredential(provider, accountId);
     let parsed: Pick<AccountUsage, 'windows' | 'plan'>;
     if (provider === 'claude') {
       parsed = parseClaude(await fetchJson('https://api.anthropic.com/api/oauth/usage', {
@@ -116,12 +118,40 @@ export async function usageOf(provider: OAuthProviderId, fresh = false): Promise
   } catch (e: any) {
     value = { ...base, error: e.message };
   }
-  cache.set(provider, { at: Date.now(), value });
+  cache.set(key, { at: Date.now(), value });
   return value;
 }
 
-/** Remember a 429 from a provider so routing can skip it until its window resets (or for 5 min). */
-const cooling = new Map<OAuthProviderId, number>();
-export const markRateLimited = (p: OAuthProviderId, untilMs = Date.now() + 5 * 60_000) => { cooling.set(p, untilMs); cache.delete(p); };
-export const isCoolingDown = (p: OAuthProviderId) => (cooling.get(p) || 0) > Date.now();
+/** Remember a 429 from an account so routing can skip it until its window resets (or for 5 min). */
+const cooling = new Map<string, number>();
+
+export const markRateLimited = (p: OAuthProviderId, untilMs = Date.now() + 5 * 60_000, accountId?: string) => {
+  const key = accountId || p;
+  cooling.set(key, untilMs);
+  cache.delete(key);
+};
+
+export const isAccountCoolingDown = (accountId: string) => (cooling.get(accountId) || 0) > Date.now();
+
+/** A provider is cooling down only when all of its connected accounts are cooling down. */
+export const isCoolingDown = (p: OAuthProviderId) => {
+  const now = Date.now();
+  if ((cooling.get(p) || 0) > now) {
+    const accs = listAccountsFor(p);
+    if (accs.length <= 1) return true;
+  }
+  const accs = listAccountsFor(p);
+  if (accs.length === 0) return false;
+  return accs.every((a) => (cooling.get(a.id) || 0) > now);
+};
+
+/** Returns a provider's accounts in rotation order, placing non-cooling accounts ahead of cooling ones. */
+export const orderedAccountsFor = (p: OAuthProviderId): PublicAccount[] => {
+  const accs = listAccountsFor(p);
+  return [
+    ...accs.filter((a) => !isAccountCoolingDown(a.id)),
+    ...accs.filter((a) => isAccountCoolingDown(a.id))
+  ];
+};
+
 export const __resetUsage = () => { cache.clear(); cooling.clear(); };

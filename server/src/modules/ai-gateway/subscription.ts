@@ -3,7 +3,7 @@
 //   GET  /v1/models                                              (every model of every connected account)
 import type { Request, Response } from 'express';
 import { getCredential, isConnected, markExpired } from './accounts.js';
-import { markRateLimited } from './usage.js';
+import { markRateLimited, orderedAccountsFor } from './usage.js';
 import { COPILOT, KIMI, KILOCODE, MUSE, NOUS, kimiHeaders, type OAuthCredential, type OAuthProviderId } from './oauth.js';
 import {
   type ChatRequest, type StreamPart, type ToolDelta, CLAUDE_CODE_SYSTEM, toClaude, claudeToOpenAi, claudeEvent, claudeParser, toCodex, codexParser, toGemini, geminiParser,
@@ -129,25 +129,40 @@ export interface ChatOutcome { inTok: number; outTok: number; status: number; er
 export async function subscriptionChat(req: Request, res: Response, body: ChatRequest, target: { provider: OAuthProviderId; model: string }): Promise<ChatOutcome> {
   const { provider, model } = target;
   const publicModel = `${ALIAS_OF[provider]}/${model}`;
-  if (!isConnected(provider)) throw new UpstreamError(503, `Akun ${provider} belum login. Hubungkan di 7Server → AI Gateway.`);
+  const candidates = orderedAccountsFor(provider);
+  if (!candidates.length) throw new UpstreamError(503, `Akun ${provider} belum login. Hubungkan di 7Server → AI Gateway.`);
 
   const ctrl = new AbortController();
   // Abort only if the client goes away before we finish (req 'close' fires right after the body is read).
   res.on('close', () => { if (!res.writableFinished) ctrl.abort(); });
 
-  let cred = await getCredential(provider);
-  let up = await call(provider, cred, model, body, ctrl.signal);
-  if (up.status === 401) {
-    // Token revoked or rotated elsewhere: refresh once and retry.
-    markExpired(provider);
-    cred = await getCredential(provider);
+  let up: globalThis.Response | undefined;
+  let lastErr: UpstreamError | undefined;
+  for (let i = 0; i < candidates.length; i++) {
+    const acc = candidates[i]!;
+    let cred = await getCredential(provider, acc.id);
     up = await call(provider, cred, model, body, ctrl.signal);
-  }
-  if (!up.ok) {
+    if (up.status === 401) {
+      // Token revoked or rotated elsewhere: refresh once and retry.
+      markExpired(provider, acc.id);
+      cred = await getCredential(provider, acc.id);
+      up = await call(provider, cred, model, body, ctrl.signal);
+    }
+    if (up.ok) break;
     const text = await up.text();
-    if (up.status === 429) markRateLimited(provider, resetOf(up, text));
-    throw new UpstreamError(up.status, `${provider} ${up.status}: ${text.slice(0, 400)}`);
+    if (up.status === 429) {
+      markRateLimited(provider, resetOf(up, text), acc.id);
+    } else if (up.status === 401 || up.status === 402 || up.status === 403 || up.status >= 500) {
+      markRateLimited(provider, Date.now() + 60_000, acc.id);
+    }
+    lastErr = new UpstreamError(up.status, `${provider} ${up.status}: ${text.slice(0, 400)}`);
+    up = undefined;
+    if (i + 1 < candidates.length && (isRetryable(lastErr) || lastErr.status === 402)) {
+      continue;
+    }
+    throw lastErr;
   }
+  if (!up) throw lastErr || new UpstreamError(502, `${provider}: all accounts failed`);
 
   // Copilot, Kimi, Kilo Code: OpenAI format already, stream/JSON through untouched.
   if (provider === 'copilot' || provider === 'kimi' || provider === 'kilocode' || provider === 'muse' || provider === 'nous') {
@@ -307,7 +322,8 @@ export const mergeBetas = (client?: string) =>
  * unchanged (JSON or SSE). `path` is '/v1/messages' or '/v1/messages/count_tokens'.
  */
 export async function claudeMessages(req: Request, res: Response, body: any, path = '/v1/messages'): Promise<ChatOutcome> {
-  if (!isConnected('claude')) throw new UpstreamError(503, 'Akun Claude belum login. Hubungkan di 7Server → AI Gateway.');
+  const candidates = orderedAccountsFor('claude');
+  if (!candidates.length) throw new UpstreamError(503, 'Akun Claude belum login. Hubungkan di 7Server → AI Gateway.');
   const ctrl = new AbortController();
   res.on('close', () => { if (!res.writableFinished) ctrl.abort(); });
 
@@ -329,11 +345,25 @@ export async function claudeMessages(req: Request, res: Response, body: any, pat
       body: payload
     });
 
-  let up = await send(await getCredential('claude'));
-  if (up.status === 401) {
-    markExpired('claude');
-    up = await send(await getCredential('claude'));
+  let up: globalThis.Response | undefined;
+  let lastFailedText = '';
+  for (let i = 0; i < candidates.length; i++) {
+    const acc = candidates[i]!;
+    up = await send(await getCredential('claude', acc.id));
+    if (up.status === 401) {
+      markExpired('claude', acc.id);
+      up = await send(await getCredential('claude', acc.id));
+    }
+    if (up.ok) break;
+    if (i + 1 < candidates.length && (up.status === 429 || up.status === 401 || up.status === 403 || up.status >= 500)) {
+      lastFailedText = await up.text();
+      if (up.status === 429) markRateLimited('claude', resetOf(up, lastFailedText), acc.id);
+      else markRateLimited('claude', Date.now() + 60_000, acc.id);
+      continue;
+    }
+    break;
   }
+  up = up!;
 
   const type = up.headers.get('content-type') || 'application/json';
   if (!up.ok || !type.includes('event-stream') || !up.body) {

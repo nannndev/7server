@@ -9,7 +9,7 @@ process.env.VPSHUB_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'vpshub-comb
 
 const { parseClaude, parseCodex, parseCopilot, isCoolingDown, __resetUsage } = await import('./usage.js');
 const { comboName, isRetryable, UpstreamError } = await import('./subscription.js');
-const { saveAccount } = await import('./accounts.js');
+const { saveAccount, listAccountsFor, reorderAccounts, removeAccount } = await import('./accounts.js');
 const { saveGatewayConfig, createVirtualKey } = await import('./store.js');
 const { handleOpenAiChatCompletions } = await import('./service.js');
 
@@ -90,5 +90,48 @@ r = await call('auto/nope');
 assert.equal(r.statusCode, 404);
 assert.match(r.body.error.message, /Unknown combo/);
 
+// ---- Multi-account per provider + ordered rotation
+__resetUsage();
+removeAccount('claude');
+const acc1 = saveAccount('claude', { accessToken: 'claude-acc-1', email: 'one@claude.ai', expiresAt: Date.now() + 3_600_000 });
+const acc2 = saveAccount('claude', { accessToken: 'claude-acc-2', email: 'two@claude.ai', expiresAt: Date.now() + 3_600_000 });
+assert.equal(listAccountsFor('claude').length, 2, 'two accounts stored under claude');
+assert.deepEqual(listAccountsFor('claude').map((a) => a.email), ['one@claude.ai', 'two@claude.ai']);
+
+// Reorder: put two@claude.ai first, then restore one@claude.ai first
+reorderAccounts('claude', [acc2.id, acc1.id]);
+assert.deepEqual(listAccountsFor('claude').map((a) => a.email), ['two@claude.ai', 'one@claude.ai']);
+reorderAccounts('claude', [acc1.id, acc2.id]);
+assert.deepEqual(listAccountsFor('claude').map((a) => a.email), ['one@claude.ai', 'two@claude.ai']);
+
+const seenBearer: string[] = [];
+globalThis.fetch = (async (url: any, init: any) => {
+  const u = String(url);
+  if (u.startsWith('https://api.anthropic.com/v1/messages')) {
+    const auth = String(init?.headers?.Authorization || '');
+    seenBearer.push(auth);
+    if (auth === 'Bearer claude-acc-1') {
+      return new Response('{"type":"error","error":{"type":"rate_limit_error"}}', { status: 429, headers: { 'retry-after': '120' } });
+    }
+    return new Response(JSON.stringify({ content: [{ type: 'text', text: 'from claude #2' }], stop_reason: 'end_turn', usage: { input_tokens: 4, output_tokens: 3 } }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' }
+    });
+  }
+  return new Response('not stubbed', { status: 599 });
+}) as any;
+
+// Request 1: tries acc1 (429) -> automatically rotates to acc2 (200)
+r = await call('cc/claude-sonnet-5');
+assert.equal(r.statusCode, 200);
+assert.equal(r.body.choices[0].message.content, 'from claude #2');
+assert.deepEqual(seenBearer, ['Bearer claude-acc-1', 'Bearer claude-acc-2']);
+assert.equal(isCoolingDown('claude'), false, 'provider not cooling down while acc2 is still healthy');
+
+// Request 2: acc1 is cooling down, so acc2 is used immediately without touching acc1
+r = await call('cc/claude-sonnet-5');
+assert.equal(r.statusCode, 200);
+assert.deepEqual(seenBearer, ['Bearer claude-acc-1', 'Bearer claude-acc-2', 'Bearer claude-acc-2']);
+
 fs.rmSync(process.env.VPSHUB_DATA_DIR!, { recursive: true, force: true });
-console.log('combo + usage tests ok');
+console.log('combo + usage + multi-account rotation tests ok');
