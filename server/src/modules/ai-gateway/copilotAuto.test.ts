@@ -68,8 +68,19 @@ assert.deepEqual(all[0].items.map((i: any) => [i.provider, i.reason]), [['codex'
 assert.ok(all[0].items[0].detail, 'raw provider message kept for the details toggle');
 
 // Reasons and catalog filters.
-const { accountProblem } = await import('./copilot.js');
+const { accountProblem, compactCopilotHistory } = await import('./copilot.js');
 const { copilotChatModels, kiloFreeModels } = await import('./subscription.js');
+
+// Context compaction: older UNTRUSTED_OUTPUT blocks shrink while recent turns stay intact.
+const bigLines = Array.from({ length: 30 }, (_, i) => `log line ${i + 1}`).join('\n');
+const longHistory = [
+  { role: 'user' as const, content: 'check logs' },
+  { role: 'user' as const, content: `<<<UNTRUSTED_OUTPUT 123 exit=0 cmd=journalctl>>>\n${bigLines}\n<<<END_UNTRUSTED_OUTPUT 123>>>` },
+  ...Array.from({ length: 6 }, (_, i) => ({ role: 'user' as const, content: `recent turn ${i}` }))
+];
+const compacted = compactCopilotHistory(longHistory);
+assert.match(compacted[1].content, /lines compacted/, 'older tool output is compacted');
+assert.equal(compacted.at(-1)!.content, 'recent turn 5', 'recent turns stay untouched');
 assert.equal(accountProblem('kilocode 402: {"error":{"title":"Paid Model - Credits Required"}}'), 'no credits');
 assert.equal(accountProblem('copilot 400: The requested model is not available for integrator'), 'model not in your plan');
 assert.deepEqual(copilotChatModels([

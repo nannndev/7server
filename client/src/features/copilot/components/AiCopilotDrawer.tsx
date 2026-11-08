@@ -88,10 +88,16 @@ interface SlashCommandItem {
   title: string;
   desc: string;
   prompt?: string;
-  action?: 'clear';
+  action?: 'clear' | 'compact';
 }
 
 const SLASH_COMMANDS: SlashCommandItem[] = [
+  {
+    cmd: '/compact',
+    title: 'Compact Context',
+    desc: 'Summarize older messages and command outputs to save tokens & speed up replies',
+    action: 'compact'
+  },
   {
     cmd: '/diagnose',
     title: 'Full System Diagnose',
@@ -731,6 +737,61 @@ export default function AiCopilotDrawer({
     }
   };
 
+  const handleCompactChat = () => {
+    if (messages.length < 3) {
+      toast.info('Conversation is already compact');
+      return;
+    }
+    const keepCount = Math.min(2, messages.length - 1);
+    const older = messages.slice(0, messages.length - keepCount);
+    const recent = messages.slice(messages.length - keepCount);
+
+    const charBefore = older.reduce((sum, m) => sum + (m.content?.length || 0) + (m.runs?.reduce((s, r) => s + (r.output?.length || 0), 0) || 0), 0);
+    const userPoints: string[] = [];
+    const cmdPoints: string[] = [];
+    const aiPoints: string[] = [];
+
+    for (const m of older) {
+      if (m.kind === 'compact') {
+        aiPoints.push(m.content);
+        continue;
+      }
+      if (m.role === 'user' && m.kind !== 'tool') {
+        const line = m.content.replace(/<<<UNTRUSTED_OUTPUT[\s\S]*?<<<END_UNTRUSTED_OUTPUT[^>]*>>>/g, '').trim().split('\n')[0]?.slice(0, 140);
+        if (line) userPoints.push(`- ${line}`);
+      } else if (m.role === 'assistant') {
+        const clean = m.content.replace(/```[\s\S]*?```/g, '').trim().split('\n').filter(Boolean)[0]?.slice(0, 160);
+        if (clean) aiPoints.push(`- ${clean}`);
+        for (const r of m.runs || []) {
+          if (r.status === 'done') {
+            cmdPoints.push(`- \`${r.code.split('\n')[0].slice(0, 80)}\` → exit ${r.exitCode ?? 0}`);
+          }
+        }
+      }
+    }
+
+    const summaryParts = [
+      `[COMPACTED CONTEXT — ${older.length} earlier messages summarized]`,
+      userPoints.length ? `User requests:\n${userPoints.slice(-6).join('\n')}` : '',
+      cmdPoints.length ? `Commands executed:\n${cmdPoints.slice(-8).join('\n')}` : '',
+      aiPoints.length ? `Key findings:\n${aiPoints.slice(-6).join('\n')}` : ''
+    ].filter(Boolean);
+
+    const summaryContent = summaryParts.join('\n\n');
+    const savedTokens = Math.max(100, Math.round((charBefore - summaryContent.length) / 4));
+
+    const compactMsg: ChatMessage = {
+      id: `compact-${Date.now()}`,
+      role: 'user',
+      kind: 'compact',
+      content: summaryContent,
+      timestamp: Date.now()
+    };
+
+    setMessages([compactMsg, ...recent]);
+    toast.success(`Compacted ${older.length} messages (~${savedTokens.toLocaleString()} tokens freed)`);
+  };
+
   const handleSend = async (overridePrompt?: string) => {
     const rawPrompt = (overridePrompt ?? input).trim();
     if ((!rawPrompt && attachedContexts.length === 0) || isStreaming) return;
@@ -741,6 +802,11 @@ export default function AiCopilotDrawer({
       if (matchedSlash.action === 'clear') {
         setInput('');
         handleNewChat();
+        return;
+      }
+      if (matchedSlash.action === 'compact') {
+        setInput('');
+        handleCompactChat();
         return;
       }
       if (matchedSlash.prompt) {
@@ -967,6 +1033,11 @@ export default function AiCopilotDrawer({
     if (item.action === 'clear') {
       setInput('');
       handleNewChat();
+      return;
+    }
+    if (item.action === 'compact') {
+      setInput('');
+      handleCompactChat();
       return;
     }
     if (item.prompt) {
@@ -1382,6 +1453,22 @@ export default function AiCopilotDrawer({
                     <div key={msg.id} className="flex items-center gap-2 pl-9 text-[10px] text-[var(--muted-foreground)]">
                       <Layers className="w-3 h-3 text-[var(--foreground)]" /> {t('copilot.toolFed')}
                     </div>
+                  ) : msg.kind === 'compact' ? (
+                    <details
+                      key={msg.id}
+                      className="rounded-xl border border-[var(--border)] bg-[var(--muted)]/30 px-3 py-2 text-[11px] text-[var(--muted-foreground)] group/compact"
+                    >
+                      <summary className="cursor-pointer select-none flex items-center justify-between gap-2 font-medium text-[var(--foreground)] list-none">
+                        <span className="flex items-center gap-1.5">
+                          <Layers className="w-3.5 h-3.5 text-emerald-500" />
+                          <span>Context Compacted</span>
+                        </span>
+                        <span className="text-[10px] font-mono text-[var(--muted-foreground)]">click to inspect</span>
+                      </summary>
+                      <pre className="mt-2 pt-2 border-t border-[var(--border)]/60 whitespace-pre-wrap font-mono text-[10px] leading-relaxed text-[var(--muted-foreground)]">
+                        {msg.content}
+                      </pre>
+                    </details>
                   ) : (
                     <div
                       key={msg.id}
@@ -1591,6 +1678,19 @@ export default function AiCopilotDrawer({
                       placement="top"
                       variant="chip"
                     />
+                  )}
+
+                  {/* Quick Compact Pill when chat has 6+ messages */}
+                  {messages.length >= 6 && !isStreaming && (
+                    <button
+                      type="button"
+                      onClick={handleCompactChat}
+                      title="Summarize older turns & tool outputs (/compact)"
+                      className="h-7 px-2 rounded-lg text-[11px] flex items-center gap-1 text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)] transition-colors"
+                    >
+                      <Layers className="w-3 h-3 text-emerald-500" />
+                      <span className="hidden sm:inline">Compact</span>
+                    </button>
                   )}
 
                   {/* Live Server Context Quick-Injector */}

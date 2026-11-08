@@ -21,8 +21,8 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;
-  /** 'tool' = command output fed back to the AI (sent as a user turn, rendered compactly) */
-  kind?: 'tool';
+  /** 'tool' = command output fed back to the AI; 'compact' = summarized earlier conversation context */
+  kind?: 'tool' | 'compact';
   runs?: CommandRun[];
   serverId?: string;
   /** agent loop depth for this user prompt */

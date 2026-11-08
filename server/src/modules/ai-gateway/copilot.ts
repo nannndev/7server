@@ -222,6 +222,51 @@ ${DEFAULT_DEVOPS_SKILL}`;
   return prompt;
 }
 
+const MAX_HISTORY_CHARS = 24_000;
+const RECENT_FULL_TURNS = 6;
+
+/** Compacts older tool outputs and summarizes older turns when conversation exceeds MAX_HISTORY_CHARS. */
+export function compactCopilotHistory(raw: CopilotChatMessage[]): CopilotChatMessage[] {
+  const recentStart = Math.max(0, raw.length - RECENT_FULL_TURNS);
+  const trimmed = raw.map((m, idx) => {
+    if (idx >= recentStart) return m;
+    let content = m.content;
+    if (content.includes('<<<UNTRUSTED_OUTPUT')) {
+      content = content.replace(
+        /(<<<UNTRUSTED_OUTPUT[^\n]*\n)([\s\S]*?)(\n<<<END_UNTRUSTED_OUTPUT[^>]*>>>)/g,
+        (_all, head: string, body: string, tail: string) => {
+          const lines = body.trim().split('\n');
+          if (lines.length <= 6 && body.length <= 400) return `${head}${body}${tail}`;
+          const snippet = [...lines.slice(0, 2), `... [${lines.length - 5} lines compacted] ...`, ...lines.slice(-3)].join('\n').slice(0, 450);
+          return `${head}${snippet}${tail}`;
+        }
+      );
+    } else if (m.role === 'assistant' && content.length > 1000) {
+      content = `${content.slice(0, 750)}\n...[earlier response compacted]...\n${content.slice(-200)}`;
+    }
+    return { role: m.role, content };
+  });
+
+  const totalChars = trimmed.reduce((sum, m) => sum + m.content.length, 0);
+  if (totalChars <= MAX_HISTORY_CHARS || trimmed.length <= RECENT_FULL_TURNS + 2) {
+    return trimmed;
+  }
+
+  // Summarize oldest turns into a single compact context note, preserving the last RECENT_FULL_TURNS intact
+  const older = trimmed.slice(0, trimmed.length - RECENT_FULL_TURNS);
+  const recent = trimmed.slice(trimmed.length - RECENT_FULL_TURNS);
+  const bulletLines: string[] = [];
+  for (const m of older) {
+    const firstLine = m.content.replace(/<<<UNTRUSTED_OUTPUT[\s\S]*?<<<END_UNTRUSTED_OUTPUT[^>]*>>>/g, '[command output]').trim().split('\n')[0]?.slice(0, 160);
+    if (firstLine) bulletLines.push(`- ${m.role === 'user' ? 'User' : 'Copilot'}: ${firstLine}`);
+  }
+  const summaryMsg: CopilotChatMessage = {
+    role: 'user',
+    content: `[COMPACTED EARLIER CONTEXT — ${older.length} earlier messages summarized]\n${bulletLines.slice(-16).join('\n')}`
+  };
+  return [summaryMsg, ...recent];
+}
+
 export async function handleCopilotChat(req: Request, res: Response): Promise<void> {
   let { messages, context, model: requestedModel } = req.body as {
     messages?: CopilotChatMessage[];
@@ -235,10 +280,12 @@ export async function handleCopilotChat(req: Request, res: Response): Promise<vo
     return;
   }
   // Only user/assistant turns come from the browser; a client "system" message would override our rules.
-  messages = messages
-    .filter((m) => m && (m.role === 'user' || m.role === 'assistant'))
-    .map((m) => ({ role: m.role, content: String(m.content ?? '').slice(0, 20000) }))
-    .slice(-60);
+  messages = compactCopilotHistory(
+    messages
+      .filter((m) => m && (m.role === 'user' || m.role === 'assistant'))
+      .map((m) => ({ role: m.role, content: String(m.content ?? '').slice(0, 20000) }))
+      .slice(-60)
+  );
   if (messages.length === 0) {
     res.status(400).json({ error: 'Messages array is required' });
     return;
