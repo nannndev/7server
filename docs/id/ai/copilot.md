@@ -42,6 +42,40 @@ Jika terjadi kegagalan pada tahapan deployment (misalnya proses build gagal, kon
 
 ---
 
+## Built-in DevOps Engineer Skill & Custom Skills (`SKILL.md`)
+
+AI SRE Copilot di 7Server dibekali *skill* standar produksi serta mendukung penambahan *custom skill* Anda sendiri:
+
+### 1. Skill Bawaan `devops-engineer` & Playbook Kontekstual
+- **Baseline `devops-engineer`**: Aktif secara default menggunakan metodologi **Build / Deploy / Ops Hats** dan alur kerja 7 langkah (*Observe → Correlate → Root Cause → Minimal Fix → Verify → Harden*) untuk diagnosa systemd, Docker, Nginx, TLS, dan Linux kernel.
+- **Playbook Spesialis Otomatis**: Menyuntikkan panduan spesifik sesuai tab dashboard yang sedang dibuka atau topik pertanyaan Anda—mencakup **Web Apps & PM2**, **Docker & Compose**, **Nginx & Reverse Proxy**, **SSL & Certbot**, **Firewall & SSH Hardening**, **Database (Postgres/MySQL/Redis/Mongo)**, **Performance Triage**, hingga **Disk Cleanup**.
+
+### 2. Custom Skills (`SKILL.md`) di Pengaturan Agen
+Buka **Copilot Drawer → Pengaturan Agen (⚙️) → Custom Skills (`SKILL.md`)** untuk menambahkan playbook kustom atau mengimpor file `SKILL.md` dari repositori komunitas (seperti `skills.sh` atau `claude-skills`):
+- **Tempel Langsung `SKILL.md`**: Tempel isi file markdown lengkap dengan YAML frontmatter (`name`, `triggers`)—7Server otomatis mengekstrak nama, kata kunci pemicu, dan isi instruksinya.
+- **Trigger Kata Kunci atau Selalu Aktif**: Isi kata kunci pemicu (misalnya `k8s, kubectl, helm, pod`) agar skill hanya dimuat saat relevan, atau kosongkan agar selalu aktif di setiap percakapan.
+
+---
+
+## Kompresi Konteks (`/compact`) & Slash Commands
+
+Sesi *troubleshooting* panjang dengan banyak output terminal SSH dapat menghabiskan kuota token konteks model AI dengan cepat. 7Server menyediakan fitur **Context Compaction** dua lapis:
+
+- **Perintah `/compact` & Tombol Compact Cepat**: Ketik `/compact` di kolom chat (atau klik tombol **Compact** yang muncul saat percakapan mencapai 6+ pesan) untuk merangkum riwayat pesan lama dan output SSH menjadi kartu ringkasan **Context Compacted** tanpa menghilangkan pesan-pesan terbaru.
+- **Auto-Compact di Sisi Server**: Sebelum mengirim riwayat percakapan ke provider AI, backend 7Server secara otomatis memangkas blok output terminal lama (`UNTRUSTED_OUTPUT`) dan merangkum percakapan terdahulu apabila ukuran konteks melewati batas aman.
+- **Slash Commands Bawaan**: Ketik `/` di kolom chat Copilot untuk memilih perintah cepat:
+  - `/compact` — Ringkas pesan & output SSH lama untuk menghemat token konteks
+  - `/diagnose` — Cek kesehatan server menyeluruh (CPU, RAM, disk, load, service gagal)
+  - `/docker` — Periksa status kontainer, crash loop, dan penggunaan resource
+  - `/logs` — Analisa log error systemd & aplikasi terbaru
+  - `/nginx` — Audit konfigurasi Nginx, error 502/504, dan vhost aktif
+  - `/ssl` — Cek masa berlaku sertifikat TLS dan timer Certbot
+  - `/ports` — Tampilkan daftar port TCP/UDP yang sedang terbuka beserta prosesnya
+  - `/disk` — Cari folder terbesar, volume Docker, dan tumpukan file log
+  - `/security` — Audit percobaan login SSH, aturan firewall, dan port terbuka
+
+---
+
 ## Batasan Keamanan & Pertahanan Injeksi
 
 1. **Daftar Perintah Read-Only yang Aman**: Perintah diagnosa seperti `docker ps`, `docker logs`, `ss`, `df`, `free`, dan `journalctl` berjalan tanpa jeda konfirmasi.

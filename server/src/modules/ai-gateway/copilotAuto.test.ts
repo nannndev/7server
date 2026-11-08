@@ -68,8 +68,29 @@ assert.deepEqual(all[0].items.map((i: any) => [i.provider, i.reason]), [['codex'
 assert.ok(all[0].items[0].detail, 'raw provider message kept for the details toggle');
 
 // Reasons and catalog filters.
-const { accountProblem, compactCopilotHistory } = await import('./copilot.js');
+const { accountProblem, compactCopilotHistory, preferencesSection } = await import('./copilot.js');
 const { copilotChatModels, kiloFreeModels } = await import('./subscription.js');
+
+// Custom skills (SKILL.md) injection: always-active skills and keyword-matched skills are included.
+const prefOut = preferencesSection(
+  {
+    skills: [
+      { name: 'k8s-ops', triggers: 'kubectl, helm, pod', content: 'Always run kubectl get events first.' },
+      { name: 'global-runbook', triggers: '', content: 'Tag all backup files with ISO date.' }
+    ]
+  },
+  'why is my pod CrashLoopBackOff?'
+);
+assert.match(prefOut, /### Skill: k8s-ops/, 'keyword-matched custom skill is injected');
+assert.match(prefOut, /### Skill: global-runbook/, 'always-active custom skill is injected');
+
+const prefUnmatched = preferencesSection(
+  {
+    skills: [{ name: 'k8s-ops', triggers: 'kubectl, helm, pod', content: 'Always run kubectl get events first.' }]
+  },
+  'check nginx syntax'
+);
+assert.doesNotMatch(prefUnmatched, /k8s-ops/, 'unmatched custom skill is not injected');
 
 // Context compaction: older UNTRUSTED_OUTPUT blocks shrink while recent turns stay intact.
 const bigLines = Array.from({ length: 30 }, (_, i) => `log line ${i + 1}`).join('\n');

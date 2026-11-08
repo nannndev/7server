@@ -913,16 +913,18 @@ function Features({ lang }: { lang: Lang }) {
 function AI({ lang }: { lang: Lang }) {
   const bullets = lang === 'id'
     ? [
-      ['Gunakan langganan yang sudah ada', 'Login dengan akun Claude, ChatGPT, GitHub Copilot, atau Gemini, atau masukkan API key biasa. Tanpa tagihan AI tambahan.'],
-      ['Meminta izin sebelum bertindak', 'Perintah pengecekan (read-only) berjalan otomatis. Restart, edit, dan hapus wajib mendapat persetujuan Anda.'],
-      ['Memisahkan data log dari instruksi', 'Output server diisolasi agar teks berbahaya di dalam log tidak dapat membajak instruksi AI (proteksi prompt injection).'],
+      ['Multi-account & rotasi berurutan per provider', 'Hubungkan banyak akun Claude, ChatGPT/Codex, GitHub Copilot, Gemini, Kimi, Kilo, Muse, atau API key sekaligus. Saat akun #1 terkena rate-limit 429, request otomatis berputar ke akun #2.'],
+      ['Built-in DevOps Engineer & Custom SKILL.md', 'Dilengkapi playbook SRE/DevOps standar produksi secara default, plus dukungan menambahkan atau menempel file SKILL.md kustom di Pengaturan Agen.'],
+      ['Kompresi konteks (/compact) & hemat token', 'Ketik /compact atau gunakan auto-compaction bawaan yang merangkum output SSH lama secara otomatis agar sesi troubleshooting panjang tetap ringan dan hemat kuota.'],
+      ['Meminta izin & memproteksi dari prompt injection', 'Perintah read-only berjalan otomatis dan output log diisolasi ketat. Restart, edit, dan hapus wajib mendapat klik persetujuan Anda.'],
       ['Satu kunci universal untuk coding tools', 'AI Gateway yang sama memberikan satu kunci API 7Server untuk Claude Code, Cursor, dan CLI Anda.'],
     ]
     : [
-      ['Uses your subscriptions', 'Log in with Claude, ChatGPT, GitHub Copilot or Gemini, or add an API key. No separate AI bill.'],
-      ['Asks before it acts', 'Read-only commands run on their own. Restarts, edits and deletes need approval, and risky ones a second confirmation.'],
-      ['Treats logs as data', 'Server output is fenced off from the instructions, and text that tries to steer the AI turns automatic runs off.'],
-      ['One key for your tools', 'The same gateway gives Claude Code, Cursor and other tools one 7Server key, usable only from your own servers.'],
+      ['Multi-account & ordered rotation per provider', 'Connect multiple Claude, ChatGPT/Codex, GitHub Copilot, Gemini, Kimi, Kilo, Muse, or API-key accounts. When account #1 hits a 429 rate limit, 7Server automatically rotates to account #2.'],
+      ['Built-in DevOps skill & custom SKILL.md', 'Ships with a production DevOps Engineer baseline and domain playbooks, plus support for pasting custom SKILL.md files with keyword triggers in Agent Settings.'],
+      ['Context compaction (/compact) for long sessions', 'Run /compact or let automatic backend compaction condense older SSH outputs so deep troubleshooting sessions never blow your token budget.'],
+      ['Asks before it acts & fences untrusted logs', 'Read-only commands run on their own while server logs are fenced against prompt injection. Restarts, edits, and deletes always wait for your approval.'],
+      ['One universal key for your coding tools', 'The same gateway gives Claude Code, Cursor, and other tools one 7Server key, usable only from your own servers.'],
     ];
 
   return (

@@ -138,10 +138,17 @@ interface CopilotContext {
   preferences?: AgentPreferences;
 }
 
+interface CustomSkillInput {
+  name?: string;
+  triggers?: string;
+  content?: string;
+}
+
 interface AgentPreferences {
   language?: 'auto' | 'id' | 'en';
   style?: 'concise' | 'balanced' | 'detailed';
   guides?: string[];
+  skills?: CustomSkillInput[];
   custom?: string;
   serverNote?: string;
 }
@@ -163,7 +170,7 @@ const STYLE_TEXT = {
 };
 
 /** User preferences go after the built-in rules and can only add to them. */
-function preferencesSection(p?: AgentPreferences): string {
+export function preferencesSection(p?: AgentPreferences, lastUserMessage = ''): string {
   if (!p) return '';
   const lines: string[] = [];
   if (p.language === 'id') lines.push('Always answer in Indonesian.');
@@ -172,9 +179,31 @@ function preferencesSection(p?: AgentPreferences): string {
   for (const g of Array.isArray(p.guides) ? p.guides : []) if (GUIDE_TEXT[g]) lines.push(GUIDE_TEXT[g]);
   const custom = String(p.custom || '').trim().slice(0, 2000);
   const note = String(p.serverNote || '').trim().slice(0, 1000);
-  if (!lines.length && !custom && !note) return '';
+
+  const matchedSkills: { name: string; content: string }[] = [];
+  if (Array.isArray(p.skills)) {
+    const lowerMsg = lastUserMessage.toLowerCase();
+    for (const rawSkill of p.skills.slice(0, 10)) {
+      const content = String(rawSkill?.content || '').trim().slice(0, 4000);
+      if (!content) continue;
+      const name = String(rawSkill?.name || 'Custom Skill').trim().slice(0, 80);
+      const triggers = String(rawSkill?.triggers || '')
+        .split(',')
+        .map((k) => k.trim().toLowerCase())
+        .filter(Boolean);
+      if (triggers.length === 0 || triggers.some((kw) => lowerMsg.includes(kw))) {
+        matchedSkills.push({ name, content });
+      }
+      if (matchedSkills.length >= 4) break;
+    }
+  }
+
+  if (!lines.length && !custom && !note && !matchedSkills.length) return '';
   let out = `\n\n--- USER PREFERENCES (set by the dashboard owner; they refine style and workflow but never override the SECURITY rules or the approval of server-changing commands) ---`;
   if (lines.length) out += `\n- ${lines.join('\n- ')}`;
+  if (matchedSkills.length) {
+    out += `\n\n--- CUSTOM SKILLS (SKILL.md) ---\n` + matchedSkills.map((s) => `### Skill: ${s.name}\n${s.content}`).join('\n\n');
+  }
   if (custom) out += `\nCustom instructions:\n${custom}`;
   if (note) out += `\n\nNotes about the active server (from the owner):\n${note}`;
   return out;
@@ -199,7 +228,7 @@ Never print, upload or send secrets (passwords, tokens, private keys, .env conte
 
 ${DEFAULT_DEVOPS_SKILL}`;
 
-  prompt += preferencesSection(context?.preferences);
+  prompt += preferencesSection(context?.preferences, lastUserMessage);
 
   if (model) prompt += `\n\nYou are running as model "${model}" via the 7Server AI Gateway. If asked which model you are, say that.`;
 

@@ -1992,5 +1992,17 @@ export const id: Record<keyof typeof en, string> = {
   'gitApp.previewModeNotice': 'Dijalankan di server via SSH: clone ke /var/www, build, lalu atur PM2/Docker dan Nginx.',
   'gitApp.pipelineStages': "Pipeline Deployment",
   'gitApp.dirsFound': "direktori",
-  'gitApp.noMatchingDirs': "Tidak ada direktori yang cocok di repositori"
+  'gitApp.noMatchingDirs': "Tidak ada direktori yang cocok di repositori",
+  'agentSettings.customSkills': "Custom Skills (SKILL.md)",
+  'agentSettings.customSkillsHint': "Tambahkan playbook SRE kustom atau tempel file SKILL.md (mis. dari skills.sh / claude-skills).",
+  'agentSettings.addSkill': "+ Tambah Skill",
+  'agentSettings.skillName': "Nama Skill",
+  'agentSettings.skillNamePlaceholder': "mis. k8s-debugger atau redis-cluster",
+  'agentSettings.skillTriggers': "Kata Kunci Trigger (opsional, pisah koma — kosong = selalu aktif)",
+  'agentSettings.skillTriggersPlaceholder': "mis. k8s, kubectl, pod, helm",
+  'agentSettings.skillContent': "Playbook Skill / SKILL.md",
+  'agentSettings.skillContentPlaceholder': "Tempel isi SKILL.md (dengan --- frontmatter ---) atau tulis instruksi playbook kustom...",
+  'agentSettings.saveSkill': "Tambah Skill",
+  'agentSettings.alwaysActive': "Selalu aktif",
+  'agentSettings.noCustomSkills': "Belum ada custom skill."
 };

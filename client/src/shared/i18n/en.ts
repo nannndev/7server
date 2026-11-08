@@ -1999,5 +1999,17 @@ export const en = {
   'gitApp.previewModeNotice': 'Runs on the server over SSH: clones into /var/www, builds, and sets up PM2/Docker and Nginx.',
   'gitApp.pipelineStages': "Deployment Pipeline",
   'gitApp.dirsFound': "directories",
-  'gitApp.noMatchingDirs': "No matching directories found in repository tree"
+  'gitApp.noMatchingDirs': "No matching directories found in repository tree",
+  'agentSettings.customSkills': "Custom Skills (SKILL.md)",
+  'agentSettings.customSkillsHint': "Add custom SRE playbooks or paste SKILL.md files (e.g. from skills.sh / claude-skills).",
+  'agentSettings.addSkill': "+ Add Skill",
+  'agentSettings.skillName': "Skill Name",
+  'agentSettings.skillNamePlaceholder': "e.g. k8s-debugger or redis-cluster",
+  'agentSettings.skillTriggers': "Trigger Keywords (optional, comma-separated — empty = always active)",
+  'agentSettings.skillTriggersPlaceholder': "e.g. k8s, kubectl, pod, helm",
+  'agentSettings.skillContent': "Skill Playbook / SKILL.md",
+  'agentSettings.skillContentPlaceholder': "Paste full SKILL.md (with --- frontmatter ---) or write custom step-by-step instructions...",
+  'agentSettings.saveSkill': "Add Skill",
+  'agentSettings.alwaysActive': "Always active",
+  'agentSettings.noCustomSkills': "No custom skills added yet."
 };
