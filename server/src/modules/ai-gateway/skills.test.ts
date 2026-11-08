@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
-import { SKILLS, pickSkills, skillsSection } from './skills.js';
+import { SKILLS, DEFAULT_DEVOPS_SKILL, pickSkills, skillsSection } from './skills.js';
 
 assert.deepEqual(pickSkills('webapps', '').map((s) => s.id), ['deploy', 'publish']);
 assert.deepEqual(pickSkills('overview', 'kenapa nginx 502?').map((s) => s.id), ['performance', 'nginx']);
 assert.deepEqual(pickSkills(undefined, 'docker container restart loop').map((s) => s.id), ['docker']);
+assert.deepEqual(pickSkills(undefined, 'setup github actions ci/cd pipeline and dockerfile').map((s) => s.id), ['devops-engineer']);
+assert.ok(DEFAULT_DEVOPS_SKILL.includes('Build / Deploy / Ops Hats'));
 assert.equal(pickSkills('terminal', 'hello').length, 0);
 assert.equal(skillsSection('terminal', 'hello'), '');
 assert.ok(pickSkills('webapps', 'cpu disk mysql nginx docker').length <= 2, 'prompt stays small');
