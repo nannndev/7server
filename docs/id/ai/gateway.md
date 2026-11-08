@@ -4,19 +4,12 @@ Gateway internal yang kompatibel dengan protokol OpenAI (`/v1/chat/completions`)
 
 ---
 
-## Hubungkan Akun Langganan (8 Provider OAuth)
+## Daftar Provider yang Didukung (Total 27 Provider)
 
-Masuk menggunakan akun langganan resmi Anda tanpa harus membeli saldo API per-token yang mahal:
-- **Anthropic Claude Pro / Team / Max** (`claude` — OAuth PKCE)
-- **ChatGPT Plus / Pro / Team / Codex** (`codex` — OAuth)
-- **GitHub Copilot** (`copilot` — Device Code Flow)
-- **Google Gemini CLI** (`gemini-cli` — Google OAuth)
-- **Kimi Code** (`kimi` — Device Code Flow)
-- **Kilo Code** (`kilocode` — Device Code Flow + Model Gratis)
-- **Muse (Koda CLI)** (`muse` — GitHub OAuth)
-- **Nous Portal** (`nous` — OAuth / API Key)
-
-Ditambah dukungan penuh untuk **19 Provider API-Key & OpenAI-Compatible** (`openai`, `anthropic`, `gemini`, `openrouter`, `glm`, `minimax`, `deepseek`, `groq`, `mistral`, `xai`, `together`, `fireworks`, `cerebras`, `cohere`, `nvidia`, `nebius`, `siliconflow`, `hyperbolic`, dan `deepinfra`).
+| Kategori | Provider yang Didukung |
+| :--- | :--- |
+| **8 Akun Langganan OAuth** *(Tanpa tagihan API terpisah)* | **Claude Pro/Team/Max** (`cc`), **ChatGPT Plus/Pro/Codex** (`cx`), **GitHub Copilot** (`gh`), **Gemini CLI** (`gc`), **Kimi Code** (`km`), **Kilo Code** (`kc`), **Muse / Koda CLI** (`ms`), **Nous Portal** (`ns`) |
+| **19 Provider API-Key** *(Kompatibel OpenAI & Anthropic)* | **OpenAI** (`oa`), **Anthropic** (`an`), **Google Gemini** (`gm`), **OpenRouter** (`or`), **GLM / Z.AI** (`glm`), **MiniMax** (`mm`), **DeepSeek** (`ds`), **Groq** (`gq`), **Mistral** (`mi`), **xAI Grok** (`xa`), **Together AI** (`tg`), **Fireworks** (`fw`), **Cerebras** (`cb`), **Cohere** (`co`), **NVIDIA NIM** (`nv`), **Nebius** (`nb`), **SiliconFlow** (`sf`), **Hyperbolic** (`hb`), **DeepInfra** (`di`) |
 
 Seluruh token akses dan API key disimpan secara aman di database lokal 7Server dan diperbarui (*auto-refresh*) secara otomatis.
 

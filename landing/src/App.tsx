@@ -927,6 +927,9 @@ function AI({ lang }: { lang: Lang }) {
       ['One universal key for your coding tools', 'The same gateway gives Claude Code, Cursor, and other tools one 7Server key, usable only from your own servers.'],
     ];
 
+  const oauthProviders = ['Claude Pro/Max', 'ChatGPT / Codex', 'GitHub Copilot', 'Gemini CLI', 'Kimi Code', 'Kilo Code', 'Muse (Koda)', 'Nous Portal'];
+  const apiKeyProviders = ['OpenAI', 'Anthropic', 'Google Gemini', 'OpenRouter', 'GLM (Z.AI)', 'MiniMax', 'DeepSeek', 'Groq', 'Mistral', 'xAI (Grok)', 'Together AI', 'Fireworks', 'Cerebras', 'Cohere', 'NVIDIA NIM', 'Nebius', 'SiliconFlow', 'Hyperbolic', 'DeepInfra'];
+
   return (
     <section id="ai" className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
       <div className="grid gap-12 lg:grid-cols-2 lg:items-start">
@@ -947,28 +950,53 @@ function AI({ lang }: { lang: Lang }) {
             ))}
           </ul>
         </div>
-        <figure className="metal reveal rounded-2xl p-5 font-mono text-[12.5px] leading-relaxed" style={v(2)}>
-          <figcaption className="sr-only">Example copilot session</figcaption>
-          <p style={{ color: 'var(--anatomy-muted)' }}>you · vps-2</p>
-          <p className="mt-1" style={{ color: 'var(--anatomy-strong)' }}>why is the api slow?</p>
-          <div className="well mt-4 rounded-lg p-3">
-            <p style={{ color: 'var(--anatomy-muted)' }}>read-only · ran automatically</p>
-            <p style={{ color: 'var(--anatomy-strong)' }}>docker stats --no-stream</p>
-            <p className="mt-1" style={{ color: 'var(--anatomy-muted)' }}>web-api  98% mem · restarted 14×</p>
-          </div>
-          <p className="mt-4">
-            The <span style={{ color: 'var(--anatomy-strong)' }}>web-api</span> container is hitting its memory limit and being killed (exit 137).
-            Raising the limit to 1 GB should stop the restart loop.
-          </p>
-          <div className="well mt-4 rounded-lg p-3">
-            <p style={{ color: 'var(--anatomy-muted)' }}>changes the server · needs your approval</p>
-            <p style={{ color: 'var(--anatomy-strong)' }}>docker update --memory 1g web-api</p>
-            <div className="mt-3 flex gap-2 font-sans text-xs" aria-hidden>
-              <span className="metal rounded-md px-2.5 py-1">Skip</span>
-              <span className="btn-silver rounded-md px-2.5 py-1 font-semibold">Run</span>
+        <div className="space-y-4">
+          <figure className="metal reveal rounded-2xl p-5 font-mono text-[12.5px] leading-relaxed" style={v(2)}>
+            <figcaption className="sr-only">Example copilot session</figcaption>
+            <p style={{ color: 'var(--anatomy-muted)' }}>you · vps-2</p>
+            <p className="mt-1" style={{ color: 'var(--anatomy-strong)' }}>why is the api slow?</p>
+            <div className="well mt-4 rounded-lg p-3">
+              <p style={{ color: 'var(--anatomy-muted)' }}>read-only · ran automatically</p>
+              <p style={{ color: 'var(--anatomy-strong)' }}>docker stats --no-stream</p>
+              <p className="mt-1" style={{ color: 'var(--anatomy-muted)' }}>web-api  98% mem · restarted 14×</p>
+            </div>
+            <p className="mt-4">
+              The <span style={{ color: 'var(--anatomy-strong)' }}>web-api</span> container is hitting its memory limit and being killed (exit 137).
+              Raising the limit to 1 GB should stop the restart loop.
+            </p>
+            <div className="well mt-4 rounded-lg p-3">
+              <p style={{ color: 'var(--anatomy-muted)' }}>changes the server · needs your approval</p>
+              <p style={{ color: 'var(--anatomy-strong)' }}>docker update --memory 1g web-api</p>
+              <div className="mt-3 flex gap-2 font-sans text-xs" aria-hidden>
+                <span className="metal rounded-md px-2.5 py-1">Skip</span>
+                <span className="btn-silver rounded-md px-2.5 py-1 font-semibold">Run</span>
+              </div>
+            </div>
+          </figure>
+
+          <div className="metal reveal rounded-2xl p-4" style={v(3)}>
+            <div className="text-[11px] font-mono uppercase tracking-wider" style={{ color: 'var(--anatomy-muted)' }}>
+              {lang === 'id' ? '8 Provider Langganan OAuth (Multi-Account)' : '8 OAuth Subscription Providers (Multi-Account)'}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {oauthProviders.map((p) => (
+                <span key={p} className="well inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 font-mono text-[11px]" style={{ color: 'var(--anatomy-strong)' }}>
+                  <span className="led h-1.5 w-1.5 rounded-full" /> {p}
+                </span>
+              ))}
+            </div>
+            <div className="mt-3 text-[11px] font-mono uppercase tracking-wider" style={{ color: 'var(--anatomy-muted)' }}>
+              {lang === 'id' ? '19 Provider API-Key & OpenAI-Compatible' : '19 API-Key & OpenAI-Compatible Providers'}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {apiKeyProviders.map((p) => (
+                <span key={p} className="well rounded-md px-2 py-0.5 font-mono text-[10.5px]" style={{ color: 'var(--anatomy-muted)' }}>
+                  {p}
+                </span>
+              ))}
             </div>
           </div>
-        </figure>
+        </div>
       </div>
     </section>
   );

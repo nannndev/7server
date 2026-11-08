@@ -7,20 +7,12 @@
 
 ---
 
-## Log In with Existing Subscriptions (8 OAuth Providers)
+## Supported Providers (27 Built-In)
 
-Instead of paying for expensive per-token API credits, you can log in directly to your existing provider subscriptions:
-
-- **Anthropic Claude Pro / Team / Max** (`claude` — OAuth PKCE)
-- **ChatGPT Plus / Pro / Team / Codex** (`codex` — OAuth)
-- **GitHub Copilot** (`copilot` — Device Code Flow)
-- **Google Gemini CLI** (`gemini-cli` — Google OAuth)
-- **Kimi Code** (`kimi` — Device Code Flow)
-- **Kilo Code** (`kilocode` — Device Code Flow + Free Models)
-- **Muse (Koda CLI)** (`muse` — GitHub OAuth)
-- **Nous Portal** (`nous` — OAuth / API Key)
-
-Alongside **19 API-Key & OpenAI-Compatible Providers** (`openai`, `anthropic`, `gemini`, `openrouter`, `glm`, `minimax`, `deepseek`, `groq`, `mistral`, `xai`, `together`, `fireworks`, `cerebras`, `cohere`, `nvidia`, `nebius`, `siliconflow`, `hyperbolic`, and `deepinfra`).
+| Category | Supported Providers |
+| :--- | :--- |
+| **8 OAuth Subscriptions** *(Zero extra API bill)* | **Claude Pro/Team/Max** (`cc`), **ChatGPT Plus/Pro/Codex** (`cx`), **GitHub Copilot** (`gh`), **Gemini CLI** (`gc`), **Kimi Code** (`km`), **Kilo Code** (`kc`), **Muse / Koda CLI** (`ms`), **Nous Portal** (`ns`) |
+| **19 API-Key Providers** *(OpenAI & Anthropic compatible)* | **OpenAI** (`oa`), **Anthropic** (`an`), **Google Gemini** (`gm`), **OpenRouter** (`or`), **GLM / Z.AI** (`glm`), **MiniMax** (`mm`), **DeepSeek** (`ds`), **Groq** (`gq`), **Mistral** (`mi`), **xAI Grok** (`xa`), **Together AI** (`tg`), **Fireworks** (`fw`), **Cerebras** (`cb`), **Cohere** (`co`), **NVIDIA NIM** (`nv`), **Nebius** (`nb`), **SiliconFlow** (`sf`), **Hyperbolic** (`hb`), **DeepInfra** (`di`) |
 
 All access tokens, refresh tokens, and API keys are securely stored in 7Server's database and refreshed automatically.
 
