@@ -943,6 +943,8 @@ export const id: Record<keyof typeof en, string> = {
   'agentSettings.pickServer': "Pilih server untuk menambah catatan.",
   'agentSettings.securityNote': "Preferensi hanya menambah aturan. Keamanan tetap berlaku: perintah yang mengubah server selalu minta persetujuan dan agent tidak mengirim secret ke luar.",
   'agentSettings.default': "Default",
+  'guide.devops-engineer': "Skill DevOps Engineer",
+  'guide.devops-engineer.desc': "Alur kerja Build/Deploy/Ops: pipeline CI/CD, Dockerfile multi-stage, IaC, health check & rencana rollback eksplisit.",
   'guide.read-first': "Investigasi dulu",
   'guide.read-first.desc': "Selalu kumpulkan data (status, log, resource) sebelum menyarankan perubahan.",
   'guide.backup-before-edit': "Backup sebelum ubah",

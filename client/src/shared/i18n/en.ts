@@ -950,6 +950,8 @@ export const en = {
   'agentSettings.pickServer': "Pick a server to add notes.",
   'agentSettings.securityNote': "Preferences can only add rules. Security still applies: server-changing commands always need approval and the agent never sends secrets out.",
   'agentSettings.default': "Default",
+  'guide.devops-engineer': "DevOps Engineer Skill",
+  'guide.devops-engineer.desc': "Build/Deploy/Ops workflow: CI/CD pipelines, multi-stage Dockerfiles, IaC, health checks & explicit rollback plans.",
   'guide.read-first': "Investigate first",
   'guide.read-first.desc': "Always gather data (status, logs, resources) before proposing changes.",
   'guide.backup-before-edit': "Backup before edits",

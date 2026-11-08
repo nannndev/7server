@@ -148,6 +148,7 @@ interface AgentPreferences {
 
 // Guide ids the dashboard can toggle (labels live in client/src/features/copilot/preferences.ts).
 const GUIDE_TEXT: Record<string, string> = {
+  'devops-engineer': DEFAULT_DEVOPS_SKILL,
   'read-first': 'Always gather evidence (status, logs, resource usage) before proposing any change.',
   'backup-before-edit': 'Before editing a config file, copy it to <file>.bak-<date> first and show the diff of your change.',
   'no-restart': 'Prefer reload or zero-downtime fixes; propose a restart only when nothing else works, and say what will be briefly unavailable.',

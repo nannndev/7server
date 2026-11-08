@@ -16,12 +16,12 @@ export interface AgentPreferences {
 }
 
 /** Ids must match GUIDE_TEXT in server/src/modules/ai-gateway/copilot.ts; labels are i18n keys `guide.<id>`. */
-export const GUIDES = ['read-first', 'backup-before-edit', 'no-restart', 'explain-commands', 'summary-table', 'docker-aware'].map((id) => ({ id }));
+export const GUIDES = ['devops-engineer', 'read-first', 'backup-before-edit', 'no-restart', 'explain-commands', 'summary-table', 'docker-aware'].map((id) => ({ id }));
 
 export const DEFAULT_PREFERENCES: AgentPreferences = {
   language: 'auto',
   style: 'balanced',
-  guides: ['read-first', 'no-restart'],
+  guides: ['devops-engineer', 'read-first', 'no-restart'],
   custom: '',
   serverNotes: {}
 };
