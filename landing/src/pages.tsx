@@ -234,6 +234,7 @@ const RELEASES: ReleaseEntry[] = [
       'Built-In DevOps Engineer Skill & Custom SKILL.md: Default production SRE baseline (Build/Deploy/Ops Hats) plus support for pasting custom SKILL.md playbooks with keyword triggers in Agent Settings.',
       'Context Compaction (/compact & Auto-Compaction): Condense long SSH troubleshooting sessions with /compact or automatic backend compaction of older UNTRUSTED_OUTPUT blocks.',
       'Vibe-Code on Server: Approved sudo password execution, pre-publish port/Nginx/Cloudflare Tunnel survey, and opt-in Auto-Run mode.',
+      'Animated Cyber-SRE Mascot & Server-Pinned Chats: Live floating robot mascot with real-time command tickers when the drawer is closed, plus server-pinned conversations that prevent accidental cross-server command execution.',
       'Brand Icons & Deploy Fixes: Crisp SVG brand icons for all 27 AI providers across Dashboard, Landing & Docs, plus Docker multi-stage build detection fixes.'
     ]
   },

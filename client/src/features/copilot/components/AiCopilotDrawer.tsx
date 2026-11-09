@@ -200,7 +200,14 @@ interface SavedChat {
   id: string;
   title: string;
   updatedAt: number;
+  serverId?: string;
+  serverName?: string;
   messages: ChatMessage[];
+}
+
+function getChatServerId(c?: SavedChat): string | undefined {
+  if (!c) return undefined;
+  return c.serverId || c.messages.find((m) => m.serverId)?.serverId;
 }
 
 const CHATS_KEY = '7server_copilot_chats';
@@ -509,7 +516,9 @@ export default function AiCopilotDrawer({
 
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
-  const [selectedServerId, setSelectedServerId] = useState<string>(activeServer?.id || '');
+  const [selectedServerId, setSelectedServerId] = useState<string>(() => {
+    return getChatServerId(chats[0]) || activeServer?.id || '';
+  });
   const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
 
@@ -606,14 +615,27 @@ export default function AiCopilotDrawer({
     return servers.find((s) => s.id === selectedServerId) || activeServer || (servers.length > 0 ? servers[0] : null);
   }, [servers, selectedServerId, activeServer]);
 
-  // Sync selectedServerId if activeServer changes
+  // Sync selectedServerId with activeServer ONLY when the current conversation is empty.
+  // Once a conversation has messages, keep it pinned to its server so navigating the dashboard
+  // doesn't hijack the active chat or redirect running agent commands to another server.
   useEffect(() => {
-    if (activeServer) {
-      setSelectedServerId(activeServer.id);
-    } else if (servers.length > 0 && !selectedServerId) {
-      setSelectedServerId(servers[0].id);
+    if (messages.length === 0 && !isStreaming && !execBusy.current) {
+      if (activeServer) {
+        setSelectedServerId(activeServer.id);
+      } else if (servers.length > 0 && !selectedServerId) {
+        setSelectedServerId(servers[0].id);
+      }
+    } else if (!selectedServerId) {
+      const msgServerId = messages.find((m) => m.serverId)?.serverId;
+      if (msgServerId && servers.some((s) => s.id === msgServerId)) {
+        setSelectedServerId(msgServerId);
+      } else if (activeServer) {
+        setSelectedServerId(activeServer.id);
+      } else if (servers.length > 0) {
+        setSelectedServerId(servers[0].id);
+      }
     }
-  }, [activeServer, servers, selectedServerId]);
+  }, [activeServer, servers, selectedServerId, messages, isStreaming]);
 
   // Close context menu on outside click
   useEffect(() => {
@@ -630,16 +652,18 @@ export default function AiCopilotDrawer({
   // Upsert the open chat into the saved list whenever it changes (empty chats are not saved).
   useEffect(() => {
     if (messages.length === 0) return;
+    const pinnedId = selectedServerId || messages.find((m) => m.serverId)?.serverId || targetServer?.id;
+    const pinnedName = servers.find((s) => s.id === pinnedId)?.name || targetServer?.name;
     setChats((prev) => {
       const title = (messages.find((m) => m.role === 'user')?.content || 'Chat').slice(0, 60);
-      const next = [{ id: chatId, title, updatedAt: Date.now(), messages }, ...prev.filter((c) => c.id !== chatId)].slice(
-        0,
-        MAX_CHATS
-      );
+      const next = [
+        { id: chatId, title, updatedAt: Date.now(), serverId: pinnedId, serverName: pinnedName, messages },
+        ...prev.filter((c) => c.id !== chatId)
+      ].slice(0, MAX_CHATS);
       saveChats(next);
       return next;
     });
-  }, [messages, chatId]);
+  }, [messages, chatId, selectedServerId, targetServer?.id, targetServer?.name, servers]);
 
   // Auto-scroll on new messages
   useEffect(() => {
@@ -1118,6 +1142,7 @@ export default function AiCopilotDrawer({
     setChatId(newId());
     setMessages([]);
     setAttachedContexts([]);
+    if (activeServer) setSelectedServerId(activeServer.id);
     setShowHistory(false);
   };
 
@@ -1125,7 +1150,27 @@ export default function AiCopilotDrawer({
     handleStop();
     setChatId(c.id);
     setMessages(c.messages);
+    setAttachedContexts([]);
+    const pinnedId = getChatServerId(c);
+    if (pinnedId && servers.some((s) => s.id === pinnedId)) {
+      setSelectedServerId(pinnedId);
+    }
     setShowHistory(false);
+  };
+
+  const switchToServerChat = (serverId: string) => {
+    if (agentBusy) return;
+    const existing = chats.find((c) => getChatServerId(c) === serverId && c.messages.length > 0);
+    setSelectedServerId(serverId);
+    setAttachedContexts([]);
+    setShowHistory(false);
+    if (existing) {
+      setChatId(existing.id);
+      setMessages(existing.messages);
+    } else {
+      setChatId(newId());
+      setMessages([]);
+    }
   };
 
   const deleteChat = (id: string) => {
@@ -1413,6 +1458,32 @@ export default function AiCopilotDrawer({
           )}
         </div>
 
+        {/* Server Pin Mismatch Banner */}
+        {activeServer && targetServer && activeServer.id !== targetServer.id && messages.length > 0 && (
+          <div className="px-3.5 py-1.5 border-b border-amber-500/25 bg-amber-500/[0.07] flex items-center justify-between gap-2 text-[11px] shrink-0 animate-[expand-in_150ms_ease-out]">
+            <div className="flex items-center gap-1.5 min-w-0 text-amber-300/95">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="truncate">
+                {t('copilot.pinnedBanner', { pinned: targetServer.name, active: activeServer.name })}
+              </span>
+            </div>
+            <button
+              type="button"
+              disabled={agentBusy}
+              onClick={() => switchToServerChat(activeServer.id)}
+              title={
+                agentBusy
+                  ? t('copilot.switchServerBusy', { name: targetServer.name })
+                  : t('copilot.switchServerChat', { name: activeServer.name })
+              }
+              className="px-2 py-0.5 rounded-md bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/35 text-amber-200 font-medium text-[10.5px] flex items-center gap-1 shrink-0 transition disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <span>{t('copilot.switchServerChat', { name: activeServer.name })}</span>
+              <ArrowRight className="w-3 h-3" />
+            </button>
+          </div>
+        )}
+
         {/* History Drawer with Search */}
         {showHistory && (
           <div className="max-h-80 flex flex-col border-b border-[var(--border)] bg-[var(--background)] animate-[expand-in_200ms_ease-out]">
@@ -1446,8 +1517,16 @@ export default function AiCopilotDrawer({
                   >
                     <button onClick={() => openChat(c)} className="flex-1 min-w-0 text-left">
                       <div className="truncate text-[var(--foreground)] font-medium">{c.title}</div>
-                      <div className="text-[10px] text-[var(--muted-foreground)]">
-                        {new Date(c.updatedAt).toLocaleString(locale)} · {t('copilot.messages', { n: c.messages.length })}
+                      <div className="text-[10px] text-[var(--muted-foreground)] flex items-center gap-1.5 flex-wrap">
+                        {(c.serverName || servers.find((s) => s.id === getChatServerId(c))?.name) && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium text-[9.5px]">
+                            <Server className="w-2.5 h-2.5" />
+                            {c.serverName || servers.find((s) => s.id === getChatServerId(c))?.name}
+                          </span>
+                        )}
+                        <span>
+                          {new Date(c.updatedAt).toLocaleString(locale)} · {t('copilot.messages', { n: c.messages.length })}
+                        </span>
                       </div>
                     </button>
                     <button

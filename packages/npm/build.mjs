@@ -20,6 +20,17 @@ fs.mkdirSync(DIST, { recursive: true });
 // 1. dashboard
 execFileSync('npx', ['vite', 'build', '--outDir', path.join(DIST, 'client'), '--emptyOutDir'], { cwd: path.join(ROOT, 'client'), stdio: 'inherit' });
 
+// Strip unused concept icons from dist/client so the npm tarball stays lean (~1.5 MB instead of >7 MB).
+const clientIconsDir = path.join(DIST, 'client', 'icons');
+if (fs.existsSync(clientIconsDir)) {
+  for (const name of fs.readdirSync(clientIconsDir)) {
+    if (name !== 'icon-opt2-server-blade.png') {
+      fs.rmSync(path.join(clientIconsDir, name), { force: true });
+    }
+  }
+}
+fs.rmSync(path.join(DIST, 'client', 'favicon.jpg'), { force: true });
+
 // 2. server: one file. ssh2 stays a real dependency (its optional native addon can't be bundled);
 // everything else is pure JS and gets inlined.
 const external = ['ssh2', 'cpu-features'];

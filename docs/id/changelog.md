@@ -24,6 +24,9 @@ Seluruh pembaruan penting pada **7Server** (`sevenserver` di npm dan `ghcr.io/na
 - **Dukungan Password Sudo, Survei Pre-Publish & Mode Auto-Run**:
   - Perintah `sudo` yang disetujui otomatis menggunakan password sudo server yang tersimpan.
   - Memeriksa port aktif, vhost Nginx, dan Cloudflare Tunnel sebelum mempublikasikan aplikasi di `/var/www`.
+- **Maskot Cyber-SRE Animasi & Pin Server per Percakapan**:
+  - Tombol melayang AI Copilot kini tampil hidup dengan karakter robot SRE (ekspresi mata berkedip/melirik saat `idle`, gelombang saat `thinking`, ticker perintah `>_` saat `executing`, peringatan `! !` saat butuh `approval`, dan `^ ^` saat `done`).
+  - Percakapan Copilot otomatis terkunci (*pinned*) ke server awalnya meskipun Anda berpindah halaman server di dashboard, dilengkapi banner pindah cepat 1-klik dan badge nama server di History.
 
 ### UI, Branding & Infrastruktur
 - Menambahkan SVG brand icon (`BrandIcon`) untuk seluruh 27 provider AI di Dashboard, Landing Page, dan Dokumentasi.

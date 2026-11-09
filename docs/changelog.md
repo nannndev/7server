@@ -25,6 +25,9 @@ All notable changes to **7Server** (`sevenserver` on npm and `ghcr.io/nannndev/7
   - Approved `sudo` commands automatically use the server's saved sudo password.
   - Surveys active ports, Nginx vhosts, and Cloudflare Tunnels before exposing apps in `/var/www`.
   - Opt-in Auto-Run mode with confirmation dialog.
+- **Animated Cyber-SRE Mascot & Server-Pinned Conversations**:
+  - Expressive floating AI Copilot mascot bubble with live status visors (`idle` blinking/glancing, `thinking` wave, `executing` `>_` command ticker, `approval` `! !` alert, and `done` `^ ^` badge) while the drawer is closed.
+  - Active Copilot conversations stay pinned to their target server even when browsing other servers in the dashboard, with a 1-click switch banner and per-chat server badges in History.
 
 ### UI, Branding & Infrastructure
 - Added crisp SVG brand icons (`BrandIcon`) for all 27 AI providers across the Dashboard, Landing Page, and Documentation.
