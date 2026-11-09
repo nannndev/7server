@@ -4,7 +4,7 @@ Seluruh pembaruan penting pada **7Server** (`sevenserver` di npm dan `ghcr.io/na
 
 ---
 
-## v0.3.0 — Universal AI Gateway 2.0, Rotasi Multi-Account, Custom `SKILL.md` & `/compact`
+## v0.3.1 — Universal AI Gateway 2.0, Rotasi Multi-Account, Custom `SKILL.md` & `/compact`
 
 ### Universal AI Gateway (27 Provider Bawaan)
 - **8 Provider Langganan OAuth**: Menambahkan **Kimi Code** (`km/`), **Kilo Code** (`kc/`), **Muse / Koda CLI** (`ms/`), dan **Nous Portal** (`ns/`) melengkapi **Claude Pro/Max** (`cc/`), **ChatGPT / Codex** (`cx/`), **GitHub Copilot** (`gh/`), dan **Gemini CLI** (`gc/`).

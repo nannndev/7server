@@ -224,8 +224,8 @@ interface ReleaseEntry {
 
 const RELEASES: ReleaseEntry[] = [
   {
-    version: 'v0.3.0',
-    date: '2026-11-08',
+    version: 'v0.3.1',
+    date: '2026-11-09',
     tag: 'Latest Release',
     title: 'Universal AI Gateway 2.0, Multi-Account Rotation, Custom SKILL.md & /compact',
     highlights: [

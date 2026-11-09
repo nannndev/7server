@@ -43,7 +43,7 @@ jobs:
 
       # Trusted Publishing (OIDC, no token) needs npm >= 11.5.1; falls back to NPM_TOKEN if that secret is set.
       - name: Publish to npm
-        run: npm install -g npm@^11.5.1 --no-audit --no-fund && npm publish --provenance --access public --tag "$NPM_TAG"
+        run: npm install -g npm@^11.5.1 --no-audit --no-fund && npm publish --provenance --access public --tag "$NPM_TAG" --loglevel verbose
         working-directory: packages/npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -4,7 +4,7 @@ All notable changes to **7Server** (`sevenserver` on npm and `ghcr.io/nannndev/7
 
 ---
 
-## v0.3.0 — Universal AI Gateway 2.0, Multi-Account Rotation, Custom `SKILL.md` & `/compact`
+## v0.3.1 — Universal AI Gateway 2.0, Multi-Account Rotation, Custom `SKILL.md` & `/compact`
 
 ### Universal AI Gateway (27 Built-In Providers)
 - **8 OAuth Subscription Providers**: Added **Kimi Code** (`km/`), **Kilo Code** (`kc/`), **Muse / Koda CLI** (`ms/`), and **Nous Portal** (`ns/`) alongside **Claude Pro/Max** (`cc/`), **ChatGPT / Codex** (`cx/`), **GitHub Copilot** (`gh/`), and **Gemini CLI** (`gc/`).
