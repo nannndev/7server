@@ -15,3 +15,12 @@ export interface SecurityHardeningStatus {
   bannedIps: string[];
 }
 
+export interface DeployUserStatus {
+  exists: boolean;
+  hasSshKey: boolean;
+  /** Whether /var/www is owned by the deploy user. */
+  ownsWebRoot: boolean;
+  /** Current owner of /var/www, for display. */
+  webRootOwner: string;
+}
+

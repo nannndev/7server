@@ -17,7 +17,18 @@ const script = buildDeployScript(spec, 'ghp_secret');
 assert.ok(!script.includes('ghp_secret'), 'raw token must not appear (base64 header only)');
 assert.ok(!script.includes('ghp_secret@github.com'), 'token must not be put in the clone URL');
 for (const st of ['clone', 'env', 'install', 'build', 'process', 'health']) assert.ok(script.includes(`step ${st}`), st);
-assert.ok(script.includes(`printf '%s=%s\\n' 'NODE_ENV' 'it'\\''s prod'`), 'env value is shell-quoted');
+assert.ok(script.includes(`printf '%s=%s\\n' 'NODE_ENV'`), 'env key is shell-quoted');
+assert.ok(script.includes(`it'\\''s prod"`), 'env value with whitespace is safely quoted for dotenv parsers');
+
+// formatDotenvValue unit tests
+{
+  const { formatDotenvValue } = await import('./deploy.js');
+  assert.equal(formatDotenvValue('Marketplace Booking System'), '"Marketplace Booking System"');
+  assert.equal(formatDotenvValue('"Already Quoted"'), '"Already Quoted"');
+  assert.equal(formatDotenvValue('simple_val'), 'simple_val');
+  assert.equal(formatDotenvValue('val with spaces'), '"val with spaces"');
+  assert.equal(formatDotenvValue(''), '');
+}
 
 // Generated scripts must at least parse in bash for every engine / domain combination.
 for (const engine of ['docker', 'native_node', 'native_php', 'static']) {
@@ -79,6 +90,8 @@ assert.ok(spec && buildDeployScript(spec).includes('exit 1\n    fi\n    sleep 2'
   assert.ok(!noDom.includes('-p 127.0.0.1:3005'), 'Docker without domain must not bind only to localhost');
   const withDom = buildDeployScript(parseDeploySpec({ ...base, engine: 'docker', domain: 'app.example.com', port: 3005 }));
   assert.ok(withDom.includes('-p 127.0.0.1:3005:"$CPORT"'), 'Docker with domain binds 127.0.0.1 behind Nginx');
+  assert.ok(!withDom.includes("printf '%s=%s\\n' 'NITRO_PORT' '3005'"), 'Docker must not inject NITRO_PORT to avoid breaking container internal port mapping');
+  assert.ok(!withDom.includes("printf '%s=%s\\n' 'PORT' '3005'"), 'Docker must not inject PORT to avoid breaking container internal port mapping');
 }
 // PM2 runner script (.7server-start.sh) exports PORT, NITRO_PORT, NUXT_PORT and HOST=0.0.0.0 so Nuxt/Next/Node never reuse stale PM2 daemon env.
 {
@@ -86,6 +99,9 @@ assert.ok(spec && buildDeployScript(spec).includes('exit 1\n    fi\n    sleep 2'
   assert.ok(nuxt.includes('export PORT=3002 NITRO_PORT=3002 NUXT_PORT=3002'), 'runner script exports chosen port');
   assert.ok(nuxt.includes('export HOST=0.0.0.0 NITRO_HOST=0.0.0.0 NUXT_HOST=0.0.0.0 HOSTNAME=0.0.0.0'), 'runner script forces 0.0.0.0 host binding');
   assert.ok(nuxt.includes('pm2 start ./.7server-start.sh'), 'PM2 starts via isolated runner script');
+  assert.ok(nuxt.includes('[ -r .env ] && . ./.env || true'), 'runner script safely sources .env only if readable');
+  assert.ok(nuxt.includes('chmod 644 .env'), 'env file has 0644 readable permissions');
+  assert.ok(nuxt.includes('cleanup_on_failure'), 'cleanup trap registered for failure rollback');
 }
 console.log('deploy ok');
 // No-domain health check must not die silently when ss shows no listener (set -e + pipefail + grep no-match).

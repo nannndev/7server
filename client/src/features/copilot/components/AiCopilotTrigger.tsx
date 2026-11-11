@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Terminal, ShieldAlert, CheckCircle2, Sparkles } from 'lucide-react';
+import { Terminal, ShieldAlert, Sparkles } from 'lucide-react';
 import { useI18n } from '@/shared/i18n';
 import type { CopilotLiveStatus } from '../types';
 
@@ -43,7 +43,17 @@ function CopilotMascot({ state, hovered }: { state: CopilotLiveStatus['state']; 
       : '#a1a1aa';
 
   return (
-    <div className="relative w-9 h-9 flex items-center justify-center shrink-0 select-none">
+    <div
+      className="relative w-9 h-9 flex items-center justify-center shrink-0 select-none"
+      style={{
+        animation:
+          state === 'idle'
+            ? 'mascot-float 3.2s ease-in-out infinite'
+            : state === 'done'
+            ? 'mascot-hop 650ms ease-out'
+            : undefined
+      }}
+    >
       {/* Outer animated orbital ring when active */}
       {(state === 'thinking' || state === 'executing') && (
         <span
@@ -150,13 +160,26 @@ function CopilotMascot({ state, hovered }: { state: CopilotLiveStatus['state']; 
   );
 }
 
+const IDLE_QUIPS: Record<'en' | 'id', string[]> = {
+  en: ['SRE Agent Ready', 'Watching your servers...', 'All quiet. I like quiet.', 'Need a hand? ⌘J', 'Standing by for orders'],
+  id: ['Asisten SRE Siap', 'Mengawasi server kamu...', 'Aman terkendali 👌', 'Butuh bantuan? ⌘J', 'Siap menerima perintah']
+};
+
 export default function AiCopilotTrigger({ open, onClick, status }: AiCopilotTriggerProps) {
   const { t, locale } = useI18n();
   const [hovered, setHovered] = useState(false);
-
-  if (open) return null;
+  const [quipIdx, setQuipIdx] = useState(0);
 
   const state = status?.state || 'idle';
+
+  // Rotate a small personality quip while idle so the mascot feels alive.
+  useEffect(() => {
+    if (state !== 'idle' || open) return;
+    const id = window.setInterval(() => setQuipIdx((i) => i + 1), 8000);
+    return () => window.clearInterval(id);
+  }, [state, open]);
+
+  if (open) return null;
   const isBusy = state === 'thinking' || state === 'executing';
   const isId = locale === 'id';
 
@@ -192,15 +215,16 @@ export default function AiCopilotTrigger({ open, onClick, status }: AiCopilotTri
 
   return (
     <div className="fixed bottom-5 right-6 z-40 flex flex-col items-end gap-2">
-      {/* Speech Bubble Callout above the button when working, waiting for approval, or just finished */}
-      {state !== 'idle' && (
+      {/* Speech Bubble Callout above the button while working or waiting for approval.
+          Hidden when done: the pill below already says "Reply Ready!", so the bubble would just stack a duplicate. */}
+      {state !== 'idle' && state !== 'done' && (
         <button
           type="button"
           onClick={onClick}
           className={`max-w-[300px] text-left rounded-2xl border px-3.5 py-2.5 shadow-2xl backdrop-blur-md bg-[var(--card)]/95 transition-all hover:scale-[1.02] cursor-pointer animate-[pop-in_200ms_ease-out] ${
             state === 'approval'
               ? 'border-amber-500/50'
-              : state === 'executing' || state === 'done'
+              : state === 'executing'
               ? 'border-emerald-500/45'
               : 'border-sky-500/45'
           }`}
@@ -209,7 +233,6 @@ export default function AiCopilotTrigger({ open, onClick, status }: AiCopilotTri
             {state === 'executing' && <Terminal className="w-3.5 h-3.5 text-emerald-400 shrink-0 animate-pulse" />}
             {state === 'thinking' && <Sparkles className="w-3.5 h-3.5 text-sky-400 shrink-0 animate-spin" style={{ animationDuration: '3s' }} />}
             {state === 'approval' && <ShieldAlert className="w-3.5 h-3.5 text-amber-400 shrink-0 animate-bounce" />}
-            {state === 'done' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
             <span className="truncate">{statusHeadline}</span>
           </div>
 
@@ -279,9 +302,10 @@ export default function AiCopilotTrigger({ open, onClick, status }: AiCopilotTri
               ? isId
                 ? 'Klik untuk buka chat'
                 : 'Click to open chat'
-              : isId
-              ? 'Asisten SRE Siap'
-              : 'SRE Agent Ready'}
+              : (() => {
+                  const quips = IDLE_QUIPS[isId ? 'id' : 'en'];
+                  return quips[quipIdx % quips.length];
+                })()}
           </span>
         </div>
 

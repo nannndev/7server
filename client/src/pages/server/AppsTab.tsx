@@ -25,7 +25,7 @@ import { updateServer } from '@/features/servers/api';
 import { SudoPasswordModal } from '@/features/servers/components/SudoPasswordModal';
 import { BrandIcon } from '@/shared/ui/brand-icon';
 import type { WebAppInfo } from '@/features/deployments/types';
-import { fetchWebApps } from '@/features/deployments/api';
+import { fetchWebApps, fetchListeningPorts } from '@/features/deployments/api';
 import { fetchCloudflareTunnelStatus, addCloudflareRoute } from '@/features/tunnels/api';
 import type { CloudflareTunnelStatus } from '@/features/tunnels/types';
 import { getBaseDomain } from '@/features/tunnels/components/CloudflareTunnelView';
@@ -47,6 +47,8 @@ export default function AppsTab() {
   const { server } = ctx;
   const [webApps, setWebApps] = useState<WebAppInfo[]>([]);
   const [loadingWebApps, setLoadingWebApps] = useState(false);
+  // Live listening ports on the server, to show per-app up/down status.
+  const [livePorts, setLivePorts] = useState<Set<string> | null>(null);
   const [appSearchQuery, setAppSearchQuery] = useState('');
   const [appTypeFilter, setAppTypeFilter] = useState<string>('ALL');
   const [appMenu, setAppMenu] = useState<string | null>(null);
@@ -283,7 +285,18 @@ export default function AppsTab() {
     // Deployed apps are root-owned: as the SSH user git refuses them ("dubious ownership") and npm can't write.
     ctx.runQuickAction(`${app.name}: ${a.label}`, a.cmd, { sudo: true });
   };
+  /** Up/down per app: 'live' if any of its ports is listening, 'down' if none is, null when unknowable (no ports / scan failed). */
+  const appStatus = (app: WebAppInfo): 'live' | 'down' | null => {
+    if (!livePorts || !app.ports) return null;
+    const ports = app.ports.split(',').map((p) => p.trim()).filter(Boolean);
+    if (ports.length === 0) return null;
+    return ports.some((p) => livePorts.has(p)) ? 'live' : 'down';
+  };
+
   const loadWebAppsData = async (manual?: unknown) => {
+    fetchListeningPorts(server.id)
+      .then((r) => setLivePorts(new Set(r.ports.map((p) => p.port))))
+      .catch(() => setLivePorts(null));
     try {
       const localMocks = getLocalMocks();
       await swr(
@@ -345,6 +358,14 @@ export default function AppsTab() {
               <Badge variant="secondary" className="text-[10px]">
                 {t('webapps.projectCount', { filtered: filteredApps.length, total: webApps.length })}
               </Badge>
+              {livePorts && webApps.some((a) => appStatus(a)) && (
+                <span className="text-[10px] font-mono text-[var(--muted-foreground)]">
+                  <span className="text-emerald-500 font-semibold">{webApps.filter((a) => appStatus(a) === 'live').length} live</span>
+                  {webApps.some((a) => appStatus(a) === 'down') && (
+                    <> · <span className="text-red-500 font-semibold">{webApps.filter((a) => appStatus(a) === 'down').length} down</span></>
+                  )}
+                </span>
+              )}
             </h3>
             <p className="text-xs text-[var(--muted-foreground)]">
               {t('webapps.subtitle')}
@@ -437,7 +458,18 @@ export default function AppsTab() {
                       <div className="flex items-center gap-2">
                         <FileCode className="w-4 h-4 text-[var(--muted-foreground)] shrink-0" />
                         <div>
-                          <span className="font-semibold text-[var(--foreground)] sensitive">{app.name}</span>
+                          <span className="font-semibold text-[var(--foreground)] sensitive inline-flex items-center gap-1.5">
+                            {app.name}
+                            {appStatus(app) === 'live' && (
+                              <span title={t('webapps.statusLive')} className="relative flex w-2 h-2 shrink-0">
+                                <span className="absolute inline-flex w-full h-full rounded-full bg-emerald-400 opacity-60 animate-ping" style={{ animationDuration: '2.5s' }} />
+                                <span className="relative inline-flex w-2 h-2 rounded-full bg-emerald-500" />
+                              </span>
+                            )}
+                            {appStatus(app) === 'down' && (
+                              <span title={t('webapps.statusDown')} className="inline-flex w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                            )}
+                          </span>
                           <div className="text-[10px] text-[var(--muted-foreground)] font-mono sensitive">{app.path}</div>
                         </div>
                       </div>

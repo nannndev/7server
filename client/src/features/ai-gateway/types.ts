@@ -1,5 +1,5 @@
 export type AiProviderId = 'anthropic' | 'openai' | 'gemini' | 'deepseek' | 'ollama' | 'openrouter'
-  | 'groq' | 'mistral' | 'xai' | 'together' | 'fireworks' | 'cerebras' | 'perplexity' | 'moonshot' | 'dashscope' | 'zai' | 'minimax' | 'nvidia' | 'custom';
+  | 'groq' | 'mistral' | 'xai' | 'together' | 'fireworks' | 'cerebras' | 'perplexity' | 'moonshot' | 'dashscope' | 'zai' | 'minimax' | 'nvidia' | 'deepinfra' | 'sambanova' | 'custom';
 
 export interface VirtualApiKey {
   id: string;
@@ -33,6 +33,8 @@ export interface ProviderConfig {
   verifiedAt?: string;
   latencyMs?: number;
   defaultModel?: string;
+  /** Models found when the key was verified (server fills this on connect). */
+  models?: string[];
   error?: string;
 }
 

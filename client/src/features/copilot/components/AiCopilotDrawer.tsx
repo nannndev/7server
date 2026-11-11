@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import {
   Bot,
   Sparkles,
@@ -15,6 +15,7 @@ import {
   Layers,
   ShieldAlert,
   ArrowRight,
+  ArrowDown,
   Plus,
   History,
   Loader2,
@@ -558,7 +559,8 @@ export default function AiCopilotDrawer({
         for (const p of PROVIDERS_META) {
           const cfg = gwConfig.providers[p.id];
           if (cfg?.connected && (cfg.apiKey || p.id === 'ollama')) {
-            for (const m of p.models) {
+            const pool = Array.from(new Set([...p.models, ...(cfg.models || [])]));
+            for (const m of pool) {
               if (m.includes('<')) continue;
               apiKeyModels.push(m.includes('/') ? m : `${p.id}/${m}`);
             }
@@ -608,12 +610,33 @@ export default function AiCopilotDrawer({
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
 
   const targetServer = useMemo(() => {
     return servers.find((s) => s.id === selectedServerId) || activeServer || (servers.length > 0 ? servers[0] : null);
   }, [servers, selectedServerId, activeServer]);
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    if (messagesContainerRef.current) {
+      const el = messagesContainerRef.current;
+      if (behavior === 'auto') {
+        el.scrollTop = el.scrollHeight;
+      } else {
+        el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+      }
+    } else if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior });
+    }
+  }, []);
+
+  const handleMessagesScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setShowScrollBottom(distanceToBottom > 180);
+  };
 
   // Sync selectedServerId with activeServer ONLY when the current conversation is empty.
   // Once a conversation has messages, keep it pinned to its server so navigating the dashboard
@@ -665,12 +688,38 @@ export default function AiCopilotDrawer({
     });
   }, [messages, chatId, selectedServerId, targetServer?.id, targetServer?.name, servers]);
 
-  // Auto-scroll on new messages
+  // Immediately jump to bottom when drawer opens, mounts, or switches chats
   useEffect(() => {
-    if (open) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!open) return;
+
+    // Instant jump to bottom
+    scrollToBottom('auto');
+
+    // Run on animation frames & timeouts to guarantee scroll after layout and slide-in transition settles
+    const raf1 = requestAnimationFrame(() => {
+      scrollToBottom('auto');
+      const raf2 = requestAnimationFrame(() => scrollToBottom('auto'));
+      return () => cancelAnimationFrame(raf2);
+    });
+
+    const t1 = setTimeout(() => scrollToBottom('auto'), 60);
+    const t2 = setTimeout(() => scrollToBottom('auto'), 180);
+    const t3 = setTimeout(() => scrollToBottom('auto'), 340);
+
+    return () => {
+      cancelAnimationFrame(raf1);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, [open, mounted, chatId, scrollToBottom]);
+
+  // Auto-scroll on new messages while drawer is already open
+  useEffect(() => {
+    if (open && messages.length > 0) {
+      scrollToBottom(isStreaming ? 'auto' : 'smooth');
     }
-  }, [messages, open]);
+  }, [messages, open, isStreaming, scrollToBottom]);
 
   // Focus input when opened
   useEffect(() => {
@@ -1559,7 +1608,11 @@ export default function AiCopilotDrawer({
         ) : (
           <>
             {/* Chat Message List */}
-            <div className="flex-1 overflow-y-auto p-3.5 space-y-3.5">
+            <div
+              ref={messagesContainerRef}
+              onScroll={handleMessagesScroll}
+              className="flex-1 overflow-y-auto p-3.5 space-y-3.5 relative"
+            >
               {messages.length === 0 ? (
                 <div className="h-full flex flex-col justify-center items-center text-center px-3 space-y-4">
                   <div className="w-11 h-11 rounded-2xl bg-[var(--foreground)]/[0.06] text-[var(--foreground)] border border-[var(--rim)] flex items-center justify-center shadow-inner">
@@ -1700,6 +1753,19 @@ export default function AiCopilotDrawer({
               )}
               <div ref={messagesEndRef} />
             </div>
+
+            {/* Floating Jump to Bottom Button */}
+            {showScrollBottom && (
+              <button
+                type="button"
+                onClick={() => scrollToBottom('smooth')}
+                className="absolute bottom-24 right-5 z-20 px-2.5 py-1.5 rounded-full bg-[var(--card)]/95 border border-[var(--border)] shadow-lg backdrop-blur-md text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted)] flex items-center gap-1.5 transition-all animate-in fade-in zoom-in-95 cursor-pointer"
+                title="Scroll to bottom"
+              >
+                <ArrowDown className="w-3.5 h-3.5 text-emerald-500" />
+                <span className="text-[11px] font-mono">↓</span>
+              </button>
+            )}
 
             {/* Composer: Slash Command Palette + Attached Context Pills + Input + ModelPicker */}
             <div className="p-3 shrink-0 relative">

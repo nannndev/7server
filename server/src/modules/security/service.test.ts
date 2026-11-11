@@ -1,5 +1,5 @@
 import assert from 'node:assert';
-import { parseAuthorizedKeys } from './service.js';
+import { parseAuthorizedKeys, parseDeployUserProbe } from './service.js';
 
 console.log('Testing SSH authorized_keys parsing...');
 
@@ -31,6 +31,11 @@ assert.strictEqual(keys[1].comment, 'github-actions@deploy-runner');
 // Key 3
 assert.strictEqual(keys[2].type, 'ssh-ed25519');
 assert.ok(keys[2].comment.includes('backup-robot'));
+
+// Deploy user probe parsing
+assert.deepStrictEqual(parseDeployUserProbe('noise\n@@DEPLOYUSER|1|1|deploy\n'), { exists: true, hasSshKey: true, ownsWebRoot: true, webRootOwner: 'deploy' });
+assert.deepStrictEqual(parseDeployUserProbe('@@DEPLOYUSER|0|0|root'), { exists: false, hasSshKey: false, ownsWebRoot: false, webRootOwner: 'root' });
+assert.deepStrictEqual(parseDeployUserProbe(''), { exists: false, hasSshKey: false, ownsWebRoot: false, webRootOwner: 'none' });
 
 console.log('security tests ok');
 

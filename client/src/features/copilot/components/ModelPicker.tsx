@@ -256,9 +256,9 @@ export function parseModelItem(id: string, combos?: Record<string, string[]>): P
 
   const tags: ModelTag[] = [];
   if (/:free$/i.test(rawName)) tags.push('FREE');
-  if (/(^|[-/])(o1|o3|o4|r1|reasoner|thinking|qwq)([-/]|$)/i.test(rawName)) tags.push('REASONING');
+  if (/(^|[-/])(o1|o3|o4|r1|reasoner|reasoning|thinking|qwq)([-/]|$)/i.test(rawName)) tags.push('REASONING');
   if (/(codex|coder|coding|codestral|devstral|starcoder)/i.test(rawName)) tags.push('CODING');
-  if (/(mini|flash|haiku|instant|nano|air|lite|fast)/i.test(rawName)) tags.push('FAST');
+  if (/(mini|flash|haiku|instant|nano|air|lite|fast|lightning|turbo)/i.test(rawName)) tags.push('FAST');
 
   let withoutFree = rawName.replace(/:free$/i, '');
   let subVendor: string | undefined;

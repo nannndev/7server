@@ -59,7 +59,7 @@ function Pillar3D({
       <div
         className="absolute inset-0 border border-white/20 flex flex-col justify-end items-center pb-1"
         style={{
-          background: `linear-gradient(to top, rgba(9,9,11,0.9), ${color})`,
+          background: `linear-gradient(to top, var(--card), ${color})`,
           transform: `translateZ(${width / 2}px)`
         }}
       >
@@ -69,7 +69,7 @@ function Pillar3D({
       <div
         className="absolute inset-0 border border-white/10"
         style={{
-          background: `linear-gradient(to top, rgba(9,9,11,0.95), ${color})`,
+          background: `linear-gradient(to top, var(--card), ${color})`,
           opacity: 0.7,
           transform: `rotateY(180deg) translateZ(${width / 2}px)`
         }}
@@ -78,7 +78,7 @@ function Pillar3D({
       <div
         className="absolute inset-0 border border-white/15"
         style={{
-          background: `linear-gradient(to top, rgba(9,9,11,0.92), ${color})`,
+          background: `linear-gradient(to top, var(--card), ${color})`,
           opacity: 0.85,
           transform: `rotateY(90deg) translateZ(${width / 2}px)`
         }}
@@ -87,7 +87,7 @@ function Pillar3D({
       <div
         className="absolute inset-0 border border-white/15"
         style={{
-          background: `linear-gradient(to top, rgba(9,9,11,0.92), ${color})`,
+          background: `linear-gradient(to top, var(--card), ${color})`,
           opacity: 0.65,
           transform: `rotateY(-90deg) translateZ(${width / 2}px)`
         }}
@@ -163,9 +163,9 @@ export default function CyberMatrixVisualizer({
     }
   ];
 
-  const cx = 150;
+  const cx = 175;
   const cy = 140;
-  const radius = 95;
+  const radius = 88;
 
   const getPolygonPoints = (s: ServerItem) =>
     axes
@@ -255,7 +255,7 @@ export default function CyberMatrixVisualizer({
         {/* Left: 3D Isometric Cityscape Pillars */}
         <div
           ref={stageRef}
-          className="lg:col-span-7 relative overflow-hidden rounded-xl bg-[#09090b] border border-zinc-800/90 flex items-center justify-center select-none cursor-grab active:cursor-grabbing"
+          className="lg:col-span-7 relative overflow-hidden rounded-xl bg-[var(--background)] border border-[var(--border)] shadow-inner flex items-center justify-center select-none cursor-grab active:cursor-grabbing"
           style={{ perspective: 1300, minHeight: 420 }}
           onPointerDown={(e) => {
             setAutoSpin(false);
@@ -294,10 +294,10 @@ export default function CyberMatrixVisualizer({
                 top: -150,
                 transform: 'rotateX(90deg)',
                 backgroundImage:
-                  'linear-gradient(to right, rgba(56,189,248,0.14) 1px, transparent 1px), linear-gradient(to bottom, rgba(56,189,248,0.14) 1px, transparent 1px)',
+                  'linear-gradient(to right, rgba(56,189,248,0.18) 1px, transparent 1px), linear-gradient(to bottom, rgba(56,189,248,0.18) 1px, transparent 1px)',
                 backgroundSize: '28px 28px',
-                backgroundColor: 'rgba(18,18,21,0.88)',
-                boxShadow: '0 0 50px rgba(56,189,248,0.12)'
+                backgroundColor: 'var(--card)',
+                boxShadow: '0 0 50px rgba(56,189,248,0.15)'
               }}
             />
 
@@ -338,7 +338,7 @@ export default function CyberMatrixVisualizer({
                   {/* Server Nameplate floating in front */}
                   <div
                     onClick={() => onManage(srv, 'overview')}
-                    className="absolute cursor-pointer px-2.5 py-1 rounded bg-zinc-900/95 border border-zinc-700 text-[10px] font-mono text-zinc-100 whitespace-nowrap hover:border-sky-400 transition"
+                    className="absolute cursor-pointer px-2.5 py-1 rounded bg-[var(--card)]/95 border border-[var(--border)] text-[10px] font-mono text-[var(--foreground)] whitespace-nowrap hover:border-sky-400 shadow-md transition"
                     style={{
                       left: baseX - 55,
                       top: -12,
@@ -366,7 +366,7 @@ export default function CyberMatrixVisualizer({
             })}
           </div>
 
-          <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-[10px] text-zinc-400 font-mono">
+          <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-[10px] text-[var(--muted-foreground)] font-mono">
             <div className="flex items-center gap-3">
               <span className="flex items-center gap-1">
                 <span className="w-2 h-2 bg-sky-400 inline-block" /> CPU
@@ -391,7 +391,7 @@ export default function CyberMatrixVisualizer({
             <span className="text-xs font-semibold text-[var(--foreground)] mb-1">
               Multi-Node Telemetry Radar (0–100%)
             </span>
-            <svg viewBox="0 0 300 275" className="w-full max-w-[300px]">
+            <svg viewBox="0 0 350 280" className="w-full max-w-[340px]">
               {/* Concentric Radar Rings */}
               {[0.25, 0.5, 0.75, 1].map((ring) => (
                 <polygon
