@@ -69,8 +69,36 @@ export function isReadOnlyCommand(command: string): boolean {
 }
 
 const SHELL_LANGS = ['', 'bash', 'sh', 'shell', 'zsh', 'console'];
+const READ_ONLY_CF_ACTIONS = new Set([
+  'list_zones',
+  'list_dns',
+  'list_tunnels',
+  'get_tunnel_config',
+  'get_zone_settings',
+  'api_get'
+]);
 
-export type Segment = { type: 'text'; text: string } | { type: 'code'; lang: string; code: string; shell: boolean };
+export function isReadOnlyCloudflareAction(raw: string): boolean {
+  try {
+    const obj = JSON.parse(raw);
+    return typeof obj?.action === 'string' && READ_ONLY_CF_ACTIONS.has(obj.action);
+  } catch {
+    return false;
+  }
+}
+
+export function isRiskyCloudflareAction(raw: string): boolean {
+  try {
+    const obj = JSON.parse(raw);
+    return obj?.action === 'delete_dns' || (obj?.action === 'api_write' && String(obj?.method || '').toUpperCase() === 'DELETE');
+  } catch {
+    return false;
+  }
+}
+
+export type Segment =
+  | { type: 'text'; text: string }
+  | { type: 'code'; lang: string; code: string; shell: boolean; cloudflare: boolean };
 
 /** Splits an AI message into text and fenced code; an unclosed fence (still streaming) runs to the end. */
 export function parseSegments(content: string): Segment[] {
@@ -80,9 +108,20 @@ export function parseSegments(content: string): Segment[] {
     const nl = body.indexOf('\n');
     const lang = (nl >= 0 ? body.slice(0, nl) : '').trim().toLowerCase();
     const code = (nl >= 0 ? body.slice(nl + 1) : body).trim();
-    return { type: 'code', lang, code, shell: SHELL_LANGS.includes(lang) && !!code };
+    const cloudflare = lang === 'cloudflare' && !!code;
+    return { type: 'code', lang, code, shell: SHELL_LANGS.includes(lang) && !!code, cloudflare };
   });
 }
+
+/** Shell & Cloudflare blocks the agent may run, in order. */
+export const extractActionBlocks = (content: string): Array<{ kind: 'bash' | 'cloudflare'; code: string }> =>
+  parseSegments(content).flatMap((s): Array<{ kind: 'bash' | 'cloudflare'; code: string }> =>
+    s.type === 'code' && s.cloudflare
+      ? [{ kind: 'cloudflare', code: s.code }]
+      : s.type === 'code' && s.shell
+        ? [{ kind: 'bash', code: s.code }]
+        : []
+  );
 
 /** Shell blocks the agent may run, in order (other languages are only shown). */
 export const extractCommands = (content: string) =>

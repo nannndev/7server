@@ -173,3 +173,83 @@ test('Framework Detection Engine - detects Python FastAPI/Django', () => {
   assert.equal(pnpmMonorepo.suggested_config.build_command, 'pnpm run build');
   assert.equal(pnpmMonorepo.suggested_config.start_command, 'node .output/server/index.mjs');
 }
+
+test('Compatibility Engine - detects PHP/Laravel 12 version mismatch with Dockerfile', async () => {
+  const { analyzeCompatibility } = await import('./compatibilityInspector.js');
+  const comp = JSON.stringify({
+    name: 'booking-system-backend',
+    require: {
+      php: '^8.3',
+      'laravel/framework': '^12.0'
+    },
+    'require-dev': {
+      'pestphp/pest': '^4.0',
+      'phpunit/phpunit': '^12.0'
+    }
+  });
+  const dockerfile = 'FROM php:8.2-fpm-alpine\nWORKDIR /var/www\nRUN composer install\nEXPOSE 8000';
+
+  const report = analyzeCompatibility({
+    directFiles: ['composer.json', 'Dockerfile'],
+    composerJsonStr: comp,
+    dockerfileStr: dockerfile
+  });
+
+  assert.equal(report.is_compatible, false);
+  assert.equal(report.score, 'incompatible');
+  assert.ok(report.issues.some((i) => i.title === 'PHP Version Incompatibility'));
+  assert.ok(report.issues.some((i) => i.suggested_fix?.includes('8.3')));
+});
+
+test('Compatibility Engine - detects Go compiler mismatch and CGO SQLite requirement', async () => {
+  const { analyzeCompatibility } = await import('./compatibilityInspector.js');
+  const goMod = `module example.com/my-go-service\n\ngo 1.23\n\nrequire github.com/mattn/go-sqlite3 v1.14.22\n`;
+  const dockerfile = `FROM golang:1.20-alpine\nENV CGO_ENABLED=0\nWORKDIR /app\nRUN go build -o server\nEXPOSE 8080`;
+
+  const report = analyzeCompatibility({
+    directFiles: ['go.mod', 'Dockerfile'],
+    goModStr: goMod,
+    dockerfileStr: dockerfile
+  });
+
+  assert.equal(report.is_compatible, false);
+  assert.ok(report.issues.some((i) => i.title === 'Go Compiler Version Mismatch'));
+  assert.ok(report.issues.some((i) => i.title.includes('CGO Required for SQLite')));
+});
+
+test('Compatibility Engine - detects Python localhost binding', async () => {
+  const { analyzeCompatibility } = await import('./compatibilityInspector.js');
+  const pyproject = `[project]\nname = "fastapi-svc"\nrequires-python = ">=3.11"\n`;
+  const dockerfile = `FROM python:3.11-slim\nWORKDIR /app\nCMD ["uvicorn", "main:app", "--host", "127.0.0.1", "--port", "8000"]`;
+
+  const report = analyzeCompatibility({
+    directFiles: ['pyproject.toml', 'Dockerfile'],
+    pyprojectStr: pyproject,
+    dockerfileStr: dockerfile
+  });
+
+  assert.equal(report.is_compatible, false);
+  assert.ok(report.issues.some((i) => i.category === 'network_binding'));
+});
+
+test('Compatibility Engine - passes cleanly when runtime matches', async () => {
+  const { analyzeCompatibility } = await import('./compatibilityInspector.js');
+  const comp = JSON.stringify({
+    name: 'clean-laravel',
+    require: {
+      php: '^8.3',
+      'laravel/framework': '^12.0'
+    }
+  });
+  const dockerfile = 'FROM php:8.3-fpm-alpine\nWORKDIR /var/www\nEXPOSE 8000';
+
+  const report = analyzeCompatibility({
+    directFiles: ['composer.json', 'Dockerfile'],
+    composerJsonStr: comp,
+    dockerfileStr: dockerfile
+  });
+
+  assert.equal(report.is_compatible, true);
+  assert.equal(report.score, 'ok');
+  assert.equal(report.issues.length, 0);
+});

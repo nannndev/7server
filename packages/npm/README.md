@@ -4,7 +4,7 @@ Installs the `7server` command.
 
 Self-hosted dashboard for your servers. It connects over the SSH access you already have: nothing is installed on your servers.
 
-Monitoring with Discord alerts, a browser terminal, Docker and Compose, Nginx and SSL, cron, services, backups, a database workbench, and an AI copilot that checks the server itself and asks before it changes anything.
+Monitoring with Discord, Telegram, and custom webhook alerts, a browser terminal, Docker and Compose, Nginx and SSL, cron, services, backups, a database workbench, and an AI copilot (with selectable personalities) & OpenAI/Anthropic-compatible AI gateway.
 
 ## Install
 
@@ -15,13 +15,25 @@ npm install -g sevenserver
 7server
 ```
 
+Or via Homebrew (macOS / Linux):
+
+```bash
+brew install nannndev/tap/sevenserver
+```
+
+Or Linux VPS one-line installer (sets up Node 22+ & `systemd`):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/nannndev/7server/main/install.sh | sudo bash
+```
+
 It opens `http://127.0.0.1:5001`. On the first visit you create the admin account in the browser: choose the username and password. Opened from another machine, it also asks for the 6-digit setup code that `7server` prints in the terminal.
 
 To skip that step, start it once with `DASHBOARD_PASSWORD=… 7server`: the admin (`admin`) is created with that password.
 
 Forgot the password? `7server reset-password admin` (on the machine that holds the data).
 
-`7server` checks npm once a day and tells you when a newer version is out (turn off with `--no-update-check`).
+`7server` checks GitHub Releases / npm once a day and tells you when a newer version is out (turn off with `--no-update-check`).
 
 ## Options
 

@@ -1,6 +1,6 @@
 import { executeCommand } from '../../infra/ssh.js';
 import type { ServerCredentials } from '../servers/types.js';
-import type { SshKeyItem, SecurityHardeningStatus } from './types.js';
+import type { SshKeyItem, SecurityHardeningStatus, DeployUserStatus } from './types.js';
 
 export function parseAuthorizedKeys(content: string): SshKeyItem[] {
   const lines = content.split('\n');
@@ -164,3 +164,60 @@ export async function unbanIp(target: ServerCredentials, ip: string): Promise<{ 
   };
 }
 
+
+// ---------------- Deploy user (non-root owner for /var/www) ----------------
+
+export async function fetchDeployUserStatus(target: ServerCredentials): Promise<DeployUserStatus> {
+  const probe = `
+EXISTS=$(id -u deploy >/dev/null 2>&1 && echo 1 || echo 0)
+HAS_KEY=$([ -s /home/deploy/.ssh/authorized_keys ] && echo 1 || echo 0)
+OWNER=$(stat -c '%U' /var/www 2>/dev/null || echo none)
+echo "@@DEPLOYUSER|$EXISTS|$HAS_KEY|$OWNER"
+`;
+  const { stdout } = await executeCommand(target, probe, 10000);
+  return parseDeployUserProbe(stdout);
+}
+
+export function parseDeployUserProbe(stdout: string): DeployUserStatus {
+  const line = stdout.split('\n').find((l) => l.startsWith('@@DEPLOYUSER|'));
+  const parts = (line || '').trim().split('|');
+  const owner = parts[3] || 'none';
+  return {
+    exists: parts[1] === '1',
+    hasSshKey: parts[2] === '1',
+    ownsWebRoot: owner === 'deploy',
+    webRootOwner: owner
+  };
+}
+
+/**
+ * Creates a non-root "deploy" user, reuses the connecting user's authorized_keys so the
+ * same SSH key works, and hands /var/www to it. Idempotent: safe to run again.
+ * Deliberately does NOT touch sshd_config or sudoers: nothing here can lock you out.
+ */
+export async function setupDeployUser(target: ServerCredentials): Promise<DeployUserStatus> {
+  const script = `
+set -e
+id -u deploy >/dev/null 2>&1 || useradd -m -s /bin/bash deploy
+mkdir -p /home/deploy/.ssh
+# Reuse the panel's SSH key so the existing credential also opens the deploy account
+if [ -s "$HOME/.ssh/authorized_keys" ] && [ ! -s /home/deploy/.ssh/authorized_keys ]; then
+  cp "$HOME/.ssh/authorized_keys" /home/deploy/.ssh/authorized_keys
+fi
+touch /home/deploy/.ssh/authorized_keys
+chown -R deploy:deploy /home/deploy/.ssh
+chmod 700 /home/deploy/.ssh
+chmod 600 /home/deploy/.ssh/authorized_keys
+mkdir -p /var/www
+chown -R deploy:deploy /var/www
+# Nginx (www-data) must still read static files served from /var/www
+command -v nginx >/dev/null 2>&1 && usermod -aG deploy www-data 2>/dev/null || true
+chmod -R g+rX /var/www
+echo "@@DEPLOYUSER_DONE"
+`;
+  const { stdout, stderr, code } = await executeCommand(target, script, 60000);
+  if (!stdout.includes('@@DEPLOYUSER_DONE')) {
+    throw new Error(`Gagal menyiapkan deploy user: ${(stderr || stdout).slice(-300) || `exit ${code}`}`);
+  }
+  return fetchDeployUserStatus(target);
+}

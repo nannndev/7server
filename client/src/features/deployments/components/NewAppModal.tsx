@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FolderGit2, ArrowLeft, Check, Lock, Globe, RefreshCw, Cpu, Settings2, Plus, Trash2, Server, Play, ShieldCheck, ChevronDown, ChevronRight, Layers, HardDrive, Folder, Sparkles, Radio } from 'lucide-react';
+import { FolderGit2, ArrowLeft, Check, Lock, Globe, RefreshCw, Cpu, Settings2, Plus, Trash2, Server, Play, ShieldCheck, ChevronDown, ChevronRight, Layers, HardDrive, Folder, Sparkles, Radio, Zap, AlertTriangle, AlertCircle, CheckCircle2, Info, Wrench } from 'lucide-react';
 import { Card } from '@/shared/ui/card';
 import { Button } from '@/shared/ui/button';
 import { Badge } from '@/shared/ui/badge';
@@ -176,6 +176,9 @@ export default function NewAppModal({
   const [installCmd, setInstallCmd] = useState('');
   const [buildCmd, setBuildCmd] = useState('');
   const [startCmd, setStartCmd] = useState('');
+  const [healthCheckPath, setHealthCheckPath] = useState('/');
+  const [postDeployCmd, setPostDeployCmd] = useState('');
+  const [autoSsl, setAutoSsl] = useState(true);
   const [internalPort, setInternalPort] = useState<number>(3000);
   const [envVars, setEnvVars] = useState<Array<{ key: string; value: string }>>([
     { key: 'NODE_ENV', value: 'production' }
@@ -205,6 +208,7 @@ export default function NewAppModal({
     status: 'waiting' | 'running' | 'completed' | 'failed';
   }>>([]);
   const [activeStackServiceId, setActiveStackServiceId] = useState<string>('');
+  const [stackContinueOnError, setStackContinueOnError] = useState<boolean>(false);
 
   // Deployment runs as a background task; this view only reads its streamed log.
   const { tasks, runStreamTask } = useTaskManager();
@@ -217,15 +221,28 @@ export default function NewAppModal({
   const [usedPorts, setUsedPorts] = useState<number[]>([]);
   const usedPortsRef = useRef<number[]>([]);
   const refreshListeningPorts = () => {
-    fetchListeningPorts(server.id)
-      .then(({ ports, probed }) => {
-        // ss misses ports held outside this Linux (Windows host under WSL); the probe catches those.
-        const used = [...new Set([...ports.filter((p) => p.proto.startsWith('tcp')).map((p) => Number(p.port)).filter(Boolean), ...(probed ?? [])])];
-        usedPortsRef.current = used;
-        setUsedPorts(used);
-        setInternalPort((cur) => freePort(cur, used));
-      })
-      .catch(() => {});
+    Promise.all([
+      fetchListeningPorts(server.id).catch(() => ({ ports: [], probed: [] })),
+      fetchCloudflareTunnelStatus(server.id).catch(() => null)
+    ]).then(([portRes, tunnelRes]) => {
+      const activePorts = (portRes.ports || [])
+        .filter((p) => p.proto.startsWith('tcp'))
+        .map((p) => Number(p.port))
+        .filter(Boolean);
+      const probedPorts = portRes.probed ?? [];
+      const tunnelPorts = (tunnelRes?.routes ?? [])
+        .map((r) => {
+          const m = r.service.match(/:(\d{2,5})/);
+          return m ? Number(m[1]) : 0;
+        })
+        .filter((prt) => prt > 0 && prt !== 80 && prt !== 443);
+
+      // Include active listening sockets, probed WSL host sockets, and ports registered in Cloudflare tunnels
+      const used = [...new Set([...activePorts, ...probedPorts, ...tunnelPorts])];
+      usedPortsRef.current = used;
+      setUsedPorts(used);
+      setInternalPort((cur) => freePort(cur, used));
+    });
   };
   const suggestPort = (p: number) => setInternalPort(freePort(p, usedPortsRef.current));
   const deployTask = tasks.find((tk) => tk.id === deployTaskId);
@@ -658,6 +675,9 @@ export default function NewAppModal({
           port: svc.internalPort,
           domain: exposureMode === 'none' ? '' : svc.customDomain,
           exposure: exposureMode,
+          autoSsl: exposureMode === 'public' && !!svc.customDomain && autoSsl,
+          healthCheckPath: healthCheckPath.trim() || '/',
+          ...(postDeployCmd.trim() ? { postDeployCmd: postDeployCmd.trim() } : {}),
           tunnelName: tunnelStatus?.tunnelName || tunnelStatus?.tunnelId,
           engine: svc.detectedEngine,
           env: svc.envVars.filter((e) => e.key.trim()),
@@ -689,10 +709,25 @@ export default function NewAppModal({
         }
       });
 
-      if (stepFailed) {
+      if (stepFailed && !stackContinueOnError) {
         break;
       }
     }
+  };
+
+  const retrySingleStackService = async (serviceId: string) => {
+    const svc = stackServices.find((s) => s.id === serviceId);
+    if (!svc) return;
+    runStackDeploy([svc]);
+  };
+
+  const continueRemainingStack = async () => {
+    const remaining = stackServices.filter((s) => s.selected && s.status !== 'completed');
+    if (remaining.length === 0) {
+      toast.info('All services in the stack are already live!');
+      return;
+    }
+    runStackDeploy(remaining);
   };
 
   const handleStartDeploy = () => {
@@ -734,6 +769,9 @@ export default function NewAppModal({
       installCmd, buildCmd, startCmd, port: internalPort,
       domain: exposureMode === 'none' ? '' : customDomain,
       exposure: exposureMode,
+      autoSsl: exposureMode === 'public' && !!customDomain && autoSsl,
+      healthCheckPath: healthCheckPath.trim() || '/',
+      ...(postDeployCmd.trim() ? { postDeployCmd: postDeployCmd.trim() } : {}),
       tunnelName: tunnelStatus?.tunnelName || tunnelStatus?.tunnelId,
       engine: inspectResult?.detected_engine, env: envVars.filter((e) => e.key.trim()), nodeMajor,
       composeSidecar: !!inspectResult?.compose_sidecar,
@@ -750,15 +788,20 @@ export default function NewAppModal({
   };
 
   const handleAskAiPreflight = () => {
-    const prompt = isStackMode
-      ? `Tolong lakukan Pre-Flight Architecture Review untuk Monorepo stack "${selectedRepo?.full_name}" branch "${selectedBranch}".
-Packages yang dipilih:
-${stackServices.filter((s) => s.selected).map((s) => `- ${s.rootDir} -> app: ${s.appName}, port: ${s.internalPort}, framework: ${s.framework}, env vars: ${s.envVars.filter((e) => e.key).length}`).join('\n')}
+    const currentCompat = isStackMode && activeStackSvc ? activeStackSvc.inspectResult?.compatibility : inspectResult?.compatibility;
+    const compatExtra = currentCompat && currentCompat.issues.length > 0
+      ? `\n\nPre-Flight Compatibility Engine findings:\n` + currentCompat.issues.map((i) => `- [${i.severity.toUpperCase()}] ${i.title}: ${i.message} (Suggested fix: ${i.suggested_fix || 'N/A'})`).join('\n')
+      : '';
 
-Periksa apakah ada potensi port collision, dependency antar-service, atau variabel environment penting yang mungkin terlewat sebelum saya mulai deploy di server ${server.name} (${server.host}).`
-      : `Tolong lakukan Pre-Flight Architecture Review untuk aplikasi "${appName}" (repo: ${selectedRepo?.full_name}, branch: ${selectedBranch}).
-Framework terdeteksi: ${activeFramework}, Root Directory: ${rootDir}, Port: ${internalPort}.
-Periksa apakah ada konfigurasi port, Docker compose, atau variabel environment yang perlu disesuaikan sebelum di-deploy di server ${server.name} (${server.host}).`;
+    const prompt = isStackMode
+      ? `Please run a Pre-Flight Architecture Review for the monorepo stack "${selectedRepo?.full_name}" branch "${selectedBranch}".
+Selected packages:
+${stackServices.filter((s) => s.selected).map((s) => `- ${s.rootDir} -> app: ${s.appName}, port: ${s.internalPort}, framework: ${s.framework}, env vars: ${s.envVars.filter((e) => e.key).length}`).join('\n')}${compatExtra}
+
+Check for potential port collisions, inter-service dependencies, or important environment variables that might be missing before I start deploying on server ${server.name} (${server.host}).`
+      : `Please run a Pre-Flight Architecture Review for the app "${appName}" (repo: ${selectedRepo?.full_name}, branch: ${selectedBranch}).
+Detected framework: ${activeFramework}, Root Directory: ${rootDir}, Port: ${internalPort}.${compatExtra}
+Check whether any port configuration, Docker compose settings, or environment variables need adjusting before deploying on server ${server.name} (${server.host}).`;
 
     window.dispatchEvent(
       new CustomEvent('7server-copilot-ask', {
@@ -1038,212 +1081,413 @@ Periksa apakah ada konfigurasi port, Docker compose, atau variabel environment y
                   <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
                     {t('gitApp.rootDirHint')}
                   </p>
+                </div>
+              </div>
 
-                  {/* Monorepo Project Roots Quick-Selector / Stack Composer */}
-                  {inspectResult?.project_roots && inspectResult.project_roots.filter((r) => r !== '/').length > 0 && (
-                    <div className="mt-2.5 p-3 rounded-xl border border-[var(--primary)]/30 bg-[var(--primary)]/5 space-y-2.5">
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
+              {/* Monorepo Project Roots Quick-Selector / Stack Composer (Full Width & Compact) */}
+              {inspectResult?.project_roots && inspectResult.project_roots.filter((r) => r !== '/').length > 0 && (
+                <div className="pt-3 border-t border-[var(--border)] space-y-3">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-md bg-[var(--primary)]/10 text-[var(--primary)] flex items-center justify-center shrink-0">
+                        <Layers className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-[var(--foreground)] block">
+                          Monorepo Detected
+                        </span>
+                        <span className="text-[10px] text-[var(--muted-foreground)]">
+                          {inspectResult.project_roots.filter((r) => r !== '/').length} packages ditemukan di repositori ini
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 bg-[var(--muted)]/80 p-0.5 rounded-lg border border-[var(--border)] text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setIsStackMode(false)}
+                        className={`px-3 py-1 rounded-md transition text-xs ${
+                          !isStackMode
+                            ? 'bg-[var(--card)] text-[var(--foreground)] shadow-xs font-semibold'
+                            : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                        }`}
+                      >
+                        Single App
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!isStackMode) {
+                            initStackMode(inspectResult.project_roots!.filter((r) => r !== '/'));
+                          }
+                        }}
+                        className={`px-3 py-1 rounded-md transition flex items-center gap-1.5 text-xs ${
+                          isStackMode
+                            ? 'bg-[var(--primary)] text-[var(--primary-foreground)] shadow-xs font-semibold'
+                            : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                        }`}
+                      >
+                        <Zap className="w-3 h-3 fill-current" />
+                        <span>Deploy Stack</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {!isStackMode ? (
+                    <div className="bg-[var(--muted)]/30 rounded-xl p-3 border border-[var(--border)]/60">
+                      <div className="text-[11px] text-[var(--muted-foreground)] mb-2">
+                        Pilih salah satu package untuk di-deploy sebagai Single App:
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {inspectResult.project_roots.map((pkgDir) => {
+                          const active = rootDir === pkgDir;
+                          return (
+                            <button
+                              key={pkgDir}
+                              type="button"
+                              onClick={() => handleSelectRootDir(pkgDir)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-mono border transition flex items-center gap-1.5 ${
+                                active
+                                  ? 'bg-[var(--primary)] text-[var(--primary-foreground)] border-transparent font-semibold shadow-xs'
+                                  : 'bg-[var(--card)] text-[var(--foreground)] border-[var(--border)] hover:border-[var(--primary)]/50'
+                              }`}
+                            >
+                              <Folder className="w-3.5 h-3.5 opacity-75" />
+                              <span>{pkgDir}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-[var(--muted)]/20 rounded-xl p-3.5 border border-[var(--border)]/70 space-y-3">
+                      <div className="flex items-center justify-between text-xs text-[var(--muted-foreground)] flex-wrap gap-2">
+                        <span className="font-medium text-[var(--foreground)] text-[11px]">
+                          Packages to include in this deployment stack:
+                        </span>
                         <div className="flex items-center gap-2">
-                          <Layers className="w-3.5 h-3.5 text-[var(--primary)]" />
-                          <span className="text-xs font-bold text-[var(--foreground)]">
-                            Monorepo Detected ({inspectResult.project_roots.filter((r) => r !== '/').length} packages)
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-1 bg-[var(--muted)]/80 p-0.5 rounded-lg border border-[var(--border)] text-xs">
                           <button
                             type="button"
-                            onClick={() => setIsStackMode(false)}
-                            className={`px-2.5 py-1 rounded-md transition ${
-                              !isStackMode
-                                ? 'bg-[var(--card)] text-[var(--foreground)] shadow-xs font-semibold'
-                                : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-                            }`}
+                            onClick={() => setStackServices((prev) => prev.map((s) => ({ ...s, selected: true })))}
+                            className="text-[11px] text-[var(--primary)] hover:underline font-medium"
                           >
-                            Single App
+                            Select All
                           </button>
+                          <span className="text-[var(--border)]">•</span>
                           <button
                             type="button"
-                            onClick={() => {
-                              if (!isStackMode) {
-                                initStackMode(inspectResult.project_roots!.filter((r) => r !== '/'));
-                              }
-                            }}
-                            className={`px-2.5 py-1 rounded-md transition flex items-center gap-1 ${
-                              isStackMode
-                                ? 'bg-[var(--primary)] text-[var(--primary-foreground)] shadow-xs font-semibold'
-                                : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-                            }`}
+                            onClick={() => setStackServices((prev) => prev.map((s) => ({ ...s, selected: false })))}
+                            className="text-[11px] text-[var(--muted-foreground)] hover:underline font-medium"
                           >
-                            <span>⚡ Deploy Stack</span>
+                            Deselect All
                           </button>
                         </div>
                       </div>
 
-                      {!isStackMode ? (
-                        <div>
-                          <div className="text-[10px] text-[var(--muted-foreground)] mb-1.5">
-                            Select a package to configure as a single app:
-                          </div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {inspectResult.project_roots.map((pkgDir) => {
-                              const active = rootDir === pkgDir;
-                              return (
-                                <button
-                                  key={pkgDir}
-                                  type="button"
-                                  onClick={() => handleSelectRootDir(pkgDir)}
-                                  className={`px-2 py-1 rounded-md text-[11px] font-mono border transition flex items-center gap-1 ${
-                                    active
-                                      ? 'bg-[var(--primary)] text-[var(--primary-foreground)] border-transparent font-semibold'
-                                      : 'bg-[var(--card)] text-[var(--foreground)] border-[var(--border)] hover:border-[var(--primary)]/50'
-                                  }`}
-                                >
-                                  <Folder className="w-3 h-3 opacity-75" />
-                                  <span>{pkgDir}</span>
-                                </button>
+                      {/* Full width responsive grid - never truncated */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                        {stackServices.map((svc) => (
+                          <div
+                            key={svc.id}
+                            onClick={() => {
+                              setStackServices((prev) =>
+                                prev.map((s) => (s.id === svc.id ? { ...s, selected: !s.selected } : s))
                               );
-                            })}
+                            }}
+                            className={`p-2.5 rounded-lg border text-xs flex items-center justify-between transition cursor-pointer select-none gap-2 ${
+                              svc.selected
+                                ? 'border-[var(--primary)]/70 bg-[var(--card)] text-[var(--foreground)] shadow-xs'
+                                : 'border-[var(--border)] bg-[var(--muted)]/10 text-[var(--muted-foreground)] opacity-50 hover:opacity-80'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <input
+                                type="checkbox"
+                                checked={svc.selected}
+                                readOnly
+                                className="rounded accent-[var(--primary)] pointer-events-none"
+                              />
+                              <BrandIcon name={svc.framework} className="w-4 h-4 shrink-0" />
+                              <div className="min-w-0">
+                                <div className="font-mono font-semibold text-xs truncate" title={svc.rootDir}>
+                                  {svc.rootDir}
+                                </div>
+                                <div className="text-[10px] text-[var(--muted-foreground)] truncate" title={svc.appName}>
+                                  {svc.appName}
+                                </div>
+                              </div>
+                            </div>
+                            <Badge variant="secondary" className="text-[10px] font-mono shrink-0 font-semibold">
+                              :{svc.internalPort}
+                            </Badge>
                           </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-2 pt-1">
-                          <div className="text-[11px] text-[var(--muted-foreground)]">
-                            Packages to include in this deployment stack:
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            {stackServices.map((svc) => (
-                              <div
+                        ))}
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-0.5">
+                        <label className="flex items-center gap-2 text-xs text-[var(--muted-foreground)] cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={stackContinueOnError}
+                            onChange={(e) => setStackContinueOnError(e.target.checked)}
+                            className="rounded accent-[var(--primary)]"
+                          />
+                          <span>{t('gitApp.continueOnError')}</span>
+                        </label>
+                      </div>
+
+                      {/* Tabs to select active service for the forms below */}
+                      {stackServices.filter((s) => s.selected).length > 0 && (
+                        <div className="pt-2.5 border-t border-[var(--border)]/60 flex items-center gap-2 overflow-x-auto pb-0.5">
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-[var(--muted-foreground)] shrink-0">
+                            Configure:
+                          </span>
+                          {stackServices.filter((s) => s.selected).map((svc) => {
+                            const isActive = activeStackServiceId === svc.id;
+                            const svcCompat = svc.inspectResult?.compatibility;
+                            return (
+                              <button
                                 key={svc.id}
-                                onClick={() => {
-                                  setStackServices((prev) =>
-                                    prev.map((s) => (s.id === svc.id ? { ...s, selected: !s.selected } : s))
-                                  );
-                                }}
-                                className={`p-2 rounded-lg border text-xs flex items-center justify-between transition cursor-pointer select-none ${
-                                  svc.selected
-                                    ? 'border-[var(--primary)]/60 bg-[var(--card)] text-[var(--foreground)] shadow-xs'
-                                    : 'border-[var(--border)] bg-[var(--muted)]/20 text-[var(--muted-foreground)] opacity-50'
+                                type="button"
+                                onClick={() => setActiveStackServiceId(svc.id)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-mono flex items-center gap-2 transition border shrink-0 ${
+                                  isActive
+                                    ? 'bg-[var(--primary)] text-[var(--primary-foreground)] border-transparent font-semibold shadow-xs'
+                                    : 'bg-[var(--card)] text-[var(--foreground)] border-[var(--border)] hover:bg-[var(--muted)]'
                                 }`}
                               >
-                                <div className="flex items-center gap-2 truncate">
-                                  <input
-                                    type="checkbox"
-                                    checked={svc.selected}
-                                    readOnly
-                                    className="rounded accent-[var(--primary)] pointer-events-none"
-                                  />
-                                  <BrandIcon name={svc.framework} className="w-3.5 h-3.5 shrink-0" />
-                                  <span className="font-mono font-medium truncate">{svc.rootDir}</span>
-                                </div>
-                                <Badge variant="secondary" className="text-[10px] font-mono shrink-0">
-                                  :{svc.internalPort}
-                                </Badge>
-                              </div>
-                            ))}
-                          </div>
-
-                          {/* Tabs to select active service for the forms below */}
-                          {stackServices.filter((s) => s.selected).length > 0 && (
-                            <div className="pt-2 border-t border-[var(--border)]/60 flex items-center gap-1.5 overflow-x-auto">
-                              <span className="text-[10px] uppercase font-bold text-[var(--muted-foreground)] shrink-0">
-                                Configure:
-                              </span>
-                              {stackServices.filter((s) => s.selected).map((svc) => {
-                                const isActive = activeStackServiceId === svc.id;
-                                return (
-                                  <button
-                                    key={svc.id}
-                                    type="button"
-                                    onClick={() => setActiveStackServiceId(svc.id)}
-                                    className={`px-2.5 py-1 rounded-md text-xs font-mono flex items-center gap-1.5 transition border shrink-0 ${
-                                      isActive
-                                        ? 'bg-[var(--primary)] text-[var(--primary-foreground)] border-transparent font-semibold shadow-xs'
-                                        : 'bg-[var(--card)] text-[var(--foreground)] border-[var(--border)] hover:bg-[var(--muted)]'
-                                    }`}
-                                  >
-                                    <BrandIcon name={svc.framework} className="w-3.5 h-3.5" />
-                                    <span>{svc.rootDir}</span>
-                                    <span className="text-[10px] opacity-75">(:{svc.internalPort})</span>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          )}
+                                <BrandIcon name={svc.framework} className="w-3.5 h-3.5" />
+                                <span className="font-semibold">{svc.rootDir}</span>
+                                {svcCompat && svcCompat.score === 'incompatible' && (
+                                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shadow-xs" title="Incompatible base image" />
+                                )}
+                                {svcCompat && svcCompat.score === 'warning' && (
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shadow-xs" title="Compatibility warning" />
+                                )}
+                                {svcCompat && svcCompat.score === 'ok' && (
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-xs" title="Validated" />
+                                )}
+                                <span className="text-[10px] opacity-75">(:{svc.internalPort})</span>
+                              </button>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
                   )}
                 </div>
-              </div>
+              )}
             </Card>
 
             {/* Card 2: Framework Detection & Runtime Presets */}
-            <Card className="p-5 space-y-4">
-              {inspecting ? (
-                <FrameworkInspectSkeleton />
-              ) : (
-                <>
-                  {inspectResult && (
-                    <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--muted)]/40 metal flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-[var(--card)] border border-[var(--border)] flex items-center justify-center text-[var(--foreground)] shrink-0">
-                          <BrandIcon
-                            name={inspectResult.framework}
-                            className="w-5 h-5"
-                            fallback={<Cpu className="w-5 h-5" />}
-                          />
-                        </div>
-                        <div>
-                          <div className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
-                            <span>{t('gitApp.detected', { framework: inspectResult.framework })}</span>
-                          </div>
-                          <div className="text-xs text-[var(--muted-foreground)]">
-                            {t('gitApp.enginePreset')} <span className="font-mono text-[var(--foreground)]">{inspectResult.build_preset}</span>
-                          </div>
-                        </div>
-                      </div>
+            {(() => {
+              const displayFramework = isStackMode && activeStackSvc ? activeStackSvc.framework : (inspectResult?.framework || '');
+              const displayEngine = isStackMode && activeStackSvc ? activeStackSvc.detectedEngine : (inspectResult?.detected_engine || '');
+              const displayPreset = isStackMode && activeStackSvc
+                ? (activeStackSvc.detectedEngine === 'docker' ? 'docker-compose' : activeStackSvc.buildCmd || activeStackSvc.framework)
+                : (inspectResult?.build_preset || '');
+              const hasInspection = isStackMode ? Boolean(activeStackSvc) : Boolean(inspectResult);
 
-                      <Badge variant="secondary" className="text-[10px] uppercase font-mono self-start sm:self-center">
-                        {inspectResult.detected_engine}
-                      </Badge>
-                    </div>
-                  )}
+              return (
+                <Card className="p-5 space-y-4">
+                  {inspecting ? (
+                    <FrameworkInspectSkeleton />
+                  ) : (
+                    <>
+                      {hasInspection && (
+                        <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--muted)]/40 metal flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-[var(--card)] border border-[var(--border)] flex items-center justify-center text-[var(--foreground)] shrink-0">
+                              <BrandIcon
+                                name={displayFramework}
+                                className="w-5 h-5"
+                                fallback={<Cpu className="w-5 h-5" />}
+                              />
+                            </div>
+                            <div>
+                              <div className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
+                                <span>{t('gitApp.detected', { framework: displayFramework })}</span>
+                                {isStackMode && activeStackSvc && (
+                                  <Badge variant="outline" className="text-[10px] font-mono border-[var(--border)]">
+                                    {activeStackSvc.rootDir}
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="text-xs text-[var(--muted-foreground)]">
+                                {t('gitApp.enginePreset')} <span className="font-mono text-[var(--foreground)]">{displayPreset}</span>
+                              </div>
+                            </div>
+                          </div>
 
-                  {/* Preset Quick Switcher */}
-                  <div className="space-y-2">
-                    <span className="block text-[11px] font-medium text-[var(--muted-foreground)]">
-                      {t('gitApp.presetSwitch')}
-                    </span>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      {FRAMEWORK_PRESETS.map((p) => {
-                        const isSelected = inspectResult?.framework.toLowerCase().includes(p.framework.toLowerCase());
+                          <Badge variant="secondary" className="text-[10px] uppercase font-mono self-start sm:self-center">
+                            {displayEngine}
+                          </Badge>
+                        </div>
+                      )}
+
+                      {/* Pre-Flight Universal Stack Compatibility Section */}
+                      {(() => {
+                        const activeCompat = isStackMode && activeStackSvc ? activeStackSvc.inspectResult?.compatibility : inspectResult?.compatibility;
+                        if (!activeCompat) return null;
+
+                        if (activeCompat.score === 'ok') {
+                          return (
+                            <div className="p-3.5 rounded-xl border border-emerald-500/25 bg-emerald-500/5 flex items-start justify-between gap-3">
+                              <div className="flex items-start gap-2.5">
+                                <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0 mt-0.5">
+                                  <CheckCircle2 className="w-4 h-4" />
+                                </div>
+                                <div>
+                                  <div className="text-xs font-semibold text-emerald-400 flex items-center gap-2">
+                                    <span>Stack Compatibility: 100% Validated</span>
+                                    {activeCompat.runtime?.language && (
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono font-bold">
+                                        {activeCompat.runtime.language.toUpperCase()}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[11px] text-[var(--muted-foreground)] mt-0.5 leading-relaxed">
+                                    {activeCompat.runtime?.provided_version
+                                      ? `Base image (${activeCompat.runtime.dockerfile_image || activeCompat.runtime.provided_version}) sesuai dengan dependensi repositori (${activeCompat.runtime.required_version || 'standard'}).`
+                                      : 'Runtime dan konfigurasi repositori siap dijalankan di 7Server tanpa konflik versi.'}
+                                  </p>
+                                </div>
+                              </div>
+                              <Badge variant="outline" className="text-[10px] text-emerald-400 border-emerald-500/30 font-mono shrink-0">
+                                Ready
+                              </Badge>
+                            </div>
+                          );
+                        }
+
                         return (
-                          <button
-                            key={p.framework}
-                            type="button"
-                            onClick={() => applyFrameworkPreset(p)}
-                            className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition border flex items-center gap-1.5 ${
-                              isSelected
-                                ? 'bg-[var(--primary)] text-[var(--primary-foreground)] border-transparent shadow-xs'
-                                : 'bg-[var(--background)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] border-[var(--border)]'
+                          <div
+                            className={`p-4 rounded-xl border space-y-3 ${
+                              activeCompat.score === 'incompatible'
+                                ? 'border-rose-500/30 bg-rose-500/5'
+                                : 'border-amber-500/30 bg-amber-500/5'
                             }`}
                           >
-                            <BrandIcon
-                              name={p.framework}
-                              mono={isSelected}
-                              className="w-3.5 h-3.5"
-                              fallback={<Cpu className="w-3.5 h-3.5" />}
-                            />
-                            <span>{p.framework}</span>
-                          </button>
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <div className="flex items-center gap-2.5">
+                                <div
+                                  className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                                    activeCompat.score === 'incompatible'
+                                      ? 'bg-rose-500/10 text-rose-400'
+                                      : 'bg-amber-500/10 text-amber-400'
+                                  }`}
+                                >
+                                  {activeCompat.score === 'incompatible' ? (
+                                    <AlertCircle className="w-4 h-4" />
+                                  ) : (
+                                    <AlertTriangle className="w-4 h-4" />
+                                  )}
+                                </div>
+                                <div>
+                                  <div
+                                    className={`text-xs font-bold ${
+                                      activeCompat.score === 'incompatible' ? 'text-rose-400' : 'text-amber-400'
+                                    }`}
+                                  >
+                                    {activeCompat.score === 'incompatible'
+                                      ? 'Potensi Inkompatibilitas Terdeteksi'
+                                      : 'Catatan Kompatibilitas Pre-Flight'}
+                                  </div>
+                                  <div className="text-[10px] text-[var(--muted-foreground)]">
+                                    {activeCompat.issues.length} catatan terdeteksi sebelum proses deploy
+                                  </div>
+                                </div>
+                              </div>
+
+                              <Badge
+                                variant="outline"
+                                className={`text-[10px] uppercase font-mono ${
+                                  activeCompat.score === 'incompatible'
+                                    ? 'border-rose-500/40 text-rose-400 bg-rose-500/10'
+                                    : 'border-amber-500/40 text-amber-400 bg-amber-500/10'
+                                }`}
+                              >
+                                {activeCompat.score === 'incompatible' ? 'Version Mismatch' : 'Notice'}
+                              </Badge>
+                            </div>
+
+                            <div className="space-y-2 pt-1">
+                              {activeCompat.issues.map((issue, idx) => (
+                                <div
+                                  key={idx}
+                                  className="p-3 rounded-lg bg-[var(--card)] border border-[var(--border)] space-y-1.5 text-xs shadow-xs"
+                                >
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="font-semibold text-[var(--foreground)] flex items-center gap-1.5">
+                                      <span
+                                        className={`w-1.5 h-1.5 rounded-full ${
+                                          issue.severity === 'error'
+                                            ? 'bg-rose-500'
+                                            : issue.severity === 'warning'
+                                            ? 'bg-amber-500'
+                                            : 'bg-blue-500'
+                                        }`}
+                                      />
+                                      {issue.title}
+                                    </span>
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--muted)] text-[var(--muted-foreground)] font-mono">
+                                      {issue.category.replace('_', ' ')}
+                                    </span>
+                                  </div>
+                                  <p className="text-[11px] text-[var(--muted-foreground)] leading-relaxed">
+                                    {issue.message}
+                                  </p>
+                                  {issue.suggested_fix && (
+                                    <div className="mt-1.5 p-2 rounded-md bg-[var(--muted)]/60 border border-[var(--border)] flex items-center justify-between gap-2">
+                                      <div className="flex items-center gap-1.5 text-[11px] font-mono text-[var(--foreground)] overflow-x-auto">
+                                        <Wrench className="w-3.5 h-3.5 text-[var(--primary)] shrink-0" />
+                                        <span>{issue.suggested_fix}</span>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
                         );
-                      })}
-                    </div>
-                  </div>
-                </>
-              )}
-            </Card>
+                      })()}
+
+                      {/* Preset Quick Switcher */}
+                      <div className="space-y-2">
+                        <span className="block text-[11px] font-medium text-[var(--muted-foreground)]">
+                          {t('gitApp.presetSwitch')}
+                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {FRAMEWORK_PRESETS.map((p) => {
+                            const isSelected = displayFramework.toLowerCase().includes(p.framework.toLowerCase());
+                            return (
+                              <button
+                                key={p.framework}
+                                type="button"
+                                onClick={() => applyFrameworkPreset(p)}
+                                className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition border flex items-center gap-1.5 ${
+                                  isSelected
+                                    ? 'bg-[var(--primary)] text-[var(--primary-foreground)] border-transparent shadow-xs'
+                                    : 'bg-[var(--background)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] border-[var(--border)]'
+                                }`}
+                              >
+                                <BrandIcon
+                                  name={p.framework}
+                                  mono={isSelected}
+                                  className="w-3.5 h-3.5"
+                                  fallback={<Cpu className="w-3.5 h-3.5" />}
+                                />
+                                <span>{p.framework}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </Card>
+              );
+            })()}
 
             {/* Card 3: Identity, Domain & Build Settings */}
             <Card className="p-5 space-y-4">
@@ -1357,6 +1601,15 @@ Periksa apakah ada konfigurasi port, Docker compose, atau variabel environment y
                             domain={isStackMode && activeStackSvc ? activeStackSvc.customDomain : customDomain}
                             serverIp={server.host}
                           />
+                          <label className="mt-1.5 inline-flex items-center gap-2 text-[11px] text-[var(--foreground)] cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={autoSsl}
+                              onChange={(e) => setAutoSsl(e.target.checked)}
+                              className="rounded border-[var(--border)]"
+                            />
+                            <span>{t('deploy.autoSslLabel')}</span>
+                          </label>
                           <p className="text-[10px] text-[var(--muted-foreground)] mt-1 flex items-center gap-1.5">
                             <BrandIcon name="nginx" className="w-3 h-3" />
                             <span>{t('gitApp.domainHint')}</span>
@@ -1443,6 +1696,32 @@ Periksa apakah ada konfigurasi port, Docker compose, atau variabel environment y
                     disabled={!overrideBuild}
                     className="h-8 text-xs font-mono disabled:opacity-75"
                     placeholder="e.g. npm start"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] text-[var(--muted-foreground)] mb-1">
+                    {t('deploy.healthCheckPath')}
+                  </label>
+                  <Input
+                    type="text"
+                    value={healthCheckPath}
+                    onChange={(e) => setHealthCheckPath(e.target.value)}
+                    placeholder="/ or /api/health"
+                    className="h-8 text-xs font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] text-[var(--muted-foreground)] mb-1">
+                    {t('deploy.postDeployCmd')}
+                  </label>
+                  <Input
+                    type="text"
+                    value={postDeployCmd}
+                    onChange={(e) => setPostDeployCmd(e.target.value)}
+                    placeholder="e.g. npx prisma migrate deploy"
+                    className="h-8 text-xs font-mono"
                   />
                 </div>
 
@@ -1688,6 +1967,39 @@ Periksa apakah ada konfigurasi port, Docker compose, atau variabel environment y
                 )}
               </div>
 
+              {/* Stack Compatibility Status in Blueprint */}
+              {(() => {
+                const currentCompat = isStackMode && activeStackSvc ? activeStackSvc.inspectResult?.compatibility : inspectResult?.compatibility;
+                if (!currentCompat) return null;
+                const isErr = currentCompat.score === 'incompatible';
+                const isWarn = currentCompat.score === 'warning';
+                return (
+                  <div
+                    className={`p-2.5 rounded-lg border text-xs flex items-center justify-between gap-2 ${
+                      isErr
+                        ? 'border-rose-500/30 bg-rose-500/10 text-rose-400'
+                        : isWarn
+                        ? 'border-amber-500/30 bg-amber-500/10 text-amber-400'
+                        : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      {isErr ? (
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      ) : isWarn ? (
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                      ) : (
+                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                      )}
+                      <span className="font-semibold text-[11px]">Stack Compatibility</span>
+                    </div>
+                    <span className="font-mono text-[10px] uppercase font-bold">
+                      {isErr ? 'Mismatch' : isWarn ? `${currentCompat.issues.length} Notes` : 'Validated'}
+                    </span>
+                  </div>
+                );
+              })()}
+
               {/* Server software the deploy needs */}
               <div className="p-3 rounded-lg border border-[var(--border)] bg-[var(--muted)]/30 space-y-2">
                 <div className="flex items-center justify-between text-[11px] font-semibold text-[var(--foreground)]">
@@ -1802,6 +2114,8 @@ Periksa apakah ada konfigurasi port, Docker compose, atau variabel environment y
           }
           onBackToConfig={() => setStep('config')}
           onRetry={() => (isStackMode ? handleStartDeploy() : retryDeploy())}
+          onRetryService={isStackMode ? (svcId) => retrySingleStackService(svcId) : undefined}
+          onContinueStack={isStackMode ? continueRemainingStack : undefined}
           onDone={() => {
             onAppCreated?.({
               name: appName,

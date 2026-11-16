@@ -178,23 +178,38 @@ function start() {
 }
 
 // ---------------------------------------------------------------- update check
-// Asks the npm registry for the latest version at most once a day (cached in the data dir) and
-// never delays startup or fails it. Opt out: --no-update-check or SEVENSERVER_NO_UPDATE_CHECK=1.
+// Asks GitHub Releases (falling back to npm) for the latest version at most once a day (cached in
+// the data dir) and never delays startup or fails it. Opt out: --no-update-check or SEVENSERVER_NO_UPDATE_CHECK=1.
 async function checkForUpdate() {
   const cacheFile = path.join(opts.data, '.update-check.json');
   let cached = null;
   try { cached = JSON.parse(fs.readFileSync(cacheFile, 'utf8')); } catch { /* first time */ }
   let latest = cached?.latest;
+  let source = cached?.source || 'github';
   if (!cached || Date.now() - cached.at > 24 * 3600_000) {
-    const r = await fetch(`https://registry.npmjs.org/${pkg.name}/latest`, { signal: AbortSignal.timeout(3000), headers: { Accept: 'application/json' } });
-    if (!r.ok) return null;
-    latest = (await r.json()).version;
-    try { fs.writeFileSync(cacheFile, JSON.stringify({ at: Date.now(), latest }), { mode: 0o600 }); } catch { /* read-only data dir */ }
+    try {
+      const gh = await fetch('https://api.github.com/repos/nannndev/7server/releases/latest', {
+        signal: AbortSignal.timeout(3000),
+        headers: { Accept: 'application/vnd.github+json', 'User-Agent': `7server/${pkg.version}` }
+      });
+      if (gh.ok) {
+        const tag = String((await gh.json()).tag_name || '').trim().replace(/^v/i, '');
+        if (tag) { latest = tag; source = 'github'; }
+      }
+    } catch { /* fallback to npm */ }
+    if (!latest) {
+      const r = await fetch(`https://registry.npmjs.org/${pkg.name}/latest`, { signal: AbortSignal.timeout(3000), headers: { Accept: 'application/json' } });
+      if (r.ok) { latest = (await r.json()).version; source = 'npm'; }
+    }
+    if (!latest) return null;
+    try { fs.writeFileSync(cacheFile, JSON.stringify({ at: Date.now(), latest, source }), { mode: 0o600 }); } catch { /* read-only data dir */ }
   }
   if (!latest || !newer(latest, pkg.version)) return null;
   const line = `Update available ${c.dim(pkg.version)} → ${c.green(latest)}`;
-  const run = `npm install -g ${pkg.name}`;
-  return `  ${c.yellow('↑')} ${line}\n    ${c.dim('run')} ${c.bold(run)} ${c.dim(`· changes: https://github.com/nannndev/7server/releases/tag/v${latest}`)}\n`;
+  const run = source === 'npm'
+    ? `npm install -g ${pkg.name}`
+    : `brew upgrade sevenserver  # or: npm i -g https://github.com/nannndev/7server/releases/download/v${latest}/sevenserver-${latest}.tgz`;
+  return `  ${c.yellow('↑')} ${line}\n    ${c.dim('run')} ${c.bold(run)}\n    ${c.dim(`changes: https://github.com/nannndev/7server/releases/tag/v${latest}`)}\n`;
 }
 
 /** Semver-ish compare: true when a > b (pre-releases sort below their release). */

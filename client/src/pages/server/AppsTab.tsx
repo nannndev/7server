@@ -17,15 +17,26 @@ import {
   X,
   Sparkles,
   Server as ServerIcon,
-  Shield
+  Shield,
+  History,
+  RotateCcw,
+  ScrollText,
+  Webhook,
+  KeyRound
 } from 'lucide-react';
 import NewAppModal from '@/features/deployments/components/NewAppModal';
+import {
+  DeployHistoryModal,
+  WebhookConfigModal,
+  AppLogsModal,
+  AppEnvModal
+} from '@/features/deployments/components/AppLifecycleModals';
 import { useTaskManager } from '@/shared/tasks/TaskContext';
 import { updateServer } from '@/features/servers/api';
 import { SudoPasswordModal } from '@/features/servers/components/SudoPasswordModal';
 import { BrandIcon } from '@/shared/ui/brand-icon';
-import type { WebAppInfo } from '@/features/deployments/types';
-import { fetchWebApps } from '@/features/deployments/api';
+import type { WebAppInfo, SavedDeployConfig } from '@/features/deployments/types';
+import { fetchWebApps, fetchListeningPorts, fetchDeployConfigs } from '@/features/deployments/api';
 import { fetchCloudflareTunnelStatus, addCloudflareRoute } from '@/features/tunnels/api';
 import type { CloudflareTunnelStatus } from '@/features/tunnels/types';
 import { getBaseDomain } from '@/features/tunnels/components/CloudflareTunnelView';
@@ -47,6 +58,8 @@ export default function AppsTab() {
   const { server } = ctx;
   const [webApps, setWebApps] = useState<WebAppInfo[]>([]);
   const [loadingWebApps, setLoadingWebApps] = useState(false);
+  // Live listening ports on the server, to show per-app up/down status.
+  const [livePorts, setLivePorts] = useState<Set<string> | null>(null);
   const [appSearchQuery, setAppSearchQuery] = useState('');
   const [appTypeFilter, setAppTypeFilter] = useState<string>('ALL');
   const [appMenu, setAppMenu] = useState<string | null>(null);
@@ -54,6 +67,11 @@ export default function AppsTab() {
   const [menuPos, setMenuPos] = useState<{ top: number; right: number; up: boolean }>({ top: 0, right: 0, up: false });
   const { tasks, runStreamTask } = useTaskManager();
   const [sudoFor, setSudoFor] = useState<WebAppInfo | null>(null);
+  const [deployConfigs, setDeployConfigs] = useState<Record<string, SavedDeployConfig>>({});
+  const [historyFor, setHistoryFor] = useState<string | null>(null);
+  const [webhookFor, setWebhookFor] = useState<string | null>(null);
+  const [logsFor, setLogsFor] = useState<string | null>(null);
+  const [envFor, setEnvFor] = useState<string | null>(null);
 
   // Pointing state (Nginx Domain & Cloudflare Tunnel)
   const [tunnelStatus, setTunnelStatus] = useState<CloudflareTunnelStatus | null>(null);
@@ -283,7 +301,25 @@ export default function AppsTab() {
     // Deployed apps are root-owned: as the SSH user git refuses them ("dubious ownership") and npm can't write.
     ctx.runQuickAction(`${app.name}: ${a.label}`, a.cmd, { sudo: true });
   };
+  /** Up/down per app: 'live' if any of its ports is listening, 'down' if none is, null when unknowable (no ports / scan failed). */
+  const appStatus = (app: WebAppInfo): 'live' | 'down' | null => {
+    if (!livePorts || !app.ports) return null;
+    const ports = app.ports.split(',').map((p) => p.trim()).filter(Boolean);
+    if (ports.length === 0) return null;
+    return ports.some((p) => livePorts.has(p)) ? 'live' : 'down';
+  };
+
   const loadWebAppsData = async (manual?: unknown) => {
+    fetchListeningPorts(server.id)
+      .then((r) => setLivePorts(new Set(r.ports.map((p) => p.port))))
+      .catch(() => setLivePorts(null));
+    fetchDeployConfigs(server.id)
+      .then((r) => {
+        const map: Record<string, SavedDeployConfig> = {};
+        for (const c of r || []) map[c.appName] = c;
+        setDeployConfigs(map);
+      })
+      .catch(() => {});
     try {
       const localMocks = getLocalMocks();
       await swr(
@@ -345,6 +381,14 @@ export default function AppsTab() {
               <Badge variant="secondary" className="text-[10px]">
                 {t('webapps.projectCount', { filtered: filteredApps.length, total: webApps.length })}
               </Badge>
+              {livePorts && webApps.some((a) => appStatus(a)) && (
+                <span className="text-[10px] font-mono text-[var(--muted-foreground)]">
+                  <span className="text-emerald-500 font-semibold">{webApps.filter((a) => appStatus(a) === 'live').length} live</span>
+                  {webApps.some((a) => appStatus(a) === 'down') && (
+                    <> · <span className="text-red-500 font-semibold">{webApps.filter((a) => appStatus(a) === 'down').length} down</span></>
+                  )}
+                </span>
+              )}
             </h3>
             <p className="text-xs text-[var(--muted-foreground)]">
               {t('webapps.subtitle')}
@@ -437,7 +481,18 @@ export default function AppsTab() {
                       <div className="flex items-center gap-2">
                         <FileCode className="w-4 h-4 text-[var(--muted-foreground)] shrink-0" />
                         <div>
-                          <span className="font-semibold text-[var(--foreground)] sensitive">{app.name}</span>
+                          <span className="font-semibold text-[var(--foreground)] sensitive inline-flex items-center gap-1.5">
+                            {app.name}
+                            {appStatus(app) === 'live' && (
+                              <span title={t('webapps.statusLive')} className="relative flex w-2 h-2 shrink-0">
+                                <span className="absolute inline-flex w-full h-full rounded-full bg-emerald-400 opacity-60 animate-ping" style={{ animationDuration: '2.5s' }} />
+                                <span className="relative inline-flex w-2 h-2 rounded-full bg-emerald-500" />
+                              </span>
+                            )}
+                            {appStatus(app) === 'down' && (
+                              <span title={t('webapps.statusDown')} className="inline-flex w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                            )}
+                          </span>
                           <div className="text-[10px] text-[var(--muted-foreground)] font-mono sensitive">{app.path}</div>
                         </div>
                       </div>
@@ -567,6 +622,38 @@ export default function AppsTab() {
                           SSH
                         </Button>
 
+                        {deployConfigs[app.name] && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              runStreamTask({
+                                id: `redeploy-${server.id}-${app.name}-${Date.now()}`,
+                                serverId: server.id,
+                                serverName: server.name,
+                                title: `Redeploy ${app.name}`,
+                                category: 'git',
+                                url: `/api/servers/${server.id}/webapps/${encodeURIComponent(app.name)}/redeploy?stream=1`,
+                                body: {},
+                                onDone: () => loadWebAppsData(true)
+                              });
+                            }}
+                            disabled={!!ctx.quickActionRunning}
+                            title={
+                              deployConfigs[app.name].autoDeploy
+                                ? 'Redeploy (Auto-deploy webhook active)'
+                                : '1-Click Redeploy'
+                            }
+                            className="h-6 px-2 text-[10px] gap-1 text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            {t('deploy.redeploy')}
+                            {deployConfigs[app.name].autoDeploy && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                            )}
+                          </Button>
+                        )}
+
                         <div className="relative">
                           <Button
                             variant="outline"
@@ -591,6 +678,34 @@ export default function AppsTab() {
                                 className="fixed w-52 z-30 bg-[var(--card)] border border-[var(--border)] rounded-lg shadow-2xl py-1 text-left"
                                 style={{ top: menuPos.top, right: menuPos.right, transform: menuPos.up ? 'translateY(-100%)' : undefined }}
                               >
+                                <button
+                                  onClick={() => { setAppMenu(null); setHistoryFor(app.name); }}
+                                  className="w-full px-3 py-1.5 text-[11px] text-left hover:bg-[var(--muted)] flex items-center gap-2"
+                                >
+                                  <History className="w-3 h-3 text-sky-400" />
+                                  {t('deploy.history')}
+                                </button>
+                                <button
+                                  onClick={() => { setAppMenu(null); setWebhookFor(app.name); }}
+                                  className="w-full px-3 py-1.5 text-[11px] text-left hover:bg-[var(--muted)] flex items-center gap-2"
+                                >
+                                  <Webhook className="w-3 h-3 text-emerald-400" />
+                                  {t('deploy.webhook')}
+                                </button>
+                                <button
+                                  onClick={() => { setAppMenu(null); setLogsFor(app.name); }}
+                                  className="w-full px-3 py-1.5 text-[11px] text-left hover:bg-[var(--muted)] flex items-center gap-2"
+                                >
+                                  <ScrollText className="w-3 h-3 text-amber-400" />
+                                  {t('deploy.liveLogs')}
+                                </button>
+                                <button
+                                  onClick={() => { setAppMenu(null); setEnvFor(app.name); }}
+                                  className="w-full px-3 py-1.5 text-[11px] text-left hover:bg-[var(--muted)] flex items-center gap-2 border-b border-[var(--border)]"
+                                >
+                                  <KeyRound className="w-3 h-3 text-violet-400" />
+                                  {t('deploy.envEditor')}
+                                </button>
                                 {(
                                   <button
                                     onClick={() => confirmRemove(app)}
@@ -643,6 +758,53 @@ export default function AppsTab() {
         hasExistingPassword={server.hasSudoPassword}
         reason={t('webapps.removeSudo')}
       />
+
+      {historyFor && (
+        <DeployHistoryModal
+          serverId={server.id}
+          appName={historyFor}
+          onClose={() => setHistoryFor(null)}
+          onRollback={(commitSha) => {
+            const target = historyFor;
+            setHistoryFor(null);
+            runStreamTask({
+              id: `rollback-${server.id}-${target}-${Date.now()}`,
+              serverId: server.id,
+              serverName: server.name,
+              title: `Rollback ${target} → ${commitSha.slice(0, 7)}`,
+              category: 'git',
+              url: `/api/servers/${server.id}/webapps/${encodeURIComponent(target)}/redeploy?stream=1`,
+              body: { commitSha },
+              onDone: () => loadWebAppsData(true)
+            });
+          }}
+        />
+      )}
+
+      {webhookFor && (
+        <WebhookConfigModal
+          serverId={server.id}
+          appName={webhookFor}
+          onClose={() => setWebhookFor(null)}
+          onChanged={() => loadWebAppsData(true)}
+        />
+      )}
+
+      {logsFor && (
+        <AppLogsModal
+          serverId={server.id}
+          appName={logsFor}
+          onClose={() => setLogsFor(null)}
+        />
+      )}
+
+      {envFor && (
+        <AppEnvModal
+          serverId={server.id}
+          appName={envFor}
+          onClose={() => setEnvFor(null)}
+        />
+      )}
 
       {/* Point App to Domain or Cloudflare Tunnel Modal */}
       {pointModalApp && (

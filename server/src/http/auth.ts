@@ -57,13 +57,20 @@ export async function loginHandler(req: Request, res: Response) {
   const username = String(req.body?.username || 'admin').trim().toLowerCase();
   const rateLimitKey = `${ip}:${username}`;
 
-  const att = loginAttempts.get(rateLimitKey) || loginAttempts.get(ip);
+  let att = loginAttempts.get(rateLimitKey) || loginAttempts.get(ip);
   if (att && att.until > Date.now()) {
     const remainingSec = Math.ceil((att.until - Date.now()) / 1000);
-    return res.status(429).json({ 
-      success: false, 
-      error: `Terlalu banyak percobaan login, silakan tunggu ${remainingSec} detik` 
+    return res.status(429).json({
+      success: false,
+      error: `Terlalu banyak percobaan login, silakan tunggu ${remainingSec} detik`
     });
+  }
+  // An expired lock means the penalty was served: start the count fresh,
+  // otherwise one more typo re-locks for another 60s forever.
+  if (att && att.until > 0 && att.until <= Date.now()) {
+    loginAttempts.delete(rateLimitKey);
+    loginAttempts.delete(ip);
+    att = undefined;
   }
 
   try {

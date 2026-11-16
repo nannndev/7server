@@ -1,5 +1,6 @@
 import type { NormalizedRepo, InspectResult, DetectedEngine, SuggestedConfig } from './types.js';
 import { getOAuthConfig } from './store.js';
+import { analyzeCompatibility } from './compatibilityInspector.js';
 
 const GITHUB_API_BASE = 'https://api.github.com';
 const USER_AGENT = '7Server-Panel';
@@ -226,7 +227,7 @@ export function detectFrameworkFromFiles(
   // A compose file that only runs services (postgres, redis) next to a Node/PHP app is a sidecar, not the app.
   const sidecarOnly = !!composeStr && !compose.builds && !files.has('dockerfile') && !!(packageJsonStr || composerJsonStr);
 
-  const hasCompose = files.has('docker-compose.yml') || files.has('docker-compose.yaml') || files.has('compose.yml') || files.has('compose.yaml') || files.has('docker-compose.prod.yml') || files.has('docker-compose.production.yml');
+  const hasCompose = Array.from(files).some((f) => /^(docker-)?compose(\.[a-z0-9_-]+)?\.ya?ml$/i.test(f));
 
   // 1. Docker
   if (!sidecarOnly && (files.has('dockerfile') || hasCompose)) {
@@ -541,7 +542,7 @@ export async function inspectGitHubRepo(
       const slashIdx = p.lastIndexOf('/');
       const fileName = (slashIdx === -1 ? p : p.slice(slashIdx + 1)).toLowerCase();
       const folder = slashIdx === -1 ? '/' : `/${p.slice(0, slashIdx)}`;
-      if (MANIFEST_FILES.has(fileName)) {
+      if (MANIFEST_FILES.has(fileName) || /^(docker-)?compose(\.[a-z0-9_-]+)?\.ya?ml$/i.test(fileName)) {
         projectRootSet.add(folder);
       }
     }
@@ -602,7 +603,7 @@ export async function inspectGitHubRepo(
     composerJsonStr = await fetchRawFileContent(accessToken, owner, repo, compPath, branch);
   }
 
-  const composeFile = directFiles.find((f) => /^(docker-)?compose\.ya?ml$/i.test(f));
+  const composeFile = directFiles.find((f) => /^(docker-)?compose(\.[a-z0-9_-]+)?\.ya?ml$/i.test(f));
   const composeStr = composeFile
     ? await fetchRawFileContent(accessToken, owner, repo, cleanSubDir ? `${cleanSubDir}/${composeFile}` : composeFile, branch)
     : null;
@@ -610,6 +611,42 @@ export async function inspectGitHubRepo(
   const dockerFile = directFiles.find((f) => f.toLowerCase() === 'dockerfile');
   const dockerfileStr = dockerFile
     ? await fetchRawFileContent(accessToken, owner, repo, cleanSubDir ? `${cleanSubDir}/${dockerFile}` : dockerFile, branch)
+    : null;
+
+  // Additional stack manifest files for compatibility analysis
+  const goModFile = directFiles.find((f) => f.toLowerCase() === 'go.mod');
+  const goModStr = goModFile
+    ? await fetchRawFileContent(accessToken, owner, repo, cleanSubDir ? `${cleanSubDir}/${goModFile}` : goModFile, branch)
+    : null;
+
+  const pyprojectFile = directFiles.find((f) => f.toLowerCase() === 'pyproject.toml');
+  const pyprojectStr = pyprojectFile
+    ? await fetchRawFileContent(accessToken, owner, repo, cleanSubDir ? `${cleanSubDir}/${pyprojectFile}` : pyprojectFile, branch)
+    : null;
+
+  const reqTxtFile = directFiles.find((f) => f.toLowerCase() === 'requirements.txt');
+  const requirementsStr = reqTxtFile
+    ? await fetchRawFileContent(accessToken, owner, repo, cleanSubDir ? `${cleanSubDir}/${reqTxtFile}` : reqTxtFile, branch)
+    : null;
+
+  const runtimeTxtFile = directFiles.find((f) => f.toLowerCase() === 'runtime.txt');
+  const runtimeTxtStr = runtimeTxtFile
+    ? await fetchRawFileContent(accessToken, owner, repo, cleanSubDir ? `${cleanSubDir}/${runtimeTxtFile}` : runtimeTxtFile, branch)
+    : null;
+
+  const pomXmlFile = directFiles.find((f) => f.toLowerCase() === 'pom.xml');
+  const pomXmlStr = pomXmlFile
+    ? await fetchRawFileContent(accessToken, owner, repo, cleanSubDir ? `${cleanSubDir}/${pomXmlFile}` : pomXmlFile, branch)
+    : null;
+
+  const buildGradleFile = directFiles.find((f) => /^(build\.gradle(\.kts)?)$/i.test(f));
+  const buildGradleStr = buildGradleFile
+    ? await fetchRawFileContent(accessToken, owner, repo, cleanSubDir ? `${cleanSubDir}/${buildGradleFile}` : buildGradleFile, branch)
+    : null;
+
+  const cargoTomlFile = directFiles.find((f) => f.toLowerCase() === 'cargo.toml');
+  const cargoTomlStr = cargoTomlFile
+    ? await fetchRawFileContent(accessToken, owner, repo, cleanSubDir ? `${cleanSubDir}/${cargoTomlFile}` : cargoTomlFile, branch)
     : null;
 
   const detected = detectFrameworkFromFiles(directFiles, packageJsonStr, composerJsonStr, composeStr, dockerfileStr, rootFiles);
@@ -651,6 +688,23 @@ export async function inspectGitHubRepo(
       }
     }
   }
+
+  // Universal Pre-Flight Compatibility Analysis
+  detected.compatibility = analyzeCompatibility({
+    directFiles,
+    packageJsonStr,
+    composerJsonStr,
+    goModStr,
+    pyprojectStr,
+    requirementsStr,
+    runtimeTxtStr,
+    pomXmlStr,
+    buildGradleStr,
+    cargoTomlStr,
+    dockerfileStr,
+    composeStr,
+    nvmStr
+  });
 
   return detected;
 }

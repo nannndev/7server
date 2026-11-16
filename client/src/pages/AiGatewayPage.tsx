@@ -29,7 +29,12 @@ import {
   Zap,
   Globe,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Play,
+  Pencil,
+  Shuffle,
+  Power,
+  X
 } from 'lucide-react';
 import { Card } from '@/shared/ui/card';
 import { Button } from '@/shared/ui/button';
@@ -43,20 +48,28 @@ import { useI18n, useT, type MessageKey } from '@/shared/i18n';
 import { BrandIcon } from '@/shared/ui/brand-icon';
 import { SubscriptionAccounts } from '@/features/ai-gateway/SubscriptionAccounts';
 import { Combos } from '@/features/ai-gateway/Combos';
+import { Playground } from '@/features/ai-gateway/Playground';
+import { UsageAnalyticsPanel } from '@/features/ai-gateway/components/UsageAnalyticsPanel';
 import type { AiGatewayTab } from '@/app/router';
 import {
   fetchGatewayKeys,
   createGatewayKey,
+  updateGatewayKey,
   deleteGatewayKey,
   toggleGatewayKey,
   fetchGatewayConfig,
+  saveGatewayConfig,
   fetchGatewayUsage,
   clearGatewayUsage,
   fetchGatewayStats,
+  fetchUsageAnalytics,
   verifyProvider,
   connectProviderApi,
   disconnectProviderApi,
-  reorderProviderKeysApi
+  reorderProviderKeysApi,
+  toggleProviderKeyAccountApi,
+  addProviderCustomModelApi,
+  removeProviderCustomModelApi
 } from '@/features/ai-gateway/api';
 import type {
   VirtualApiKey,
@@ -64,7 +77,9 @@ import type {
   AiUsageLog,
   AiGatewayStats,
   AiProviderId,
-  ProviderVerificationResult
+  ProviderVerificationResult,
+  UsageAnalytics,
+  UsageRange
 } from '@/features/ai-gateway/types';
 
 interface AiGatewayPageProps {
@@ -93,7 +108,16 @@ export const PROVIDERS_META: ProviderMeta[] = [
     tagline: 'aiGw.p.anthropic.tagline',
     badge: 'aiGw.p.anthropic.badge',
     color: 'from-amber-500/20 to-orange-500/10 text-amber-500 border-amber-500/30',
-    models: ['claude-3-7-sonnet-20250219', 'claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022'],
+    models: [
+      'claude-opus-5-5',
+      'claude-sonnet-5-5',
+      'claude-haiku-5-5',
+      'claude-opus-4-6',
+      'claude-sonnet-4-6',
+      'claude-haiku-4-5',
+      'claude-3-7-sonnet-20250219',
+      'claude-3-5-haiku-20241022'
+    ],
     defaultUrl: 'https://api.anthropic.com',
     keyPlaceholder: 'sk-ant-api03-...',
     docsUrl: 'https://console.anthropic.com/settings/keys'
@@ -104,7 +128,25 @@ export const PROVIDERS_META: ProviderMeta[] = [
     tagline: 'aiGw.p.openai.tagline',
     badge: 'aiGw.p.openai.badge',
     color: 'from-emerald-500/20 to-teal-500/10 text-emerald-500 border-emerald-500/30',
-    models: ['gpt-4o', 'gpt-4o-mini', 'o1', 'o3-mini'],
+    models: [
+      'gpt-5.5',
+      'gpt-5.4',
+      'gpt-5.4-mini',
+      'gpt-5.2',
+      'gpt-5.1',
+      'gpt-5',
+      'gpt-5-mini',
+      'gpt-4.1',
+      'gpt-4o',
+      'gpt-4o-mini',
+      'o3',
+      'o3-mini',
+      'o3-pro',
+      'o4-mini',
+      'o1',
+      'o1-mini',
+      'gpt-4-turbo'
+    ],
     defaultUrl: 'https://api.openai.com/v1',
     keyPlaceholder: 'sk-proj-...',
     docsUrl: 'https://platform.openai.com/api-keys'
@@ -115,7 +157,13 @@ export const PROVIDERS_META: ProviderMeta[] = [
     tagline: 'aiGw.p.deepseek.tagline',
     badge: 'aiGw.p.deepseek.badge',
     color: 'from-blue-500/20 to-cyan-500/10 text-blue-500 border-blue-500/30',
-    models: ['deepseek-chat', 'deepseek-reasoner'],
+    models: [
+      'deepseek-v4-pro',
+      'deepseek-v4.1-flash',
+      'deepseek-v4-flash',
+      'deepseek-chat',
+      'deepseek-reasoner'
+    ],
     defaultUrl: 'https://api.deepseek.com',
     keyPlaceholder: 'sk-...',
     docsUrl: 'https://platform.deepseek.com/api_keys'
@@ -126,7 +174,15 @@ export const PROVIDERS_META: ProviderMeta[] = [
     tagline: 'aiGw.p.openrouter.tagline',
     badge: 'aiGw.p.openrouter.badge',
     color: 'from-[var(--foreground)]/10 to-pink-500/10 text-[var(--foreground)] border-[var(--rim)]',
-    models: ['openrouter/anthropic/claude-sonnet-4', 'openrouter/openai/gpt-4o-mini'],
+    models: [
+      'openrouter/anthropic/claude-sonnet-4',
+      'openrouter/openai/gpt-4o-mini',
+      'openrouter/nvidia/llama-nemotron-embed-vl-1b-v2:free',
+      'openrouter/black-forest-labs/FLUX.1-schnell',
+      'openrouter/google/imagen-3.0-generate-002',
+      'openrouter/google/veo-3.1',
+      'openrouter/openai/sora-2-pro'
+    ],
     defaultUrl: 'https://openrouter.ai/api/v1',
     keyPlaceholder: 'sk-or-v1-...',
     docsUrl: 'https://openrouter.ai/keys'
@@ -137,7 +193,20 @@ export const PROVIDERS_META: ProviderMeta[] = [
     tagline: 'aiGw.p.gemini.tagline',
     badge: 'aiGw.p.gemini.badge',
     color: 'from-red-500/20 to-amber-500/10 text-red-500 border-red-500/30',
-    models: ['gemini-2.0-flash', 'gemini-1.5-pro'],
+    models: [
+      'gemini-4-argon',
+      'gemini-3.8-flash',
+      'gemini-3.7-flash',
+      'gemini-3.6-flash',
+      'gemini-3.5-flash-lite',
+      'gemini-3.1-pro-preview',
+      'gemini-3-flash-preview',
+      'gemini-2.5-pro',
+      'gemini-2.5-flash',
+      'gemini-2.5-flash-lite',
+      'gemini-2.0-flash',
+      'gemini-1.5-pro'
+    ],
     defaultUrl: 'https://generativelanguage.googleapis.com',
     keyPlaceholder: 'AIzaSy...',
     docsUrl: 'https://aistudio.google.com/app/apikey'
@@ -148,7 +217,20 @@ export const PROVIDERS_META: ProviderMeta[] = [
     tagline: 'aiGw.p.ollama.tagline',
     badge: 'aiGw.p.ollama.badge',
     color: 'from-zinc-500/20 to-stone-500/10 text-zinc-300 border-zinc-500/30',
-    models: ['llama3.2', 'deepseek-r1:8b', 'mistral', 'qwen2.5-coder'],
+    models: [
+      'llama3.2',
+      'deepseek-r1:8b',
+      'mistral',
+      'qwen2.5-coder',
+      'gpt-oss:120b',
+      'kimi-k2.5',
+      'glm-5',
+      'minimax-m2.5',
+      'glm-4.7-flash',
+      'qwen3.5',
+      'minimax-m3',
+      'deepseek-v4.1-flash:cloud'
+    ],
     defaultUrl: 'http://localhost:11434',
     keyPlaceholder: 'aiGw.ollamaNoKey',
     docsUrl: 'https://ollama.com'
@@ -160,7 +242,13 @@ export const PROVIDERS_META: ProviderMeta[] = [
     tagline: 'aiGw.p.groq.tagline',
     badge: 'aiGw.p.groq.badge',
     color: 'from-orange-500/20 to-red-500/10 text-orange-500 border-orange-500/30',
-    models: ['groq/llama-3.3-70b-versatile', 'groq/qwen/qwen3-32b'],
+    models: [
+      'groq/llama-3.3-70b-versatile',
+      'groq/meta-llama/llama-4-maverick-17b-128e-instruct',
+      'groq/qwen/qwen3-32b',
+      'groq/openai/gpt-oss-120b',
+      'groq/whisper-large-v3-turbo'
+    ],
     defaultUrl: 'https://api.groq.com/openai/v1',
     keyPlaceholder: 'gsk_...',
     docsUrl: 'https://console.groq.com/keys'
@@ -171,7 +259,12 @@ export const PROVIDERS_META: ProviderMeta[] = [
     tagline: 'aiGw.p.mistral.tagline',
     badge: 'aiGw.p.mistral.badge',
     color: 'from-orange-500/20 to-amber-500/10 text-orange-400 border-orange-500/30',
-    models: ['mistral/mistral-large-latest', 'mistral/codestral-latest'],
+    models: [
+      'mistral/mistral-large-latest',
+      'mistral/codestral-latest',
+      'mistral/mistral-medium-latest',
+      'mistral/mistral-embed'
+    ],
     defaultUrl: 'https://api.mistral.ai/v1',
     keyPlaceholder: '...',
     docsUrl: 'https://console.mistral.ai/api-keys'
@@ -182,7 +275,16 @@ export const PROVIDERS_META: ProviderMeta[] = [
     tagline: 'aiGw.p.xai.tagline',
     badge: 'aiGw.p.xai.badge',
     color: 'from-zinc-500/20 to-zinc-500/10 text-[var(--foreground)] border-[var(--rim)]',
-    models: ['xai/grok-4', 'xai/grok-3-mini'],
+    models: [
+      'xai/grok-4.7',
+      'xai/grok-4.6',
+      'xai/grok-4.5',
+      'xai/grok-4',
+      'xai/grok-4-fast-reasoning',
+      'xai/grok-code-fast-1',
+      'xai/grok-3',
+      'xai/grok-3-mini'
+    ],
     defaultUrl: 'https://api.x.ai/v1',
     keyPlaceholder: 'xai-...',
     docsUrl: 'https://console.x.ai'
@@ -193,7 +295,12 @@ export const PROVIDERS_META: ProviderMeta[] = [
     tagline: 'aiGw.p.together.tagline',
     badge: 'aiGw.p.together.badge',
     color: 'from-blue-500/20 to-indigo-500/10 text-blue-400 border-blue-500/30',
-    models: ['together/meta-llama/Llama-3.3-70B-Instruct-Turbo'],
+    models: [
+      'together/meta-llama/Llama-3.3-70B-Instruct-Turbo',
+      'together/deepseek-ai/DeepSeek-R1',
+      'together/Qwen/Qwen3-235B-A22B',
+      'together/meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8'
+    ],
     defaultUrl: 'https://api.together.xyz/v1',
     keyPlaceholder: '...',
     docsUrl: 'https://api.together.ai/settings/api-keys'
@@ -204,7 +311,12 @@ export const PROVIDERS_META: ProviderMeta[] = [
     tagline: 'aiGw.p.fireworks.tagline',
     badge: 'aiGw.p.fireworks.badge',
     color: 'from-violet-500/20 to-fuchsia-500/10 text-violet-400 border-violet-500/30',
-    models: ['fireworks/accounts/fireworks/models/llama-v3p3-70b-instruct'],
+    models: [
+      'fireworks/accounts/fireworks/models/deepseek-v3p1',
+      'fireworks/accounts/fireworks/models/llama-v3p3-70b-instruct',
+      'fireworks/accounts/fireworks/models/qwen3-235b-a22b',
+      'fireworks/nomic-ai/nomic-embed-text-v1.5'
+    ],
     defaultUrl: 'https://api.fireworks.ai/inference/v1',
     keyPlaceholder: 'fw_...',
     docsUrl: 'https://fireworks.ai/account/api-keys'
@@ -215,7 +327,14 @@ export const PROVIDERS_META: ProviderMeta[] = [
     tagline: 'aiGw.p.cerebras.tagline',
     badge: 'aiGw.p.cerebras.badge',
     color: 'from-orange-500/20 to-rose-500/10 text-orange-400 border-orange-500/30',
-    models: ['cerebras/llama-3.3-70b', 'cerebras/qwen-3-32b'],
+    models: [
+      'cerebras/gpt-oss-120b',
+      'cerebras/zai-glm-4.7',
+      'cerebras/llama-3.3-70b',
+      'cerebras/llama-4-scout-17b-16e-instruct',
+      'cerebras/qwen-3-235b-a22b-instruct-2507',
+      'cerebras/qwen-3-32b'
+    ],
     defaultUrl: 'https://api.cerebras.ai/v1',
     keyPlaceholder: 'csk-...',
     docsUrl: 'https://cloud.cerebras.ai'
@@ -226,7 +345,10 @@ export const PROVIDERS_META: ProviderMeta[] = [
     tagline: 'aiGw.p.perplexity.tagline',
     badge: 'aiGw.p.perplexity.badge',
     color: 'from-teal-500/20 to-cyan-500/10 text-teal-400 border-teal-500/30',
-    models: ['perplexity/sonar', 'perplexity/sonar-pro'],
+    models: [
+      'perplexity/sonar-pro',
+      'perplexity/sonar'
+    ],
     defaultUrl: 'https://api.perplexity.ai',
     keyPlaceholder: 'pplx-...',
     docsUrl: 'https://www.perplexity.ai/settings/api'
@@ -237,7 +359,18 @@ export const PROVIDERS_META: ProviderMeta[] = [
     tagline: 'aiGw.p.moonshot.tagline',
     badge: 'aiGw.p.moonshot.badge',
     color: 'from-slate-500/20 to-zinc-500/10 text-[var(--foreground)] border-[var(--rim)]',
-    models: ['moonshot/kimi-k2-0711-preview'],
+    models: [
+      'moonshot/kimi-k3',
+      'moonshot/k3',
+      'moonshot/kimi-for-coding',
+      'moonshot/kimi-for-coding-highspeed',
+      'moonshot/kimi-k2.7-code',
+      'moonshot/kimi-k2.6',
+      'moonshot/kimi-k2.5',
+      'moonshot/kimi-k2.5-thinking',
+      'moonshot/kimi-k2-0711-preview',
+      'moonshot/kimi-latest'
+    ],
     defaultUrl: 'https://api.moonshot.ai/v1',
     keyPlaceholder: 'sk-...',
     docsUrl: 'https://platform.moonshot.ai/console/api-keys'
@@ -248,7 +381,16 @@ export const PROVIDERS_META: ProviderMeta[] = [
     tagline: 'aiGw.p.dashscope.tagline',
     badge: 'aiGw.p.dashscope.badge',
     color: 'from-orange-500/20 to-amber-500/10 text-orange-400 border-orange-500/30',
-    models: ['dashscope/qwen-plus', 'dashscope/qwen3-coder-plus'],
+    models: [
+      'dashscope/qwen3.5-plus',
+      'dashscope/kimi-k2.5',
+      'dashscope/glm-5',
+      'dashscope/MiniMax-M2.5',
+      'dashscope/qwen3-coder-next',
+      'dashscope/qwen3-coder-plus',
+      'dashscope/glm-4.7',
+      'dashscope/qwen-plus'
+    ],
     defaultUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
     keyPlaceholder: 'sk-...',
     docsUrl: 'https://bailian.console.alibabacloud.com'
@@ -259,7 +401,18 @@ export const PROVIDERS_META: ProviderMeta[] = [
     tagline: 'aiGw.p.zai.tagline',
     badge: 'aiGw.p.zai.badge',
     color: 'from-blue-500/20 to-sky-500/10 text-blue-400 border-blue-500/30',
-    models: ['zai/glm-4.5', 'zai/glm-4.5-air'],
+    models: [
+      'zai/glm-5.3',
+      'zai/glm-5.3-flash',
+      'zai/glm-5.2',
+      'zai/glm-5.1',
+      'zai/glm-5-turbo',
+      'zai/glm-5',
+      'zai/glm-4.7',
+      'zai/glm-4.6v',
+      'zai/glm-4.5',
+      'zai/glm-4.5-air'
+    ],
     defaultUrl: 'https://api.z.ai/api/paas/v4',
     keyPlaceholder: '...',
     docsUrl: 'https://z.ai/manage-apikey/apikey-list'
@@ -270,7 +423,15 @@ export const PROVIDERS_META: ProviderMeta[] = [
     tagline: 'aiGw.p.minimax.tagline',
     badge: 'aiGw.p.minimax.badge',
     color: 'from-rose-500/20 to-pink-500/10 text-rose-400 border-rose-500/30',
-    models: ['minimax/MiniMax-M1'],
+    models: [
+      'minimax/MiniMax-M3',
+      'minimax/MiniMax-M2.7',
+      'minimax/MiniMax-M2.5',
+      'minimax/MiniMax-M2.1',
+      'minimax/MiniMax-M1',
+      'minimax/speech-2.8-hd',
+      'minimax/speech-2.8-turbo'
+    ],
     defaultUrl: 'https://api.minimax.io/v1',
     keyPlaceholder: '...',
     docsUrl: 'https://www.minimax.io/platform'
@@ -281,10 +442,63 @@ export const PROVIDERS_META: ProviderMeta[] = [
     tagline: 'aiGw.p.nvidia.tagline',
     badge: 'aiGw.p.nvidia.badge',
     color: 'from-lime-500/20 to-green-500/10 text-lime-500 border-lime-500/30',
-    models: ['nvidia/meta/llama-3.3-70b-instruct'],
+    models: [
+      'nvidia/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning',
+      'nvidia/nvidia/nemotron-3.5-super-vl-120b-a12b',
+      'nvidia/nvidia/nemotron-3.5-lightning-30b-a3b',
+      'nvidia/nvidia/nemotron-3-ultra-550b-a55b',
+      'nvidia/deepseek-ai/deepseek-v4.1-flash',
+      'nvidia/deepseek-ai/deepseek-v4-pro',
+      'nvidia/deepseek-ai/deepseek-v4-flash',
+      'nvidia/deepseek-ai/deepseek-r1',
+      'nvidia/deepseek-ai/deepseek-v3',
+      'nvidia/minimaxai/minimax-m3',
+      'nvidia/minimaxai/minimax-m2.7',
+      'nvidia/z-ai/glm-5.2',
+      'nvidia/moonshotai/kimi-k2.6',
+      'nvidia/meta/llama-3.3-70b-instruct',
+      'nvidia/meta/llama-3.1-405b-instruct',
+      'nvidia/meta/llama-3.1-70b-instruct',
+      'nvidia/nvidia/llama-3.1-nemotron-70b-instruct',
+      'nvidia/nvidia/llama-3.1-nemotron-51b-instruct',
+      'nvidia/mistralai/mistral-large-2-instruct',
+      'nvidia/qwen/qwen2.5-72b-instruct',
+      'nvidia/qwen/qwen2.5-coder-32b-instruct'
+    ],
     defaultUrl: 'https://integrate.api.nvidia.com/v1',
     keyPlaceholder: 'nvapi-...',
     docsUrl: 'https://build.nvidia.com'
+  },
+  {
+    id: 'deepinfra',
+    name: 'DeepInfra',
+    tagline: 'aiGw.p.deepinfra.tagline',
+    badge: 'aiGw.p.deepinfra.badge',
+    color: 'from-sky-500/20 to-blue-500/10 text-sky-400 border-sky-500/30',
+    models: [
+      'deepinfra/meta-llama/Llama-3.3-70B-Instruct',
+      'deepinfra/deepseek-ai/DeepSeek-R1',
+      'deepinfra/Qwen/Qwen2.5-Coder-32B-Instruct',
+      'deepinfra/mistralai/Mistral-Small-24B-Instruct-2501'
+    ],
+    defaultUrl: 'https://api.deepinfra.com/v1/openai',
+    keyPlaceholder: '...',
+    docsUrl: 'https://deepinfra.com/dash/api_keys'
+  },
+  {
+    id: 'sambanova',
+    name: 'SambaNova',
+    tagline: 'aiGw.p.sambanova.tagline',
+    badge: 'aiGw.p.sambanova.badge',
+    color: 'from-rose-500/20 to-orange-500/10 text-rose-400 border-rose-500/30',
+    models: [
+      'sambanova/Meta-Llama-3.3-70B-Instruct',
+      'sambanova/DeepSeek-R1',
+      'sambanova/Qwen2.5-72B-Instruct'
+    ],
+    defaultUrl: 'https://api.sambanova.ai/v1',
+    keyPlaceholder: '...',
+    docsUrl: 'https://cloud.sambanova.ai/apis'
   },
   {
     id: 'custom',
@@ -327,11 +541,23 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
   const [selectedKeyId, setSelectedKeyId] = useState<string>('');
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
 
-  // New Key modal
+  // New Key modal & Edit Key Policy modal
   const [showNewKeyModal, setShowNewKeyModal] = useState(false);
   const [newKeyName, setNewKeyName] = useState('');
   const [newKeyProviders, setNewKeyProviders] = useState<AiProviderId[]>([]);
+  const [newKeyRateLimit, setNewKeyRateLimit] = useState('');
+  const [newKeyBudget, setNewKeyBudget] = useState('');
+  const [newKeyMaxTokens, setNewKeyMaxTokens] = useState('');
+  const [newKeyExpiresAt, setNewKeyExpiresAt] = useState('');
   const [createdKeySecret, setCreatedKeySecret] = useState<string | null>(null);
+
+  const [editingKey, setEditingKey] = useState<VirtualApiKey | null>(null);
+  const [editKeyName, setEditKeyName] = useState('');
+  const [editKeyProviders, setEditKeyProviders] = useState<AiProviderId[]>([]);
+  const [editKeyRateLimit, setEditKeyRateLimit] = useState('');
+  const [editKeyBudget, setEditKeyBudget] = useState('');
+  const [editKeyMaxTokens, setEditKeyMaxTokens] = useState('');
+  const [editKeyExpiresAt, setEditKeyExpiresAt] = useState('');
 
   // Provider Connection Modal
   const [connectingProvider, setConnectingProvider] = useState<ProviderMeta | null>(null);
@@ -343,13 +569,45 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationResult, setVerificationResult] = useState<ProviderVerificationResult | null>(null);
 
-  // Usage tab filters
+  // Model catalog view modal
+  const [viewingModelsProvider, setViewingModelsProvider] = useState<ProviderMeta | null>(null);
+  const [modelModalFilter, setModelModalFilter] = useState('');
+  const [customModelInput, setCustomModelInput] = useState('');
+  const [savingCustomModel, setSavingCustomModel] = useState(false);
+
+  // Usage tab analytics & filters
+  const [usageRange, setUsageRange] = useState<UsageRange>('30d');
   const [usageSearch, setUsageSearch] = useState('');
   const [providerFilter, setProviderFilter] = useState<string>('all');
+  const [modelFilter, setModelFilter] = useState<string>('all');
+  const [keyFilter, setKeyFilter] = useState<string>('all');
+  const [analytics, setAnalytics] = useState<UsageAnalytics | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState<boolean>(false);
 
   // Providers tab search & filter
   const [apiSearch, setApiSearch] = useState('');
   const [apiFilter, setApiFilter] = useState<'all' | 'connected' | 'native' | 'compat'>('all');
+
+  const loadAnalytics = async (opts?: {
+    range?: UsageRange;
+    provider?: string;
+    model?: string;
+    keyId?: string;
+  }) => {
+    try {
+      setAnalyticsLoading(true);
+      const data = await fetchUsageAnalytics(opts?.range ?? usageRange, {
+        provider: opts?.provider ?? providerFilter,
+        model: opts?.model ?? modelFilter,
+        keyId: opts?.keyId ?? keyFilter
+      });
+      setAnalytics(data);
+    } catch {
+      // Non-fatal; logs table still renders below
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -357,7 +615,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
       const [keysData, configData, usageData, statsData] = await Promise.all([
         fetchGatewayKeys().catch(() => []),
         fetchGatewayConfig().catch(() => null),
-        fetchGatewayUsage(150).catch(() => []),
+        fetchGatewayUsage(500).catch(() => []),
         fetchGatewayStats().catch(() => null)
       ]);
 
@@ -378,6 +636,55 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (tab !== 'usage') return;
+    let cancelled = false;
+    setAnalyticsLoading(true);
+    fetchUsageAnalytics(usageRange, {
+      provider: providerFilter,
+      model: modelFilter,
+      keyId: keyFilter
+    })
+      .then((data) => {
+        if (!cancelled) setAnalytics(data);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setAnalyticsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tab, usageRange, providerFilter, modelFilter, keyFilter]);
+
+  const filteredUsage = useMemo(() => {
+    const now = Date.now();
+    const minTs =
+      usageRange === '1d'
+        ? now - 24 * 60 * 60 * 1000
+        : usageRange === '7d'
+          ? now - 7 * 24 * 60 * 60 * 1000
+          : usageRange === '30d'
+            ? now - 30 * 24 * 60 * 60 * 1000
+            : 0;
+    const q = usageSearch.trim().toLowerCase();
+
+    return usage.filter((log) => {
+      if (minTs > 0) {
+        const ts = Date.parse(log.timestamp);
+        if (Number.isFinite(ts) && ts < minTs) return false;
+      }
+      if (providerFilter !== 'all' && log.provider !== providerFilter) return false;
+      if (modelFilter !== 'all' && log.model !== modelFilter) return false;
+      if (keyFilter !== 'all' && log.keyId !== keyFilter) return false;
+      if (q) {
+        const haystack = `${log.model} ${log.provider} ${log.keyName} ${log.statusCode ?? ''} ${log.status}`.toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [usage, usageRange, providerFilter, modelFilter, keyFilter, usageSearch]);
 
   const copyToClipboard = (text: string, sectionId: string) => {
     navigator.clipboard.writeText(text);
@@ -481,15 +788,69 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
     if (!newKeyName.trim()) return;
 
     try {
-      const newKey = await createGatewayKey(newKeyName.trim(), newKeyProviders);
+      const policy = {
+        rateLimitPerMin: newKeyRateLimit ? Number(newKeyRateLimit) : undefined,
+        maxBudgetUsd: newKeyBudget ? Number(newKeyBudget) : undefined,
+        maxTokens: newKeyMaxTokens ? Number(newKeyMaxTokens) : undefined,
+        expiresAt: newKeyExpiresAt || undefined
+      };
+      const newKey = await createGatewayKey(newKeyName.trim(), newKeyProviders, policy);
       setCreatedKeySecret(newKey.key ?? null);
       setKeys((prev) => [newKey, ...prev]);
       setSelectedKeyId(newKey.id);
       setNewKeyName('');
       setNewKeyProviders([]);
+      setNewKeyRateLimit('');
+      setNewKeyBudget('');
+      setNewKeyMaxTokens('');
+      setNewKeyExpiresAt('');
       toast.success(t('aiGateway.keyCreatedTitle'));
     } catch (err: any) {
       toast.error(err.message || t('aiGw.errCreateKey'));
+    }
+  };
+
+  const openEditKey = (k: VirtualApiKey) => {
+    setEditingKey(k);
+    setEditKeyName(k.name);
+    setEditKeyProviders(k.allowedProviders || []);
+    setEditKeyRateLimit(k.rateLimitPerMin ? String(k.rateLimitPerMin) : '');
+    setEditKeyBudget(k.maxBudgetUsd ? String(k.maxBudgetUsd) : '');
+    setEditKeyMaxTokens(k.maxTokens ? String(k.maxTokens) : '');
+    setEditKeyExpiresAt(k.expiresAt ? k.expiresAt.slice(0, 16) : '');
+  };
+
+  const handleSaveEditKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingKey || !editKeyName.trim()) return;
+    try {
+      const updated = await updateGatewayKey(editingKey.id, {
+        name: editKeyName.trim(),
+        allowedProviders: editKeyProviders.length > 0 ? editKeyProviders : null,
+        rateLimitPerMin: editKeyRateLimit ? Number(editKeyRateLimit) : null,
+        maxBudgetUsd: editKeyBudget ? Number(editKeyBudget) : null,
+        maxTokens: editKeyMaxTokens ? Number(editKeyMaxTokens) : null,
+        expiresAt: editKeyExpiresAt ? new Date(editKeyExpiresAt).toISOString() : null
+      });
+      setKeys((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+      setEditingKey(null);
+      toast.success(locale === 'id' ? 'Kebijakan virtual key diperbarui' : 'Virtual key policy updated');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update key');
+    }
+  };
+
+  const handleRoutingStrategyChange = async (strategy: 'ordered' | 'round_robin') => {
+    try {
+      const updated = await saveGatewayConfig({ routingStrategy: strategy });
+      setConfig(updated);
+      toast.success(
+        locale === 'id'
+          ? `Strategi routing diubah ke ${strategy === 'round_robin' ? 'Round-Robin' : 'Ordered'}`
+          : `Routing strategy set to ${strategy === 'round_robin' ? 'Round-Robin' : 'Ordered'}`
+      );
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update routing strategy');
     }
   };
 
@@ -529,6 +890,12 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
     try {
       await clearGatewayUsage();
       setUsage([]);
+      setStats((prev) =>
+        prev
+          ? { ...prev, totalRequests: 0, totalTokens: 0 }
+          : prev
+      );
+      loadAnalytics();
       toast.success(t('aiGw.logsCleared'));
     } catch (err: any) {
       toast.error(err.message || t('aiGw.errClearLogs'));
@@ -662,6 +1029,17 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
           {t('aiGateway.tabQuickstart')}
         </button>
         <button
+          onClick={() => onTabChange('playground')}
+          className={`flex items-center gap-2 px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
+            currentTab === 'playground'
+              ? 'border-[var(--rim)] text-[var(--foreground)] font-semibold'
+              : 'border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+          }`}
+        >
+          <Play className="w-3.5 h-3.5" />
+          Playground
+        </button>
+        <button
           onClick={() => onTabChange('usage')}
           className={`flex items-center gap-2 px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
             currentTab === 'usage'
@@ -692,11 +1070,38 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                 </div>
               </div>
             </div>
-            {connectedCount > 0 ? (
-              <Button size="sm" onClick={() => onTabChange('keys')} className="btn-metal h-7 text-xs shrink-0">
-                {t('aiGw.step1Next')}
-              </Button>
-            ) : null}
+            <div className="flex items-center gap-2 shrink-0 flex-wrap">
+              <div className="inline-flex items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--background)] p-0.5 text-[11px]" title={locale === 'id' ? 'Strategi rotasi multi-key & multi-akun' : 'Multi-key & multi-account rotation strategy'}>
+                <Shuffle className="w-3 h-3 ml-1.5 text-[var(--muted-foreground)]" />
+                <button
+                  type="button"
+                  onClick={() => handleRoutingStrategyChange('ordered')}
+                  className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer ${
+                    (config?.routingStrategy || 'ordered') === 'ordered'
+                      ? 'btn-metal font-medium'
+                      : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                  }`}
+                >
+                  Ordered
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleRoutingStrategyChange('round_robin')}
+                  className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer ${
+                    config?.routingStrategy === 'round_robin'
+                      ? 'btn-metal font-medium'
+                      : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                  }`}
+                >
+                  Round-Robin
+                </button>
+              </div>
+              {connectedCount > 0 ? (
+                <Button size="sm" onClick={() => onTabChange('keys')} className="btn-metal h-7 text-xs shrink-0">
+                  {t('aiGw.step1Next')}
+                </Button>
+              ) : null}
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -779,6 +1184,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                 .map((p) => {
                   const provConfig = config?.providers?.[p.id];
                   const isConnected = provConfig?.connected === true && (provConfig?.apiKey || p.id === 'ollama' || p.id === 'custom');
+                  const allCardModels = Array.from(new Set([...(provConfig?.customModels || []), ...(provConfig?.models || []), ...p.models]));
 
                   return (
                     <Card
@@ -823,7 +1229,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                         </p>
 
                         <div className="flex flex-wrap gap-1">
-                          {p.models.slice(0, 2).map((m) => {
+                          {allCardModels.slice(0, 2).map((m) => {
                             const fullModel = m.includes('/') ? m : `${p.id}/${m}`;
                             return (
                               <button
@@ -837,11 +1243,18 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                               </button>
                             );
                           })}
-                          {p.models.length > 2 && (
-                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--muted)]/50 text-[var(--muted-foreground)]">
-                              +{p.models.length - 2}
-                            </span>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setViewingModelsProvider(p);
+                              setModelModalFilter('');
+                              setCustomModelInput('');
+                            }}
+                            title={`View all ${allCardModels.length} models or add custom model for ${p.name}`}
+                            className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--muted)]/50 hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
+                          >
+                            {allCardModels.length > 2 ? `+${allCardModels.length - 2}` : '+ model'}
+                          </button>
                         </div>
                       </div>
 
@@ -952,9 +1365,35 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                     {keys.map((k) => (
                       <tr key={k.id} className="hover:bg-[var(--muted)]/30 transition-colors">
                         <td className="py-3 px-3 font-medium text-[var(--foreground)]">
-                          <div className="flex items-center gap-2">
-                            <Key className="w-3.5 h-3.5 text-[var(--foreground)] shrink-0" />
-                            <span>{k.name}</span>
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <Key className="w-3.5 h-3.5 text-[var(--foreground)] shrink-0" />
+                              <span>{k.name}</span>
+                            </div>
+                            {(k.rateLimitPerMin || k.maxBudgetUsd || k.maxTokens || k.expiresAt) && (
+                              <div className="flex flex-wrap gap-1">
+                                {k.rateLimitPerMin ? (
+                                  <span className="text-[9.5px] font-mono px-1.5 py-0.5 rounded bg-[var(--muted)] text-[var(--muted-foreground)]">
+                                    {k.rateLimitPerMin} rpm
+                                  </span>
+                                ) : null}
+                                {k.maxBudgetUsd ? (
+                                  <span className="text-[9.5px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500">
+                                    ${(k.totalCostUsd || 0).toFixed(2)}/${k.maxBudgetUsd.toFixed(2)}
+                                  </span>
+                                ) : null}
+                                {k.maxTokens ? (
+                                  <span className="text-[9.5px] font-mono px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400">
+                                    max {formatTokens(k.maxTokens)}
+                                  </span>
+                                ) : null}
+                                {k.expiresAt ? (
+                                  <span className={`text-[9.5px] font-mono px-1.5 py-0.5 rounded ${Date.now() > Date.parse(k.expiresAt) ? 'bg-rose-500/10 text-rose-500' : 'bg-amber-500/10 text-amber-500'}`}>
+                                    exp {new Date(k.expiresAt).toLocaleDateString(locale)}
+                                  </span>
+                                ) : null}
+                              </div>
+                            )}
                           </div>
                         </td>
                         <td className="py-3 px-3 font-mono text-xs text-[var(--muted-foreground)]">
@@ -965,19 +1404,32 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                         </td>
                         <td className="py-3 px-3">
                           <div className="flex flex-wrap gap-1">
-                            {PROVIDERS_META.filter(p => config?.providers?.[p.id]?.connected).map(p => (
-                              <Badge key={p.id} variant="outline" className="text-[9px] uppercase border-emerald-500/30 text-emerald-500 bg-emerald-500/5">
-                                {p.id}
-                              </Badge>
-                            ))}
-                            {connectedCount === 0 && (
-                              <span className="text-[10px] text-amber-500">{t('aiGw.noneConnected')}</span>
+                            {k.allowedProviders?.length ? (
+                              k.allowedProviders.map((pid) => (
+                                <Badge key={pid} variant="outline" className="text-[9px] uppercase border-sky-500/30 text-sky-400 bg-sky-500/5">
+                                  {pid}
+                                </Badge>
+                              ))
+                            ) : (
+                              <>
+                                {PROVIDERS_META.filter(p => config?.providers?.[p.id]?.connected).map(p => (
+                                  <Badge key={p.id} variant="outline" className="text-[9px] uppercase border-emerald-500/30 text-emerald-500 bg-emerald-500/5">
+                                    {p.id}
+                                  </Badge>
+                                ))}
+                                {connectedCount === 0 && (
+                                  <span className="text-[10px] text-amber-500">{t('aiGw.noneConnected')}</span>
+                                )}
+                              </>
                             )}
                           </div>
                         </td>
                         <td className="py-3 px-3 text-right font-mono">{k.totalRequests.toLocaleString()}</td>
                         <td className="py-3 px-3 text-right font-mono text-[var(--foreground)]">
-                          {formatTokens((k.totalInputTokens || 0) + (k.totalOutputTokens || 0))}
+                          <div>{formatTokens((k.totalInputTokens || 0) + (k.totalOutputTokens || 0))}</div>
+                          {(k.totalCostUsd || 0) > 0 && (
+                            <div className="text-[10px] text-emerald-500">${(k.totalCostUsd || 0).toFixed(4)}</div>
+                          )}
                         </td>
                         <td className="py-3 px-3 text-[var(--muted-foreground)]">
                           {k.lastUsedAt ? new Date(k.lastUsedAt).toLocaleDateString(locale) : t('aiGw.never')}
@@ -995,15 +1447,26 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                           </button>
                         </td>
                         <td className="py-3 px-3 text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteKey(k)}
-                            className="text-red-500 hover:text-red-600 hover:bg-red-500/10 h-7 w-7 p-0"
-                            title={t('aiGateway.revokeKey')}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
+                          <div className="inline-flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openEditKey(k)}
+                              className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] h-7 w-7 p-0"
+                              title={locale === 'id' ? 'Edit batas & kebijakan' : 'Edit limits & policy'}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteKey(k)}
+                              className="text-red-500 hover:text-red-600 hover:bg-red-500/10 h-7 w-7 p-0"
+                              title={t('aiGateway.revokeKey')}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1157,11 +1620,32 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
         </div>
       )}
 
-      {/* ----------------- TAB 4: USAGE LOGS ----------------- */}
+      {/* ----------------- TAB: LIVE PLAYGROUND ----------------- */}
+      {currentTab === 'playground' && <Playground config={config} />}
+
+      {/* ----------------- TAB 4: USAGE & ANALYTICS ----------------- */}
       {currentTab === 'usage' && (
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
+        <div className="space-y-5">
+          <UsageAnalyticsPanel
+            analytics={analytics}
+            loading={analyticsLoading}
+            range={usageRange}
+            onRangeChange={setUsageRange}
+            selectedProvider={providerFilter}
+            onSelectProvider={setProviderFilter}
+            selectedModel={modelFilter}
+            onSelectModel={setModelFilter}
+            selectedKeyId={keyFilter}
+            onSelectKeyId={setKeyFilter}
+            availableKeys={keys.map((k) => ({ id: k.id, name: k.name }))}
+            onRefresh={() => {
+              loadData();
+              loadAnalytics();
+            }}
+          />
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+            <div className="flex flex-wrap items-center gap-2">
               <div className="relative">
                 <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
                 <Input
@@ -1177,8 +1661,35 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                 className="h-8 px-2.5 text-xs rounded-lg bg-[var(--background)] border border-[var(--border)] text-[var(--foreground)]"
               >
                 <option value="all">{t('aiGw.allProviders')}</option>
-                {PROVIDERS_META.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                {[
+                  { id: 'codex', name: 'ChatGPT / Codex' },
+                  { id: 'copilot', name: 'GitHub Copilot' },
+                  { id: 'claude', name: 'Claude (Subscription)' },
+                  { id: 'gemini-cli', name: 'Gemini (Subscription)' },
+                  { id: 'kimi', name: 'Kimi Code' },
+                  { id: 'kilocode', name: 'Kilo Code' },
+                  { id: 'muse', name: 'Muse Code' },
+                  { id: 'nous', name: 'Nous Research' },
+                  ...PROVIDERS_META
+                ].map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
               </select>
+              {modelFilter !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => setModelFilter('all')}
+                  className="h-8 px-2.5 text-xs rounded-lg border border-sky-500/40 bg-sky-500/10 text-[var(--foreground)] font-mono inline-flex items-center gap-1.5 hover:bg-sky-500/15 transition-colors cursor-pointer"
+                >
+                  <span className="truncate max-w-[180px]">{modelFilter}</span>
+                  <span className="text-[var(--muted-foreground)]">×</span>
+                </button>
+              )}
+              <span className="text-[11px] text-[var(--muted-foreground)] tabular-nums ml-1">
+                {filteredUsage.length} / {usage.length}
+              </span>
             </div>
 
             <Button
@@ -1193,7 +1704,7 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
             </Button>
           </div>
 
-          {usage.length === 0 ? (
+          {filteredUsage.length === 0 ? (
             <Card className="p-12 text-center bg-[var(--card)] border border-[var(--border)] space-y-2">
               <Activity className="w-8 h-8 text-[var(--muted-foreground)]/40 mx-auto" />
               <p className="text-xs text-[var(--muted-foreground)]">{t('aiGateway.noLogs')}</p>
@@ -1216,10 +1727,18 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--border)]">
-                    {usage.map((log) => (
+                    {filteredUsage.map((log) => (
                       <tr key={log.id} className="hover:bg-[var(--muted)]/30 transition-colors">
-                        <td className="py-2.5 px-3 font-mono text-[11px] text-[var(--muted-foreground)]">
-                          {new Date(log.timestamp).toLocaleTimeString(locale)}
+                        <td className="py-2.5 px-3 font-mono text-[11px] text-[var(--muted-foreground)] whitespace-nowrap">
+                          {usageRange === '1d'
+                            ? new Date(log.timestamp).toLocaleTimeString(locale)
+                            : new Date(log.timestamp).toLocaleString(locale, {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit'
+                              })}
                         </td>
                         <td className="py-2.5 px-3">
                           <span
@@ -1272,6 +1791,128 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
         </div>
       )}
 
+      {/* ----------------- VIEW MODELS MODAL ----------------- */}
+      {viewingModelsProvider && (
+        <Modal
+          onClose={() => {
+            setViewingModelsProvider(null);
+            setModelModalFilter('');
+          }}
+          className="max-w-lg"
+        >
+          <ModalCard
+            title={`${viewingModelsProvider.name} Models (${viewingModelsProvider.models.length})`}
+            icon={<BrandIcon name={viewingModelsProvider.id} className="w-4 h-4" />}
+            onClose={() => {
+              setViewingModelsProvider(null);
+              setModelModalFilter('');
+            }}
+          >
+            <div className="space-y-3">
+              {/* Add custom model form */}
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const model = customModelInput.trim();
+                  if (!model) return;
+                  setSavingCustomModel(true);
+                  try {
+                    const updated = await addProviderCustomModelApi(viewingModelsProvider.id, model);
+                    setConfig(updated);
+                    setCustomModelInput('');
+                    toast.success(`Added custom model ${model}`);
+                  } catch (err: any) {
+                    toast.error(err.message || 'Failed to add custom model');
+                  } finally {
+                    setSavingCustomModel(false);
+                  }
+                }}
+                className="flex items-center gap-2"
+              >
+                <input
+                  type="text"
+                  value={customModelInput}
+                  onChange={(e) => setCustomModelInput(e.target.value)}
+                  placeholder={`Add custom model ID (e.g. ${viewingModelsProvider.id}/my-model)...`}
+                  className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:border-emerald-500/50 font-mono"
+                />
+                <Button type="submit" size="sm" disabled={savingCustomModel || !customModelInput.trim()} className="h-7 px-2.5 text-xs gap-1">
+                  <Plus className="w-3.5 h-3.5" />
+                  Add
+                </Button>
+              </form>
+
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
+                <input
+                  type="text"
+                  value={modelModalFilter}
+                  onChange={(e) => setModelModalFilter(e.target.value)}
+                  placeholder="Filter models..."
+                  className="w-full pl-8.5 pr-3 py-1.5 text-xs rounded-lg border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:border-emerald-500/50"
+                />
+              </div>
+              <div className="max-h-80 overflow-y-auto space-y-1.5 pr-1">
+                {(() => {
+                  const customList = config?.providers?.[viewingModelsProvider.id]?.customModels || [];
+                  const customSet = new Set(customList);
+                  const discovered = config?.providers?.[viewingModelsProvider.id]?.models || [];
+                  const merged = Array.from(new Set([...customList, ...discovered, ...viewingModelsProvider.models]));
+                  return merged
+                    .filter((m) => m.toLowerCase().includes(modelModalFilter.toLowerCase()))
+                    .map((m) => {
+                      const fullModel = m.includes('/') ? m : `${viewingModelsProvider.id}/${m}`;
+                      const isCustom = customSet.has(m);
+                      return (
+                        <div
+                          key={m}
+                          className="flex items-center justify-between gap-2 p-2 rounded-lg bg-[var(--muted)]/40 hover:bg-[var(--muted)] border border-[var(--border)]/50 transition-colors group"
+                        >
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="text-xs font-mono text-[var(--foreground)] truncate select-all">{m}</span>
+                            {isCustom && (
+                              <Badge variant="outline" className="text-[9px] py-0 px-1 text-emerald-400 border-emerald-500/30 bg-emerald-500/10 shrink-0">
+                                custom
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(fullModel, `modal-model-${m}`)}
+                              className="px-2 py-1 text-[11px] font-medium rounded bg-[var(--background)] hover:bg-emerald-500/10 hover:text-emerald-500 border border-[var(--border)] text-[var(--muted-foreground)] transition-colors cursor-pointer"
+                            >
+                              {copiedSection === `modal-model-${m}` ? t('common.copied') : t('common.copy')}
+                            </button>
+                            {isCustom && (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    const updated = await removeProviderCustomModelApi(viewingModelsProvider.id, m);
+                                    setConfig(updated);
+                                    toast.success(`Removed ${m}`);
+                                  } catch (err: any) {
+                                    toast.error(err.message || 'Failed to remove custom model');
+                                  }
+                                }}
+                                title="Remove custom model"
+                                className="p-1 rounded text-red-400 hover:bg-red-500/10"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    });
+                })()}
+              </div>
+            </div>
+          </ModalCard>
+        </Modal>
+      )}
+
       {/* ----------------- CONNECT PROVIDER MODAL ----------------- */}
       {connectingProvider && (
         <Modal onClose={() => setConnectingProvider(null)} className="max-w-md">
@@ -1309,10 +1950,12 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                       </button>
                     </div>
                     <div className="space-y-1 max-h-36 overflow-y-auto pr-0.5">
-                      {config!.providers![connectingProvider.id]!.apiKeys!.map((k, idx, arr) => (
+                      {config!.providers![connectingProvider.id]!.apiKeys!.map((k, idx, arr) => {
+                        const keyEnabled = k.enabled !== false;
+                        return (
                         <div
                           key={k.id}
-                          className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--background)] border border-[var(--border)] text-xs"
+                          className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--background)] border border-[var(--border)] text-xs ${keyEnabled ? '' : 'opacity-60'}`}
                         >
                           <div className="flex items-center gap-2 min-w-0">
                             <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--muted)] text-[var(--foreground)]">
@@ -1323,6 +1966,27 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                             </span>
                           </div>
                           <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  const updated = await toggleProviderKeyAccountApi(connectingProvider.id, k.id, !keyEnabled);
+                                  setConfig(updated);
+                                  toast.success(keyEnabled ? 'Account key disabled' : 'Account key enabled');
+                                } catch (err: any) {
+                                  toast.error(err.message || 'Failed to toggle key');
+                                }
+                              }}
+                              title={keyEnabled ? 'Disable this account key' : 'Enable this account key'}
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-medium flex items-center gap-1 border transition-colors ${
+                                keyEnabled
+                                  ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/20'
+                                  : 'bg-[var(--muted)] text-[var(--muted-foreground)] border-[var(--border)] hover:text-[var(--foreground)]'
+                              }`}
+                            >
+                              <Power className="w-2.5 h-2.5" />
+                              {keyEnabled ? 'ON' : 'OFF'}
+                            </button>
                             {arr.length > 1 && (
                               <>
                                 <button
@@ -1357,7 +2021,8 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                             )}
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -1575,6 +2240,60 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block text-[11px] font-medium text-[var(--foreground)] mb-1">
+                    Rate limit (req/min)
+                  </label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={newKeyRateLimit}
+                    onChange={(e) => setNewKeyRateLimit(e.target.value)}
+                    placeholder={locale === 'id' ? 'Tanpa batas' : 'Unlimited'}
+                    className="text-xs h-8"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-[var(--foreground)] mb-1">
+                    Max Budget (USD)
+                  </label>
+                  <Input
+                    type="number"
+                    min={0.01}
+                    step={0.01}
+                    value={newKeyBudget}
+                    onChange={(e) => setNewKeyBudget(e.target.value)}
+                    placeholder={locale === 'id' ? 'Tanpa batas' : 'Unlimited'}
+                    className="text-xs h-8"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-[var(--foreground)] mb-1">
+                    Max Tokens
+                  </label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={newKeyMaxTokens}
+                    onChange={(e) => setNewKeyMaxTokens(e.target.value)}
+                    placeholder={locale === 'id' ? 'Tanpa batas' : 'Unlimited'}
+                    className="text-xs h-8"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-[var(--foreground)] mb-1">
+                    Expires At
+                  </label>
+                  <Input
+                    type="datetime-local"
+                    value={newKeyExpiresAt}
+                    onChange={(e) => setNewKeyExpiresAt(e.target.value)}
+                    className="text-xs h-8"
+                  />
+                </div>
+              </div>
+
               <div className="flex items-center justify-end gap-2 pt-2">
                 <Button type="button" variant="ghost" onClick={() => setShowNewKeyModal(false)}>
                   {t('common.cancel')}
@@ -1585,6 +2304,85 @@ export default function AiGatewayPage({ tab, onTabChange }: AiGatewayPageProps) 
               </div>
             </form>
           )}
+          </ModalCard>
+        </Modal>
+      )}
+
+      {/* ----------------- EDIT VIRTUAL KEY POLICY MODAL ----------------- */}
+      {editingKey && (
+        <Modal className="max-w-md" onClose={() => setEditingKey(null)}>
+          <ModalCard
+            title={locale === 'id' ? `Edit Kebijakan Key: ${editingKey.name}` : `Edit Key Policy: ${editingKey.name}`}
+            icon={<Key className="w-4 h-4 text-[var(--foreground)]" />}
+            onClose={() => setEditingKey(null)}
+          >
+            <form onSubmit={handleSaveEditKey} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-[var(--foreground)] mb-1">
+                  {t('aiGateway.keyName')}
+                </label>
+                <Input
+                  required
+                  value={editKeyName}
+                  onChange={(e) => setEditKeyName(e.target.value)}
+                  className="text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[var(--foreground)] mb-1.5">
+                  {t('aiGw.allowedProviders')} ({editKeyProviders.length === 0 ? (locale === 'id' ? 'Semua' : 'All') : editKeyProviders.length})
+                </label>
+                <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
+                  {PROVIDERS_META.map((prov) => {
+                    const checked = editKeyProviders.includes(prov.id);
+                    return (
+                      <label key={prov.id} className="flex items-center gap-2 text-xs text-[var(--foreground)] cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            if (e.target.checked) setEditKeyProviders((prev) => [...prev, prov.id]);
+                            else setEditKeyProviders((prev) => prev.filter((p) => p !== prov.id));
+                          }}
+                          className="rounded border-[var(--border)]"
+                        />
+                        <BrandIcon name={prov.id} className="w-3.5 h-3.5" />
+                        <span>{prov.name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block text-[11px] font-medium text-[var(--foreground)] mb-1">Rate limit (req/min)</label>
+                  <Input type="number" min={1} value={editKeyRateLimit} onChange={(e) => setEditKeyRateLimit(e.target.value)} placeholder="Unlimited" className="text-xs h-8" />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-[var(--foreground)] mb-1">Max Budget (USD)</label>
+                  <Input type="number" min={0.01} step={0.01} value={editKeyBudget} onChange={(e) => setEditKeyBudget(e.target.value)} placeholder="Unlimited" className="text-xs h-8" />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-[var(--foreground)] mb-1">Max Tokens</label>
+                  <Input type="number" min={1} value={editKeyMaxTokens} onChange={(e) => setEditKeyMaxTokens(e.target.value)} placeholder="Unlimited" className="text-xs h-8" />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-[var(--foreground)] mb-1">Expires At</label>
+                  <Input type="datetime-local" value={editKeyExpiresAt} onChange={(e) => setEditKeyExpiresAt(e.target.value)} className="text-xs h-8" />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <Button type="button" variant="ghost" onClick={() => setEditingKey(null)}>
+                  {t('common.cancel')}
+                </Button>
+                <Button type="submit" disabled={!editKeyName.trim()} className="btn-metal">
+                  {locale === 'id' ? 'Simpan' : 'Save'}
+                </Button>
+              </div>
+            </form>
           </ModalCard>
         </Modal>
       )}

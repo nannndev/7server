@@ -31,8 +31,11 @@ import {
   deleteSshKey,
   fetchSecurityHardening,
   unbanIp,
+  fetchDeployUserStatus,
+  setupDeployUser,
   type SshKeyItem,
-  type SecurityHardeningStatus
+  type SecurityHardeningStatus,
+  type DeployUserStatus
 } from '@/features/servers/api';
 import { swr } from '@/shared/lib/cache';
 import { useT } from '@/shared/i18n';
@@ -56,12 +59,37 @@ export default function SecurityTab() {
   // Unbanning IP state
   const [unbanningIp, setUnbanningIp] = useState<string | null>(null);
 
+  // Deploy user (non-root owner of /var/www)
+  const [deployUser, setDeployUser] = useState<DeployUserStatus | null>(null);
+  const [settingUpDeploy, setSettingUpDeploy] = useState(false);
+
+  const handleSetupDeployUser = async () => {
+    const ok = await confirmModal({
+      title: t('security.deployUserTitle'),
+      message: t('security.deployUserConfirm'),
+      variant: 'warning',
+      confirmText: t('security.deployUserAction')
+    });
+    if (!ok) return;
+    setSettingUpDeploy(true);
+    try {
+      const st = await setupDeployUser(server.id);
+      setDeployUser(st);
+      toast.success(t('security.deployUserDone'));
+    } catch (err: any) {
+      toast.error(err.message || t('security.deployUserFailed'));
+    } finally {
+      setSettingUpDeploy(false);
+    }
+  };
+
   const loadSecurityData = async (force = false) => {
     setError(null);
     try {
       await Promise.all([
         swr(`ssh-keys:${server.id}`, () => fetchSshKeys(server.id), setKeys, setLoading, force),
-        swr(`hardening:${server.id}`, () => fetchSecurityHardening(server.id), setHardening, () => {}, force)
+        swr(`hardening:${server.id}`, () => fetchSecurityHardening(server.id), setHardening, () => {}, force),
+        swr(`deploy-user:${server.id}`, () => fetchDeployUserStatus(server.id), setDeployUser, () => {}, force)
       ]);
     } catch (err: any) {
       setError(err.message || t('sec.loadFailed'));
@@ -316,6 +344,49 @@ export default function SecurityTab() {
                 </span>
               </div>
             </div>
+          </Card>
+
+          {/* Deploy User: non-root owner for /var/www */}
+          <Card className="p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--foreground)] flex items-center gap-2">
+                <Server className="w-4 h-4 text-emerald-500" />
+                {t('security.deployUserTitle')}
+              </h3>
+              {deployUser && (
+                <Badge
+                  variant={deployUser.exists && deployUser.ownsWebRoot ? 'success' : 'warning'}
+                  className="text-[10px] font-mono py-0 px-2"
+                >
+                  {deployUser.exists && deployUser.ownsWebRoot
+                    ? t('security.deployUserActive')
+                    : deployUser.exists
+                    ? t('security.deployUserPartial')
+                    : t('security.deployUserMissing')}
+                </Badge>
+              )}
+            </div>
+            <p className="text-[11px] text-[var(--muted-foreground)] leading-relaxed">
+              {t('security.deployUserDesc')}
+            </p>
+            {deployUser && (
+              <div className="text-[11px] font-mono text-[var(--muted-foreground)] flex items-center gap-3 flex-wrap">
+                <span>user: <span className={deployUser.exists ? 'text-emerald-500' : 'text-amber-500'}>{deployUser.exists ? 'deploy' : '—'}</span></span>
+                <span>ssh key: <span className={deployUser.hasSshKey ? 'text-emerald-500' : 'text-amber-500'}>{deployUser.hasSshKey ? 'ok' : '—'}</span></span>
+                <span>/var/www: <span className={deployUser.ownsWebRoot ? 'text-emerald-500' : 'text-amber-500'}>{deployUser.webRootOwner}</span></span>
+              </div>
+            )}
+            {!(deployUser?.exists && deployUser?.ownsWebRoot) && (
+              <Button
+                size="sm"
+                onClick={handleSetupDeployUser}
+                disabled={settingUpDeploy || !deployUser}
+                className="gap-1.5 h-8 text-xs"
+              >
+                {settingUpDeploy ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                {t('security.deployUserAction')}
+              </Button>
+            )}
           </Card>
 
           {/* Fail2ban Intrusion Defense */}

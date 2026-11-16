@@ -12,6 +12,12 @@ export interface QuotaWindow {
   used?: number;
   total?: number;
 }
+export interface AccountGatewayStats {
+  todayRequests: number;
+  todayTokens: number;
+  totalRequests: number;
+  totalTokens: number;
+}
 export interface AccountUsage {
   accountId?: string;
   provider: OAuthProviderId;
@@ -21,6 +27,8 @@ export interface AccountUsage {
   exhausted: boolean;
   checkedAt: string;
   error?: string;
+  /** Local requests & tokens routed through 7Server AI Gateway for this provider */
+  gatewayStats?: AccountGatewayStats;
 }
 
 const pct = (v: unknown) => Math.max(0, Math.min(100, Number(v) || 0));
@@ -90,7 +98,14 @@ const TTL = 60_000;
 export async function usageOf(provider: OAuthProviderId, fresh = false, accountId?: string): Promise<AccountUsage> {
   const key = accountId || provider;
   const hit = cache.get(key);
-  if (!fresh && hit && Date.now() - hit.at < TTL) return hit.value;
+  const hasExpiredReset = Boolean(
+    hit?.value.windows.some((w) => {
+      if (!w.resetsAt || w.usedPercent <= 0) return false;
+      const t = Date.parse(w.resetsAt);
+      return Number.isFinite(t) && t <= Date.now();
+    })
+  );
+  if (!fresh && hit && !hasExpiredReset && Date.now() - hit.at < TTL) return hit.value;
   const base: AccountUsage = { accountId: key, provider, windows: [] as QuotaWindow[], exhausted: false, checkedAt: new Date().toISOString() };
   let value: AccountUsage;
   try {
@@ -145,13 +160,22 @@ export const isCoolingDown = (p: OAuthProviderId) => {
   return accs.every((a) => (cooling.get(a.id) || 0) > now);
 };
 
+const rrCursor = new Map<string, number>();
+
+/** Rotate `items` using an in-memory round-robin pointer for `bucketKey`, or return unchanged for `'ordered'`. */
+export function rotateRoundRobin<T>(items: T[], bucketKey: string, strategy: 'ordered' | 'round_robin' = 'ordered'): T[] {
+  if (strategy !== 'round_robin' || items.length <= 1) return items;
+  const idx = (rrCursor.get(bucketKey) || 0) % items.length;
+  rrCursor.set(bucketKey, idx + 1);
+  return idx === 0 ? items : [...items.slice(idx), ...items.slice(0, idx)];
+}
+
 /** Returns a provider's accounts in rotation order, placing non-cooling accounts ahead of cooling ones. */
-export const orderedAccountsFor = (p: OAuthProviderId): PublicAccount[] => {
-  const accs = listAccountsFor(p);
-  return [
-    ...accs.filter((a) => !isAccountCoolingDown(a.id)),
-    ...accs.filter((a) => isAccountCoolingDown(a.id))
-  ];
+export const orderedAccountsFor = (p: OAuthProviderId, strategy: 'ordered' | 'round_robin' = 'ordered'): PublicAccount[] => {
+  const accs = listAccountsFor(p).filter((a) => a.enabled !== false);
+  const ready = rotateRoundRobin(accs.filter((a) => !isAccountCoolingDown(a.id)), `oauth:${p}`, strategy);
+  const coolingAccs = accs.filter((a) => isAccountCoolingDown(a.id));
+  return [...ready, ...coolingAccs];
 };
 
-export const __resetUsage = () => { cache.clear(); cooling.clear(); };
+export const __resetUsage = () => { cache.clear(); cooling.clear(); rrCursor.clear(); };

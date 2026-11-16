@@ -1,6 +1,6 @@
 import { Router, Request } from 'express';
 import { withServer } from '../../http/handlers.js';
-import { fetchSshKeys, addSshKey, deleteSshKey, fetchHardeningStatus, unbanIp } from './service.js';
+import { fetchSshKeys, addSshKey, deleteSshKey, fetchHardeningStatus, unbanIp, fetchDeployUserStatus, setupDeployUser } from './service.js';
 
 export const securityRoutes = Router();
 
@@ -21,6 +21,14 @@ securityRoutes.delete('/servers/:id/security/keys/:keyId', withServer(async (tar
 
 securityRoutes.get('/servers/:id/security/hardening', withServer(async (target) => {
   return await fetchHardeningStatus(target);
+}));
+
+securityRoutes.get('/servers/:id/security/deploy-user', withServer(async (target) => {
+  return await fetchDeployUserStatus(target);
+}));
+
+securityRoutes.post('/servers/:id/security/deploy-user', withServer(async (target) => {
+  return await setupDeployUser(target);
 }));
 
 securityRoutes.post('/servers/:id/security/fail2ban/unban', withServer(async (target, req: Request) => {

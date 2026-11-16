@@ -76,6 +76,7 @@ export default defineConfig({
             items: [
               { text: 'AI SRE Copilot', link: '/ai/copilot' },
               { text: 'Universal AI Gateway', link: '/ai/gateway' },
+              { text: 'Technical Build Spec', link: '/ai/gateway-spec' },
               { text: 'CLI & IDE Integration', link: '/ai/ide-cli-integration' },
             ]
           },
@@ -141,6 +142,7 @@ export default defineConfig({
             items: [
               { text: 'AI SRE Copilot', link: '/id/ai/copilot' },
               { text: 'Universal AI Gateway', link: '/id/ai/gateway' },
+              { text: 'Panduan Teknis Implementasi', link: '/id/ai/gateway-implementation' },
               { text: 'Integrasi IDE & CLI', link: '/id/ai/ide-cli-integration' },
             ]
           },

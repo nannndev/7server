@@ -47,13 +47,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refreshUser]);
 
   const login = async (password: string, username = 'admin') => {
-    setLoading(true);
-    try {
-      const res = await apiLogin(password, username);
-      setUser(res.user);
-    } finally {
-      setLoading(false);
-    }
+    const res = await apiLogin(password, username);
+    setUser(res.user);
   };
 
   const logout = async () => {

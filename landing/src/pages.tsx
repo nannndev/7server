@@ -224,9 +224,22 @@ interface ReleaseEntry {
 
 const RELEASES: ReleaseEntry[] = [
   {
+    version: 'v0.4.0',
+    date: '2026-11-16',
+    tag: 'Latest Release',
+    title: 'Deployment Lifecycle, Cloudflare API Copilot Access, AI Gateway Controls & Multi-Channel Alerts',
+    highlights: [
+      'Full Deployment Lifecycle: Saved deploy configs with encrypted env vars, 1-click Redeploy, Deploy History & instant Commit Rollback, GitHub Push Auto-Deploy Webhooks (HMAC-SHA256), custom healthcheck paths, post-deploy migration hooks, Auto-SSL (Certbot), live app logs, and quick .env editor.',
+      'Cloudflare API Access for AI Copilot: Connect a Cloudflare API Token in Integrations so AI Copilot can inspect and manage DNS records, Zero Trust Tunnels, SSL/TLS modes, and cache purges directly (with 1-click approval for mutations).',
+      'AI Gateway Per-Account Toggles & Custom Models: Enable or disable individual API keys and OAuth subscription accounts independently, and add/remove custom model IDs on any provider.',
+      'Multi-Channel Alerts & Monitoring Overhaul: Telegram Bot & Custom JSON Webhook alerts alongside Discord, per-event notification routing, live Alert History with acknowledge controls, and in-app Version Update Notifier.',
+      'Distribution & Installers: Official one-line VPS installer (install.sh), Homebrew Tap (brew install nannndev/tap/sevenserver), and Docker Compose setup.'
+    ]
+  },
+  {
     version: 'v0.3.1',
     date: '2026-11-09',
-    tag: 'Latest Release',
+    tag: 'Previous Release',
     title: 'Universal AI Gateway 2.0, Multi-Account Rotation, Custom SKILL.md & /compact',
     highlights: [
       '27 Built-In AI Providers: 8 OAuth Subscription providers (Claude, ChatGPT/Codex, GitHub Copilot, Gemini CLI, Kimi Code, Kilo Code, Muse/Koda, Nous Portal) + 19 API-Key & OpenAI-compatible providers.',

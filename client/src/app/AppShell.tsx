@@ -1,5 +1,5 @@
 // Layout shell: sidebar + top bar + the routed page, and the app-wide modals.
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Server } from 'lucide-react';
 import type { ServerItem } from '@/features/servers/types';
 import { createServer, updateServer, deleteServer } from '@/features/servers/api';
@@ -16,7 +16,7 @@ import ServerPage from '@/pages/ServerPage';
 import AiGatewayPage from '@/pages/AiGatewayPage';
 import AiCopilotDrawer from '@/features/copilot/components/AiCopilotDrawer';
 import AiCopilotTrigger from '@/features/copilot/components/AiCopilotTrigger';
-import type { CopilotLiveStatus } from '@/features/copilot/types';
+import type { CopilotBubbleAction, CopilotLiveStatus } from '@/features/copilot/types';
 import { BackgroundTasksWidget } from '@/shared/tasks/BackgroundTasksWidget';
 import UsersPage from '@/pages/UsersPage';
 import IntegrationsPage from '@/pages/IntegrationsPage';
@@ -28,6 +28,7 @@ import { Skeleton } from '@/shared/ui/skeleton';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import CommandPalette from './CommandPalette';
+import { useAppVersion, VersionUpdateBanner } from './VersionUpdateNotifier';
 import { useRoute, type FleetView, type ServerTab } from './router';
 import { useT } from '@/shared/i18n';
 import { toast } from '@/shared/ui/toast';
@@ -57,8 +58,17 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [copilotOpen, setCopilotOpen] = useState(false);
   const [copilotStatus, setCopilotStatus] = useState<CopilotLiveStatus>({ state: 'idle' });
+  const [copilotOrigin, setCopilotOrigin] = useState<{ x: number; y: number } | undefined>(undefined);
+  const copilotActionRef = useRef<((action: CopilotBubbleAction) => void) | null>(null);
+  const handleCopilotActionReady = useCallback((fn: ((action: CopilotBubbleAction) => void) | null) => {
+    copilotActionRef.current = fn;
+  }, []);
+  const handleCopilotBubbleAction = useCallback((action: CopilotBubbleAction) => {
+    copilotActionRef.current?.(action);
+  }, []);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const { user } = useAuth();
+  const { info: versionInfo, checking: versionChecking, check: checkVersion, showBanner: showVersionBanner, dismissBanner: dismissVersionBanner } = useAppVersion();
 
   // Fleet view comes from the URL; the last one used is remembered for the plain "#/" link.
   const [lastView, setLastView] = useState<FleetView>(readView);
@@ -149,7 +159,18 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
           onOpenUsers={() => navigate({ page: 'users', tab: 'users' })}
           onOpenSessions={() => navigate({ page: 'users', tab: 'sessions' })}
           onOpenChangePassword={() => setShowChangePasswordModal(true)}
+          versionInfo={versionInfo}
+          versionChecking={versionChecking}
+          onCheckVersion={checkVersion}
+          activeAlerts={monitor.activeAlerts}
+          alertHistory={monitor.alertHistory}
+          unreadAlertCount={monitor.activeAlertCount}
+          onAckAlert={monitor.ackAlert}
         />
+
+        {showVersionBanner && versionInfo && (
+          <VersionUpdateBanner info={versionInfo} onDismiss={dismissVersionBanner} />
+        )}
 
         <main id="main" key={route.page === 'server' ? `server:${route.id}` : route.page} className="page-enter flex-1 w-full max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
           {route.page === 'monitoring' ? (
@@ -268,6 +289,8 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
         activeServer={managedServer}
         activeTab={route.page === 'server' ? route.tab : undefined}
         onStatusChange={setCopilotStatus}
+        onActionReady={handleCopilotActionReady}
+        origin={copilotOrigin}
         onRunInTerminal={(cmd, srv) => {
           setTerminalInitialCommand(cmd);
           setTerminalServer(srv);
@@ -277,6 +300,8 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
         open={copilotOpen}
         onClick={() => setCopilotOpen(true)}
         status={copilotStatus}
+        onAnchorChange={setCopilotOrigin}
+        onAction={handleCopilotBubbleAction}
       />
       <BackgroundTasksWidget />
     </div>

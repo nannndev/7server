@@ -60,6 +60,34 @@ export interface SuggestedConfig {
   internal_port: number;
 }
 
+export type StackLanguage = 'php' | 'node' | 'go' | 'python' | 'java' | 'rust' | 'generic';
+
+export interface CompatibilityIssue {
+  severity: 'error' | 'warning' | 'info';
+  category: 'runtime_mismatch' | 'missing_dependency' | 'network_binding' | 'build_configuration' | 'volume_shadowing';
+  title: string;
+  message: string;
+  suggested_fix?: string;
+  auto_fixable?: boolean;
+  file?: string;
+}
+
+export interface RuntimeVersionInfo {
+  language: StackLanguage;
+  required_version?: string;
+  provided_version?: string;
+  source_file?: string;
+  dockerfile_image?: string;
+}
+
+export interface CompatibilityReport {
+  is_compatible: boolean;
+  score: 'ok' | 'warning' | 'incompatible';
+  runtime?: RuntimeVersionInfo;
+  issues: CompatibilityIssue[];
+  recommendations: string[];
+}
+
 export interface InspectResult {
   detected_engine: DetectedEngine;
   framework: string;
@@ -74,5 +102,7 @@ export interface InspectResult {
   node_version?: number;
   /** Repo has a compose file that only provides services (db, cache) for the app; deploy starts it first. */
   compose_sidecar?: boolean;
+  /** Pre-flight universal stack compatibility report (version mismatch, host binding, builder checks) */
+  compatibility?: CompatibilityReport;
 }
 

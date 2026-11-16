@@ -11,20 +11,34 @@ echo "===START_WEBAPPS==="
 for d in /var/www/*; do
   [ -d "$d" ] || continue
   name=$(basename "$d")
+  [ -f "$d/.7server-deploying" ] && continue
   [ "$name" = "html" ] && [ ! -f "$d/index.php" ] && [ ! -f "$d/index.html" ] && continue
 
   app_type="Web App"
-  if [ -f "$d/artisan" ]; then
+  # Subfolder detection (for Monorepo apps deployed to /var/www/<app>)
+  sub_match=""
+  case "$name" in
+    *-backend|*backend*) sub_match="backend";;
+    *-frontend|*frontend*|*-web|*web*|*-client) sub_match="frontend";;
+  esac
+
+  if [ -f "$d/artisan" ] || ([ -n "$sub_match" ] && [ -f "$d/$sub_match/artisan" ]) || ls "$d"/*/artisan >/dev/null 2>&1; then
     app_type="Laravel (PHP)"
-  elif [ -d "$d/.output" ] || [ -f "$d/nuxt.config.ts" ] || [ -f "$d/nuxt.config.js" ]; then
+  elif [ -d "$d/.output" ] || [ -f "$d/nuxt.config.ts" ] || [ -f "$d/nuxt.config.js" ] || ([ -n "$sub_match" ] && ([ -f "$d/$sub_match/nuxt.config.ts" ] || [ -f "$d/$sub_match/nuxt.config.js" ])); then
     app_type="Nuxt (Node.js)"
-  elif [ -d "$d/.next" ] || [ -f "$d/next.config.js" ] || [ -f "$d/next.config.mjs" ] || [ -f "$d/next.config.ts" ]; then
+  elif [ -d "$d/.next" ] || [ -f "$d/next.config.js" ] || [ -f "$d/next.config.mjs" ] || [ -f "$d/next.config.ts" ] || ([ -n "$sub_match" ] && ls "$d/$sub_match"/next.config.* >/dev/null 2>&1); then
     app_type="Next.js (Node.js)"
-  elif [ -f "$d/package.json" ]; then
+  elif ([ -n "$sub_match" ] && [ -f "$d/$sub_match/composer.json" ]) || ls "$d"/*/composer.json >/dev/null 2>&1; then
+    app_type="PHP Application"
+  elif ([ -n "$sub_match" ] && [ -f "$d/$sub_match/go.mod" ]) || ls "$d"/*/go.mod >/dev/null 2>&1; then
+    app_type="Go"
+  elif ([ -n "$sub_match" ] && [ -f "$d/$sub_match/requirements.txt" ]) || ls "$d"/*/requirements.txt >/dev/null 2>&1; then
+    app_type="Python"
+  elif [ -f "$d/package.json" ] || ([ -n "$sub_match" ] && [ -f "$d/$sub_match/package.json" ]); then
     app_type="Node.js"
   elif [ -f "$d/Dockerfile" ] || [ -f "$d/docker-compose.yml" ] || [ -f "$d/docker-compose.yaml" ] || [ -f "$d/compose.yml" ] || [ -f "$d/docker-compose.prod.yml" ] || [ -f "$d/docker-compose.production.yml" ]; then
     app_type="Docker"
-  elif [ -d "$d/dist" ]; then
+  elif [ -d "$d/dist" ] || ([ -n "$sub_match" ] && [ -d "$d/$sub_match/dist" ]); then
     app_type="Frontend (SPA / Vite)"
   elif ls "$d"/*.php >/dev/null 2>&1; then
     app_type="PHP Application"

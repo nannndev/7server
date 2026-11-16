@@ -128,3 +128,8 @@ export async function execOnServer(serverId: string, command: string): Promise<{
   const res = await apiFetch(`${API_BASE}/servers/${encodeURIComponent(serverId)}/exec`, jsonPost({ command }));
   return unwrap(res, 'Command failed');
 }
+
+export async function execCloudflareAction(command: string): Promise<{ ok: boolean; action: string; result: unknown }> {
+  const res = await apiFetch(`${API_BASE}/integrations/cloudflare/action`, jsonPost({ command }));
+  return unwrap(res, 'Cloudflare action failed');
+}

@@ -26,8 +26,8 @@
 - **Browser terminal.** A full xterm.js shell per server: colors, resize, `htop`, `vim`, several sessions side by side.
 - **Day-to-day ops in one place.** Processes, systemd services, PM2, Docker containers and images, Nginx sites, SSL certificates, cron jobs, open ports, firewall (UFW), backups, file manager and logs.
 - **Databases.** Browse MySQL/MariaDB, PostgreSQL, SQLite, Redis and MongoDB, run queries and see an ER diagram.
-- **Monitoring and alerts.** Thresholds per server, uptime history and Discord alerts.
-- **AI copilot and gateway.** Ask about a server and let the agent run commands for you (read-only ones run directly, anything else waits for your OK). Use your own API keys or your existing Claude, ChatGPT, Copilot or Gemini subscriptions, with fallback combos and quotas, and an OpenAI-compatible endpoint for your other tools.
+- **Monitoring and alerts.** Thresholds per server, uptime & SSL history, alert timeline, and notifications via Discord, Telegram, or custom JSON webhooks.
+- **AI copilot and gateway.** Ask about a server with selectable agent personalities, let the agent run commands (read-only directly, changes wait for your OK), or test models in the live Playground. Use your own API keys or Claude, ChatGPT, Copilot, Gemini subscriptions with fallback combos, per-key rate/budget/expiry policies, cost analytics, and OpenAI/Anthropic-compatible endpoints (`/v1/chat/completions`, `/v1/responses`, `/v1/embeddings`, `/v1/messages`).
 - **Users and roles.** Admin, operator and viewer roles, per-server access, sessions and an audit log.
 
 ## Screenshots
@@ -88,6 +88,23 @@ All screenshots use demo data: throwaway containers and made-up names, no real s
 
 ## Install
 
+### Homebrew (macOS / Linux)
+
+```bash
+brew install nannndev/tap/sevenserver
+7server                      # http://127.0.0.1:5001, data in ~/.7server
+# or run in the background:
+brew services start sevenserver
+```
+
+### Linux VPS one-line installer (systemd)
+
+Installs Node.js 22+ if missing, downloads the latest GitHub Release tarball, and registers `sevenserver.service`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/nannndev/7server/main/install.sh | sudo bash
+```
+
 ### npm
 
 Needs Node.js 22.13 or newer.
@@ -102,7 +119,7 @@ npm install -g sevenserver
 7server reset-password admin # locked out? set a new password
 ```
 
-When a new version is out, `7server` tells you on startup (it checks npm at most once a day; turn it off with `--no-update-check`). More options in [packages/npm/README.md](packages/npm/README.md).
+When a new version is out, `7server` tells you on startup (checks GitHub Releases / npm at most once a day; turn it off with `--no-update-check`). More options in [packages/npm/README.md](packages/npm/README.md).
 
 ### Docker
 
@@ -166,7 +183,7 @@ npm run release patch        # or minor, major, 1.2.3: bumps, commits and tags v
 git push origin main vX.Y.Z
 ```
 
-The tag starts the release workflow: it publishes `sevenserver` to npm (Trusted Publishing, with provenance), pushes the multi-arch image to GHCR and creates a GitHub Release. Versions like `1.2.0-beta.1` go to the npm `next` tag and are marked as prereleases.
+The tag starts the release workflow: it attaches the `.tgz` package to the GitHub Release, pushes the multi-arch image to GHCR, updates the Homebrew tap (`nannndev/homebrew-tap`), and publishes `sevenserver` to npm (Trusted Publishing, with provenance). Versions like `1.2.0-beta.1` go to the npm `next` tag and are marked as prereleases.
 
 Release notes are grouped by pull request label. Labels live in [.github/labels.yml](.github/labels.yml); pull requests are labeled by the files they touch and by their title prefix (`feat:` → enhancement, `fix:` → bug, `feat!:` → breaking).
 

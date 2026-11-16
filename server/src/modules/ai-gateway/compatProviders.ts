@@ -24,6 +24,8 @@ export const COMPAT_PROVIDERS: CompatProvider[] = [
   { id: 'zai', baseUrl: 'https://api.z.ai/api/paas/v4', sampleModel: 'glm-4.5' },
   { id: 'minimax', baseUrl: 'https://api.minimax.io/v1', sampleModel: 'MiniMax-M1' },
   { id: 'nvidia', baseUrl: 'https://integrate.api.nvidia.com/v1', sampleModel: 'meta/llama-3.3-70b-instruct' },
+  { id: 'deepinfra', baseUrl: 'https://api.deepinfra.com/v1/openai', sampleModel: 'meta-llama/Llama-3.3-70B-Instruct' },
+  { id: 'sambanova', baseUrl: 'https://api.sambanova.ai/v1', sampleModel: 'Meta-Llama-3.3-70B-Instruct' },
   // Any other OpenAI-compatible endpoint (LiteLLM, vLLM, LM Studio, a self-hosted proxy): base URL is required.
   { id: 'custom', baseUrl: '', sampleModel: '' }
 ];

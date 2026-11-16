@@ -56,9 +56,11 @@ misconfigure `base_url` often).
 | Method | Path | Wire format |
 |---|---|---|
 | `POST` | `/v1/chat/completions` | OpenAI Chat Completions (JSON or SSE) |
+| `POST` | `/v1/responses` | OpenAI Responses API (native or adapted JSON/SSE) |
+| `POST` | `/v1/embeddings` | OpenAI Embeddings API |
 | `POST` | `/v1/messages` | Anthropic Messages (JSON or SSE) |
 | `POST` | `/v1/messages/count_tokens` | Anthropic token count (passthrough) |
-| `GET`  | `/v1/models` | OpenAI model list `{ object:"list", data:[{id, object:"model", owned_by}] }` |
+| `GET`  | `/v1/models` | OpenAI model list filtered by `allowedProviders` + `<alias>/auto` |
 | `GET`  | `/health` | `{ status:"ok" }`, no auth |
 
 ### 2.1 Authentication
@@ -89,15 +91,22 @@ VirtualKey {
   enabled: bool
   allowedProviders?: ProviderId[]   // null = all
   rateLimitPerMin?: int
+  maxBudgetUsd?: number
+  maxTokens?: int
+  expiresAt?: timestamp
   createdAt, lastUsedAt?: timestamp
   totalRequests, totalInputTokens, totalOutputTokens: int
+  totalCostUsd?: number
 }
 
 ProviderConfig {                    // one per API-key provider
   enabled: bool
   apiKey?: string                   // encrypted at rest, masked in every API response
+  apiKeys?: [{ id, label?, apiKey, addedAt }] // optional ordered/round-robin multi-key rotation list
+  routingStrategy?: 'ordered' | 'round_robin'
   baseUrl?: string
   defaultModel?: string
+  models?: string[]                 // cached "<provider>/<model>" entries discovered on verify
   connected?: bool, verifiedAt?, latencyMs?, error?
 }
 
@@ -139,6 +148,7 @@ The `model` field in the request body is the routing key. Resolve it in this ord
 | Model string | Meaning | Example |
 |---|---|---|
 | `auto/<combo>` | Fallback chain from `config.combos[combo]` | `auto/fast-code` |
+| `<alias>/auto` | Auto-pick + intra-provider fallback chain (`buildProviderAutoChain`) | `gh/auto`, `cx/auto` |
 | `<alias>/<model>` | Specific provider + upstream model | `oa/gpt-4o`, `an/claude-sonnet-5`, `ds/deepseek-chat` |
 | plain name | Heuristic / default provider | `gpt-4o` → openai, `deepseek-*` → deepseek, `llama*`/`qwen*`/`mistral*` → ollama if enabled, else `defaultProvider` |
 
@@ -149,6 +159,8 @@ resolve(model):
   if model starts with "auto/":
       chain = config.combos[name]  or  404 "Unknown combo"
       return chain.map(resolveAlias)
+  if model is "<alias>/auto":
+      return buildProviderAutoChain(ALIAS[alias]).map(m => ({provider: ALIAS[alias], model: m}))
   if model contains "/" and prefix is a known alias:
       return [ {provider: ALIAS[prefix], model: rest} ]
   return [ heuristic(model) ]
@@ -364,8 +376,9 @@ DELETE /ai-gateway/keys/:id
 GET    /ai-gateway/config                     → masked config
 POST   /ai-gateway/config                     → partial update (merge, never blank secrets)
 POST   /ai-gateway/providers/:id/verify  {apiKey, baseUrl}
-POST   /ai-gateway/providers/:id/connect {apiKey, baseUrl}   # verify, then save
+POST   /ai-gateway/providers/:id/connect {apiKey, baseUrl, label?, addNew?} # verify, then save
 POST   /ai-gateway/providers/:id/disconnect
+POST   /ai-gateway/providers/:id/reorder {keyIds}
 
 GET    /ai-gateway/combos
 PUT    /ai-gateway/combos/:name  {targets: string[]}
@@ -374,12 +387,13 @@ DELETE /ai-gateway/combos/:name
 GET    /ai-gateway/usage?limit=100            # clamp 1..500
 DELETE /ai-gateway/usage
 GET    /ai-gateway/stats                      → totals, active keys, connected providers
+GET    /ai-gateway/analytics?range=30d&tzOffset=0&provider=&model=  → series, byModel, byProvider
 
 # optional (section 9)
 GET    /ai-gateway/accounts
-POST   /ai-gateway/accounts/:provider/start | complete | poll | test
+POST   /ai-gateway/accounts/:provider/start | complete | poll | test | reorder
 DELETE /ai-gateway/accounts/:provider
-GET    /ai-gateway/accounts/usage?fresh=1
+GET    /ai-gateway/accounts/usage?fresh=1&tzOffset=0
 ```
 
 Validation for combos: name `^[a-z0-9][a-z0-9._-]{0,39}$`; 1–8 targets; every target MUST resolve to

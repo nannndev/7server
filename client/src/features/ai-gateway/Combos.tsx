@@ -7,7 +7,7 @@ import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { toast } from '@/shared/ui/toast';
 import { useI18n } from '@/shared/i18n';
-import { deleteCombo, fetchAccounts, fetchCombos, saveCombo } from './api';
+import { deleteCombo, fetchAccounts, fetchCombos, fetchGatewayConfig, saveCombo } from './api';
 import { ModelPicker } from '@/features/copilot/components/ModelPicker';
 
 const ALIAS: Record<string, string> = {
@@ -31,15 +31,34 @@ export function Combos() {
 
   useEffect(() => {
     fetchCombos().then(setCombos).catch((e) => toast.error(e.message));
-    fetchAccounts()
-      .then(({ accounts, models, aliases }) =>
-        setOptions(
-          accounts.flatMap((a) => {
-            const prefix = aliases?.[a.provider] || ALIAS[a.provider];
-            return prefix ? (models[a.provider] || []).map((m) => `${prefix}/${m}`) : [];
-          })
-        )
-      )
+    Promise.all([
+      fetchAccounts().catch(() => ({ accounts: [], models: {}, aliases: {} })),
+      fetchGatewayConfig().catch(() => null)
+    ])
+      .then(([{ accounts, models, aliases }, cfg]) => {
+        const list: string[] = [];
+        const seen = new Set<string>();
+        const add = (id: string) => {
+          if (!id || seen.has(id)) return;
+          seen.add(id);
+          list.push(id);
+        };
+        for (const a of accounts) {
+          const prefix = (aliases as Record<string, string | undefined>)?.[a.provider] || ALIAS[a.provider];
+          if (!prefix) continue;
+          add(`${prefix}/auto`);
+          for (const m of (models as Record<string, string[]>)[a.provider] || []) add(`${prefix}/${m}`);
+        }
+        if (cfg?.providers) {
+          for (const [provId, pCfg] of Object.entries(cfg.providers)) {
+            if (!pCfg?.enabled || !pCfg?.connected) continue;
+            add(`${provId}/auto`);
+            if (pCfg.defaultModel) add(pCfg.defaultModel.includes('/') ? pCfg.defaultModel : `${provId}/${pCfg.defaultModel}`);
+            for (const m of pCfg.models || []) add(m.includes('/') ? m : `${provId}/${m}`);
+          }
+        }
+        setOptions(list);
+      })
       .catch(() => setOptions([]));
   }, []);
 

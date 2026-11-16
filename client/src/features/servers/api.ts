@@ -261,6 +261,19 @@ export const unbanIp = async (id: string, ip: string) =>
     'Failed to unban IP'
   );
 
+export interface DeployUserStatus {
+  exists: boolean;
+  hasSshKey: boolean;
+  ownsWebRoot: boolean;
+  webRootOwner: string;
+}
+
+export const fetchDeployUserStatus = async (id: string) =>
+  unwrap<DeployUserStatus>(await apiFetch(`${API_BASE}/servers/${id}/security/deploy-user`), 'Failed to fetch deploy user status');
+
+export const setupDeployUser = async (id: string) =>
+  unwrap<DeployUserStatus>(await apiFetch(`${API_BASE}/servers/${id}/security/deploy-user`, jsonPost({})), 'Failed to set up deploy user');
+
 // ---------------------------------------------------------------------------
 // Server Audit Log API
 // ---------------------------------------------------------------------------

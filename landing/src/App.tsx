@@ -1043,6 +1043,8 @@ function Security({ lang }: { lang: Lang }) {
 
 const INSTALL = {
   npm: { label: 'npm', note: 'Node.js 22.13 or newer. Data lives in ~/.7server.', steps: [['Install', 'npm install -g sevenserver'], ['Run', '7server']] as [string, string][] },
+  script: { label: 'VPS Script', note: 'One-line Ubuntu/Debian VPS installer with systemd service setup.', steps: [['Install & start', 'curl -fsSL https://raw.githubusercontent.com/nannndev/7server/main/install.sh | bash']] as [string, string][] },
+  brew: { label: 'Homebrew', note: 'macOS & Linuxbrew formula via nannndev/homebrew-tap.', steps: [['Tap & install', 'brew tap nannndev/tap && brew install sevenserver'], ['Run', '7server']] as [string, string][] },
   docker: { label: 'Docker', note: 'Best for a VPS. Data lives in the 7server-data volume; the port is bound to localhost, so put HTTPS in front.', steps: [['Get the compose file', `git clone ${REPO}.git && cd 7server`], ['Set a password', 'cp .env.docker.example .env'], ['Start', 'docker compose up -d']] as [string, string][] },
   source: { label: 'From source', note: 'For development: UI on :3000, API on :5001.', steps: [['Clone', `git clone ${REPO}.git && cd 7server`], ['Install', '(cd server && npm install) && (cd client && npm install)'], ['Run', 'npm run dev']] as [string, string][] }
 };

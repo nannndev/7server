@@ -7,7 +7,9 @@ import type {
   AiUsageLog,
   AiGatewayStats,
   AiProviderId,
-  ProviderVerificationResult
+  ProviderVerificationResult,
+  UsageAnalytics,
+  UsageRange
 } from './types';
 
 export async function fetchGatewayKeys(): Promise<VirtualApiKey[]> {
@@ -17,10 +19,40 @@ export async function fetchGatewayKeys(): Promise<VirtualApiKey[]> {
   return data.keys;
 }
 
-export async function createGatewayKey(name: string, allowedProviders?: AiProviderId[]): Promise<VirtualApiKey> {
-  const res = await apiFetch(`${API_BASE}/ai-gateway/keys`, jsonPost({ name, allowedProviders }));
+export interface VirtualKeyPolicyPayload {
+  rateLimitPerMin?: number;
+  maxBudgetUsd?: number;
+  maxTokens?: number;
+  expiresAt?: string;
+}
+
+export async function createGatewayKey(
+  name: string,
+  allowedProviders?: AiProviderId[],
+  policy?: VirtualKeyPolicyPayload
+): Promise<VirtualApiKey> {
+  const res = await apiFetch(`${API_BASE}/ai-gateway/keys`, jsonPost({ name, allowedProviders, ...policy }));
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to create virtual key');
+  return data.key;
+}
+
+export async function updateGatewayKey(
+  id: string,
+  updates: { name?: string; enabled?: boolean; allowedProviders?: AiProviderId[] | null } & {
+    rateLimitPerMin?: number | null;
+    maxBudgetUsd?: number | null;
+    maxTokens?: number | null;
+    expiresAt?: string | null;
+  }
+): Promise<VirtualApiKey> {
+  const res = await apiFetch(`${API_BASE}/ai-gateway/keys/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to update virtual key');
   return data.key;
 }
 
@@ -83,6 +115,35 @@ export async function fetchGatewayStats(): Promise<AiGatewayStats> {
   return data.stats;
 }
 
+export async function fetchUsageAnalytics(
+  range: UsageRange = '30d',
+  opts?: { provider?: string; model?: string; keyId?: string }
+): Promise<UsageAnalytics> {
+  const params = new URLSearchParams({
+    range,
+    tzOffset: String(new Date().getTimezoneOffset())
+  });
+  if (opts?.provider && opts.provider !== 'all') params.set('provider', opts.provider);
+  if (opts?.model && opts.model !== 'all') params.set('model', opts.model);
+  if (opts?.keyId && opts.keyId !== 'all') params.set('keyId', opts.keyId);
+  const res = await apiFetch(`${API_BASE}/ai-gateway/analytics?${params.toString()}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to fetch AI usage analytics');
+  return data.analytics;
+}
+
+export async function runPlaygroundRequest(
+  payload: { model: string; messages: { role: string; content: string }[]; temperature?: number; max_tokens?: number; stream?: boolean },
+  signal?: AbortSignal
+): Promise<Response> {
+  return apiFetch(`${API_BASE}/ai-gateway/playground`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+    signal
+  });
+}
+
 export async function verifyProvider(
   providerId: AiProviderId,
   apiKey?: string,
@@ -126,6 +187,46 @@ export async function reorderProviderKeysApi(providerId: AiProviderId, keyIds: s
   return data.config;
 }
 
+export async function toggleProviderKeyAccountApi(providerId: AiProviderId, keyId: string, enabled: boolean): Promise<AiGatewayConfig> {
+  const res = await apiFetch(`${API_BASE}/ai-gateway/providers/${encodeURIComponent(providerId)}/keys/${encodeURIComponent(keyId)}/toggle`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to toggle API key account');
+  return data.config;
+}
+
+export async function addProviderCustomModelApi(providerId: AiProviderId | OAuthProviderId, model: string): Promise<AiGatewayConfig> {
+  const res = await apiFetch(`${API_BASE}/ai-gateway/providers/${encodeURIComponent(providerId)}/custom-models`, jsonPost({ model }));
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to add custom model');
+  return data.config;
+}
+
+export async function removeProviderCustomModelApi(providerId: AiProviderId | OAuthProviderId, model: string): Promise<AiGatewayConfig> {
+  const res = await apiFetch(`${API_BASE}/ai-gateway/providers/${encodeURIComponent(providerId)}/custom-models`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to remove custom model');
+  return data.config;
+}
+
+export async function toggleAccountApi(provider: OAuthProviderId, accountId: string, enabled: boolean): Promise<SubscriptionAccount[]> {
+  const res = await apiFetch(`${API_BASE}/ai-gateway/accounts/${encodeURIComponent(provider)}/toggle`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ accountId, enabled })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to toggle account');
+  return data.accounts;
+}
+
 
 // ---- Subscription accounts (OAuth login per provider, multi-account + ordered rotation)
 
@@ -155,8 +256,11 @@ export const reorderAccountsApi = async (p: OAuthProviderId, accountIds: string[
   (await body<{ accounts: SubscriptionAccount[] }>(await apiFetch(acct(p, 'reorder'), jsonPost({ accountIds })), 'Failed to reorder accounts')).accounts;
 
 // ---- Quota and combos
-export const fetchAccountUsage = async (fresh = false) =>
-  (await body<{ usage: AccountUsage[] }>(await apiFetch(`${API_BASE}/ai-gateway/accounts/usage${fresh ? '?fresh=1' : ''}`), 'Failed to read quota')).usage;
+export const fetchAccountUsage = async (fresh = false) => {
+  const params = new URLSearchParams({ tzOffset: String(new Date().getTimezoneOffset()) });
+  if (fresh) params.set('fresh', '1');
+  return (await body<{ usage: AccountUsage[] }>(await apiFetch(`${API_BASE}/ai-gateway/accounts/usage?${params.toString()}`), 'Failed to read quota')).usage;
+};
 export const fetchCombos = async () => (await body<{ combos: Record<string, string[]> }>(await apiFetch(`${API_BASE}/ai-gateway/combos`), 'Failed to load combos')).combos;
 export const saveCombo = async (name: string, targets: string[]) =>
   (await body<{ combos: Record<string, string[]> }>(await apiFetch(`${API_BASE}/ai-gateway/combos/${encodeURIComponent(name)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ targets }) }), 'Failed to save combo')).combos;

@@ -610,13 +610,13 @@ export default function TopologyVisualizer({
 
       {/* INITIAL SCANNING RADAR LOADER */}
       {!hasLoadedOnce && loadingNodeData ? (
-        <div className="relative rounded-xl border border-zinc-800 bg-[#09090b] min-h-[520px] flex flex-col items-center justify-center p-8 overflow-hidden text-center select-none">
+        <div className="relative rounded-xl border border-[var(--border)] bg-[var(--card)] min-h-[520px] flex flex-col items-center justify-center p-8 overflow-hidden text-center select-none shadow-xs">
           {/* Cyber Radar Grid Background */}
           <div
             className="absolute inset-0 pointer-events-none opacity-25"
             style={{
               backgroundImage:
-                'radial-gradient(circle at 50% 50%, rgba(56, 189, 248, 0.25), transparent 70%), linear-gradient(to right, #27272a 1px, transparent 1px), linear-gradient(to bottom, #27272a 1px, transparent 1px)',
+                'radial-gradient(circle at 50% 50%, rgba(56, 189, 248, 0.2), transparent 70%), linear-gradient(to right, var(--border) 1px, transparent 1px), linear-gradient(to bottom, var(--border) 1px, transparent 1px)',
               backgroundSize: '100% 100%, 36px 36px, 36px 36px'
             }}
           />
@@ -625,66 +625,66 @@ export default function TopologyVisualizer({
           <div className="relative flex items-center justify-center mb-6">
             <div className="absolute w-48 h-48 rounded-full border border-emerald-500/20 animate-ping duration-1000" />
             <div className="absolute w-36 h-36 rounded-full border border-sky-500/30 animate-pulse" />
-            <div className="w-20 h-20 rounded-full bg-zinc-900 border border-emerald-500/40 shadow-xl shadow-emerald-500/10 flex items-center justify-center z-10">
-              <Network className="w-8 h-8 text-emerald-400 animate-pulse" />
+            <div className="w-20 h-20 rounded-full bg-[var(--background)] border border-emerald-500/40 shadow-xl shadow-emerald-500/10 flex items-center justify-center z-10">
+              <Network className="w-8 h-8 text-emerald-500 dark:text-emerald-400 animate-pulse" />
             </div>
           </div>
 
           <div className="relative z-10 space-y-2 max-w-md">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-mono">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-xs font-mono">
               <RefreshCw className="w-3.5 h-3.5 animate-spin" />
               <span>{t('topology.scanningTitle')}</span>
             </div>
-            <h3 className="text-sm font-semibold text-zinc-100">
+            <h3 className="text-sm font-semibold text-[var(--foreground)]">
               {t('topology.scanningTitle')}
             </h3>
-            <p className="text-xs text-zinc-400 leading-relaxed">
+            <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
               {t('topology.scanningSub')}
             </p>
 
             {/* 4 Layer Scanning Progress Pills */}
             <div className="flex items-center justify-center gap-2 pt-3 flex-wrap">
-              <span className="px-2.5 py-1 rounded-lg bg-zinc-900 border border-zinc-800 text-[11px] font-mono text-sky-400 flex items-center gap-1.5 animate-pulse">
+              <span className="px-2.5 py-1 rounded-lg bg-[var(--background)] border border-[var(--border)] text-[11px] font-mono text-sky-600 dark:text-sky-400 flex items-center gap-1.5 animate-pulse">
                 <Globe className="w-3 h-3" /> {t('topology.layerIngress')}
               </span>
-              <span className="px-2.5 py-1 rounded-lg bg-zinc-900 border border-zinc-800 text-[11px] font-mono text-emerald-400 flex items-center gap-1.5 animate-pulse delay-75">
+              <span className="px-2.5 py-1 rounded-lg bg-[var(--background)] border border-[var(--border)] text-[11px] font-mono text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 animate-pulse delay-75">
                 <Server className="w-3 h-3" /> {t('topology.layerGateway')}
               </span>
-              <span className="px-2.5 py-1 rounded-lg bg-zinc-900 border border-zinc-800 text-[11px] font-mono text-rose-400 flex items-center gap-1.5 animate-pulse delay-150">
+              <span className="px-2.5 py-1 rounded-lg bg-[var(--background)] border border-[var(--border)] text-[11px] font-mono text-rose-600 dark:text-rose-400 flex items-center gap-1.5 animate-pulse delay-150">
                 <Layers className="w-3 h-3" /> {t('topology.layerApps')}
               </span>
-              <span className="px-2.5 py-1 rounded-lg bg-zinc-900 border border-zinc-800 text-[11px] font-mono text-amber-400 flex items-center gap-1.5 animate-pulse delay-200">
+              <span className="px-2.5 py-1 rounded-lg bg-[var(--background)] border border-[var(--border)] text-[11px] font-mono text-amber-600 dark:text-amber-400 flex items-center gap-1.5 animate-pulse delay-200">
                 <Database className="w-3 h-3" /> {t('topology.layerData')}
               </span>
             </div>
           </div>
         </div>
       ) : viewMode !== 'matrix' ? (
-        <div className="relative rounded-xl overflow-hidden border border-zinc-800 bg-[#09090b]">
+        <div className="relative rounded-xl overflow-hidden border border-[var(--border)] bg-[var(--background)] shadow-inner">
           {/* Floating Pill on Rescan */}
           {loadingNodeData && hasLoadedOnce && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 px-3.5 py-1.5 rounded-full bg-zinc-950/90 border border-emerald-500/40 text-emerald-400 shadow-xl shadow-black/60 backdrop-blur-md flex items-center gap-2 text-xs font-mono animate-in fade-in">
-              <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 px-3.5 py-1.5 rounded-full bg-[var(--card)]/95 border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 shadow-xl backdrop-blur-md flex items-center gap-2 text-xs font-mono animate-in fade-in">
+              <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-500 dark:text-emerald-400" />
               <span>{t('topology.updatingPill')}</span>
             </div>
           )}
           {/* Layer Headers for Pipeline Mode */}
           {targetServer && viewMode === 'pipeline' && (
-            <div className="grid grid-cols-4 border-b border-zinc-800/80 bg-zinc-950/60 px-4 py-2 text-[11px] font-mono text-zinc-400">
+            <div className="grid grid-cols-4 border-b border-[var(--border)] bg-[var(--muted)]/50 px-4 py-2 text-[11px] font-mono text-[var(--muted-foreground)]">
               <div className="flex items-center gap-1.5">
-                <Globe className="w-3.5 h-3.5 text-sky-400" />
+                <Globe className="w-3.5 h-3.5 text-sky-500 dark:text-sky-400" />
                 <span>1. {t('topology.layerIngress').toUpperCase()}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <Server className="w-3.5 h-3.5 text-emerald-400" />
+                <Server className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
                 <span>2. {t('topology.layerGateway').toUpperCase()}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <Layers className="w-3.5 h-3.5 text-rose-400" />
+                <Layers className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" />
                 <span>3. {t('topology.layerApps').toUpperCase()}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <Database className="w-3.5 h-3.5 text-amber-400" />
+                <Database className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
                 <span>4. {t('topology.layerData').toUpperCase()}</span>
               </div>
             </div>
@@ -715,7 +715,7 @@ export default function TopologyVisualizer({
               className="absolute inset-0 pointer-events-none opacity-20"
               style={{
                 backgroundImage:
-                  'radial-gradient(circle at 50% 50%, rgba(56, 189, 248, 0.16), transparent 70%), linear-gradient(to right, #27272a 1px, transparent 1px), linear-gradient(to bottom, #27272a 1px, transparent 1px)',
+                  'radial-gradient(circle at 50% 50%, rgba(56, 189, 248, 0.16), transparent 70%), linear-gradient(to right, var(--border) 1px, transparent 1px), linear-gradient(to bottom, var(--border) 1px, transparent 1px)',
                 backgroundSize: '100% 100%, 36px 36px, 36px 36px'
               }}
             />
@@ -782,7 +782,7 @@ export default function TopologyVisualizer({
                     >
                       {/* Node Shadow */}
                       {viewMode === 'isometric' && (
-                        <rect x={6} y={8} width={boxW} height={boxH} rx={10} fill="rgba(0,0,0,0.6)" />
+                        <rect x={6} y={8} width={boxW} height={boxH} rx={10} fill="rgba(0,0,0,0.18)" className="dark:fill-black/60" />
                       )}
 
                       {/* Main Node Card */}
@@ -790,10 +790,10 @@ export default function TopologyVisualizer({
                         width={boxW}
                         height={boxH}
                         rx={10}
-                        fill="#121215"
-                        stroke={isSelected ? '#ffffff' : node.color}
+                        fill="var(--card)"
+                        stroke={isSelected ? 'var(--foreground)' : node.color}
                         strokeWidth={isSelected ? 2.5 : 1.5}
-                        className="transition-colors group-hover:brightness-125"
+                        className="transition-colors group-hover:brightness-105"
                       />
 
                       {/* Accent Strip */}
@@ -811,7 +811,7 @@ export default function TopologyVisualizer({
                       <text
                         x={30}
                         y={23}
-                        fill="#f4f4f5"
+                        fill="var(--foreground)"
                         fontSize="11"
                         fontWeight="600"
                         fontFamily="ui-sans-serif, system-ui, sans-serif"
@@ -821,7 +821,7 @@ export default function TopologyVisualizer({
                       <text
                         x={30}
                         y={38}
-                        fill="#a1a1aa"
+                        fill="var(--muted-foreground)"
                         fontSize="9.5"
                         fontFamily="ui-monospace, SFMono-Regular, monospace"
                       >
@@ -834,8 +834,8 @@ export default function TopologyVisualizer({
             </div>
 
             {/* Bottom HUD Bar & Controls */}
-            <div className="absolute bottom-3 left-3 right-3 flex flex-wrap items-center justify-between gap-2 bg-zinc-950/90 backdrop-blur-md border border-zinc-800 rounded-lg px-3 py-2 text-xs">
-              <div className="flex items-center gap-3 text-[11px] text-zinc-400">
+            <div className="absolute bottom-3 left-3 right-3 flex flex-wrap items-center justify-between gap-2 bg-[var(--card)]/95 backdrop-blur-md border border-[var(--border)] rounded-lg px-3 py-2 text-xs shadow-md">
+              <div className="flex items-center gap-3 text-[11px] text-[var(--muted-foreground)]">
                 <span className="flex items-center gap-1">
                   <span className="w-2.5 h-2.5 rounded-full bg-sky-400" /> Ingress
                 </span>
@@ -857,29 +857,29 @@ export default function TopologyVisualizer({
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setZoom((z) => Math.max(0.5, +(z - 0.1).toFixed(2)))}
-                  className="p-1 rounded text-zinc-400 hover:text-zinc-100"
+                  className="p-1 rounded text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
                   title="Zoom Out"
                 >
                   <ZoomOut className="w-3.5 h-3.5" />
                 </button>
-                <span className="font-mono text-[11px] text-zinc-300 min-w-10 text-center">
+                <span className="font-mono text-[11px] text-[var(--foreground)] min-w-10 text-center">
                   {Math.round(zoom * 100)}%
                 </span>
                 <button
                   onClick={() => setZoom((z) => Math.min(2.2, +(z + 0.1).toFixed(2)))}
-                  className="p-1 rounded text-zinc-400 hover:text-zinc-100"
+                  className="p-1 rounded text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
                   title="Zoom In"
                 >
                   <ZoomIn className="w-3.5 h-3.5" />
                 </button>
-                <div className="w-px h-3 bg-zinc-800" />
+                <div className="w-px h-3 bg-[var(--border)]" />
                 <button
                   onClick={() => {
                     setZoom(1);
                     setPan({ x: 0, y: 0 });
                     setTilt({ x: 22, z: -6 });
                   }}
-                  className="text-[11px] text-zinc-400 hover:text-zinc-100 flex items-center gap-1"
+                  className="text-[11px] text-[var(--muted-foreground)] hover:text-[var(--foreground)] flex items-center gap-1"
                 >
                   <RotateCcw className="w-3 h-3" /> Reset View
                 </button>
