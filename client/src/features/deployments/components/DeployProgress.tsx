@@ -113,6 +113,19 @@ export function DeployProgress({
     () => (currentTask?.logs ?? []).filter((l) => !l.startsWith('@@STAGE') && !l.startsWith('__7SERVER_')),
     [currentTask?.logs]
   );
+  const failureHint = useMemo(() => {
+    if (!deployFailed || logs.length === 0) return '';
+    const clean = logs.slice(-50).map((l) => stripAnsi(l).trim()).filter(Boolean);
+    const ignoreRe = /^(===|---|Tearing down|Files preserved|Set Internal Port|Nothing is answering|Container\(s\) crashed|Deployment failed: container|Detected crashed|Ports listening|Recent container logs)/i;
+    const logMarkerIdx = [...clean].reverse().findIndex((l) => /^Recent container logs:|^--- Logs:/i.test(l));
+    if (logMarkerIdx !== -1) {
+      const startIdx = clean.length - 1 - logMarkerIdx + 1;
+      const candidate = clean.slice(startIdx).find((l) => !ignoreRe.test(l) && !/^(Detected container|Container crash)/i.test(l));
+      if (candidate) return candidate;
+    }
+    const errLine = [...clean].reverse().find((l) => !ignoreRe.test(l) && /(fatal|panic|error|gagal|wajib|eaddrinuse|enoent|exception|permission denied|exited \([1-9])/i.test(l));
+    return errLine || '';
+  }, [deployFailed, logs]);
   const stages = useMemo(() => {
     const derived = deriveStages(currentTask, currentStageDefs);
     if (manualSuccess) {
@@ -444,6 +457,11 @@ Please check the process and container status on the server, analyze the root ca
               <p className="text-[11px] text-[var(--muted-foreground)] mt-0.5 leading-relaxed">
                 {t('gitApp.aiDiagnoseDesc')}
               </p>
+              {failureHint && (
+                <div className="mt-2 px-2.5 py-1.5 rounded-lg bg-red-500/10 border border-red-500/25 text-[11px] font-mono text-red-500 dark:text-red-400 break-all">
+                  {failureHint}
+                </div>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0 flex-wrap">

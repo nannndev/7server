@@ -11,6 +11,7 @@ interface StoredAccount {
   provider: OAuthProviderId;
   label?: string;
   email?: string;
+  enabled?: boolean;
   connectedAt: string;
   refreshedAt?: string;
   lastError?: string;
@@ -23,6 +24,7 @@ export interface PublicAccount {
   provider: OAuthProviderId;
   label?: string;
   email?: string;
+  enabled: boolean;
   connectedAt: string;
   refreshedAt?: string;
   expiresAt?: number;
@@ -53,6 +55,7 @@ const toPublic = (a: StoredAccount): PublicAccount => {
     provider: a.provider,
     label: a.label,
     email: a.email,
+    enabled: a.enabled !== false,
     connectedAt: a.connectedAt,
     refreshedAt: a.refreshedAt,
     expiresAt,
@@ -69,7 +72,7 @@ export function listAccountsFor(provider: OAuthProviderId): PublicAccount[] {
   return read().filter((a) => a.provider === provider).map(toPublic);
 }
 
-export const isConnected = (p: OAuthProviderId) => read().some((a) => a.provider === p);
+export const isConnected = (p: OAuthProviderId) => read().some((a) => a.provider === p && a.enabled !== false);
 
 export function saveAccount(provider: OAuthProviderId, cred: OAuthCredential, accountId?: string, label?: string): PublicAccount {
   const all = read();
@@ -129,6 +132,13 @@ export function removeAccount(provider: OAuthProviderId, accountId?: string): bo
   if (next.length === all.length) return false;
   write(next);
   return true;
+}
+
+export function toggleAccount(provider: OAuthProviderId, accountId: string, enabled: boolean): PublicAccount[] {
+  const all = read();
+  const next = all.map((a) => (a.provider === provider && a.id === accountId ? { ...a, enabled } : a));
+  write(next);
+  return listAccounts();
 }
 
 /** Reorders accounts of a single provider according to `accountIds` (1st = highest priority in rotation). */

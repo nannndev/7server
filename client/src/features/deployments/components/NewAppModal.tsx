@@ -176,6 +176,9 @@ export default function NewAppModal({
   const [installCmd, setInstallCmd] = useState('');
   const [buildCmd, setBuildCmd] = useState('');
   const [startCmd, setStartCmd] = useState('');
+  const [healthCheckPath, setHealthCheckPath] = useState('/');
+  const [postDeployCmd, setPostDeployCmd] = useState('');
+  const [autoSsl, setAutoSsl] = useState(true);
   const [internalPort, setInternalPort] = useState<number>(3000);
   const [envVars, setEnvVars] = useState<Array<{ key: string; value: string }>>([
     { key: 'NODE_ENV', value: 'production' }
@@ -672,6 +675,9 @@ export default function NewAppModal({
           port: svc.internalPort,
           domain: exposureMode === 'none' ? '' : svc.customDomain,
           exposure: exposureMode,
+          autoSsl: exposureMode === 'public' && !!svc.customDomain && autoSsl,
+          healthCheckPath: healthCheckPath.trim() || '/',
+          ...(postDeployCmd.trim() ? { postDeployCmd: postDeployCmd.trim() } : {}),
           tunnelName: tunnelStatus?.tunnelName || tunnelStatus?.tunnelId,
           engine: svc.detectedEngine,
           env: svc.envVars.filter((e) => e.key.trim()),
@@ -763,6 +769,9 @@ export default function NewAppModal({
       installCmd, buildCmd, startCmd, port: internalPort,
       domain: exposureMode === 'none' ? '' : customDomain,
       exposure: exposureMode,
+      autoSsl: exposureMode === 'public' && !!customDomain && autoSsl,
+      healthCheckPath: healthCheckPath.trim() || '/',
+      ...(postDeployCmd.trim() ? { postDeployCmd: postDeployCmd.trim() } : {}),
       tunnelName: tunnelStatus?.tunnelName || tunnelStatus?.tunnelId,
       engine: inspectResult?.detected_engine, env: envVars.filter((e) => e.key.trim()), nodeMajor,
       composeSidecar: !!inspectResult?.compose_sidecar,
@@ -1592,6 +1601,15 @@ Check whether any port configuration, Docker compose settings, or environment va
                             domain={isStackMode && activeStackSvc ? activeStackSvc.customDomain : customDomain}
                             serverIp={server.host}
                           />
+                          <label className="mt-1.5 inline-flex items-center gap-2 text-[11px] text-[var(--foreground)] cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={autoSsl}
+                              onChange={(e) => setAutoSsl(e.target.checked)}
+                              className="rounded border-[var(--border)]"
+                            />
+                            <span>{t('deploy.autoSslLabel')}</span>
+                          </label>
                           <p className="text-[10px] text-[var(--muted-foreground)] mt-1 flex items-center gap-1.5">
                             <BrandIcon name="nginx" className="w-3 h-3" />
                             <span>{t('gitApp.domainHint')}</span>
@@ -1678,6 +1696,32 @@ Check whether any port configuration, Docker compose settings, or environment va
                     disabled={!overrideBuild}
                     className="h-8 text-xs font-mono disabled:opacity-75"
                     placeholder="e.g. npm start"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] text-[var(--muted-foreground)] mb-1">
+                    {t('deploy.healthCheckPath')}
+                  </label>
+                  <Input
+                    type="text"
+                    value={healthCheckPath}
+                    onChange={(e) => setHealthCheckPath(e.target.value)}
+                    placeholder="/ or /api/health"
+                    className="h-8 text-xs font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] text-[var(--muted-foreground)] mb-1">
+                    {t('deploy.postDeployCmd')}
+                  </label>
+                  <Input
+                    type="text"
+                    value={postDeployCmd}
+                    onChange={(e) => setPostDeployCmd(e.target.value)}
+                    placeholder="e.g. npx prisma migrate deploy"
+                    className="h-8 text-xs font-mono"
                   />
                 </div>
 

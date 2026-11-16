@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   FolderGit2, CheckCircle2, ExternalLink, RefreshCw,
-  Trash2, Shield, GitBranch, Zap, X, Lock
+  Trash2, Shield, GitBranch, Zap, X, Lock, Cloud, Globe
 } from 'lucide-react';
 import {
   fetchGitIntegrations,
@@ -9,6 +9,13 @@ import {
   connectGitViaToken
 } from '@/features/git/api';
 import type { SafeGitIntegration } from '@/features/git/types';
+import {
+  fetchCloudflareIntegration,
+  connectCloudflareToken,
+  syncCloudflareZones,
+  disconnectCloudflare,
+  type SafeCloudflareIntegration
+} from '@/features/cloudflare/api';
 import { Card } from '@/shared/ui/card';
 import { Button } from '@/shared/ui/button';
 import { Badge } from '@/shared/ui/badge';
@@ -27,13 +34,25 @@ export default function IntegrationsPage() {
   const [patToken, setPatToken] = useState('');
   const [submittingToken, setSubmittingToken] = useState(false);
 
+  // Cloudflare integration state
+  const [cf, setCf] = useState<SafeCloudflareIntegration>({ connected: false, zones: [] });
+  const [showCfModal, setShowCfModal] = useState(false);
+  const [cfToken, setCfToken] = useState('');
+  const [submittingCf, setSubmittingCf] = useState(false);
+  const [syncingCf, setSyncingCf] = useState(false);
+
   const GITHUB_PAT_URL = 'https://github.com/settings/tokens/new?scopes=repo,read:user,admin:repo_hook&description=7Server+Control+Panel';
+  const CF_TOKEN_URL = 'https://dash.cloudflare.com/profile/api-tokens';
 
   const loadData = async () => {
     try {
       setLoading(true);
-      const ints = await fetchGitIntegrations();
+      const [ints, cfData] = await Promise.all([
+        fetchGitIntegrations(),
+        fetchCloudflareIntegration().catch(() => ({ connected: false, zones: [] }))
+      ]);
       setIntegrations(ints);
+      setCf(cfData);
     } catch (err: any) {
       toast.error(err.message || t('integrations.loadFailed'));
     } finally {
@@ -237,6 +256,118 @@ export default function IntegrationsPage() {
           </div>
         </Card>
 
+        {/* Cloudflare Card */}
+        <Card className="p-5 flex flex-col justify-between border-[var(--border)]">
+          <div className="space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-[#F38020]/15 text-[#F38020] border border-[#F38020]/30 flex items-center justify-center shrink-0">
+                  <Cloud className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-[var(--foreground)]">Cloudflare</h3>
+                  <p className="text-[11px] text-[var(--muted-foreground)]">DNS, Tunnels & SSL API Access</p>
+                </div>
+              </div>
+              {cf.connected ? (
+                <Badge className="bg-emerald-500/15 text-emerald-500 border-emerald-500/30 text-[10px]">
+                  <CheckCircle2 className="w-3 h-3 mr-1" />
+                  Connected
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="text-[10px]">Not connected</Badge>
+              )}
+            </div>
+
+            {cf.connected ? (
+              <div className="space-y-2 text-xs">
+                {cf.accountName && (
+                  <div className="text-[var(--muted-foreground)]">
+                    Account: <span className="font-medium text-[var(--foreground)]">{cf.accountName}</span>
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-1.5">
+                  {cf.zones.length > 0 ? (
+                    cf.zones.map((z) => (
+                      <Badge key={z.id} variant="outline" className="text-[10px] font-mono gap-1">
+                        <Globe className="w-2.5 h-2.5 text-amber-400" />
+                        {z.name}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-[11px] text-[var(--muted-foreground)]">No zones cached</span>
+                  )}
+                </div>
+                <p className="text-[11px] text-emerald-500/90">
+                  AI Copilot & Tunnels can manage DNS, Zero Trust Tunnels, SSL & Cache directly.
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-[var(--muted-foreground)]">
+                Connect your Cloudflare API Token so AI Copilot and 7Server can automatically add CNAME/A DNS records, configure Tunnels, SSL mode, and purge cache.
+              </p>
+            )}
+          </div>
+
+          <div className="pt-5 border-t border-[var(--border)] mt-4 flex items-center gap-2">
+            {cf.connected ? (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={syncingCf}
+                  onClick={async () => {
+                    setSyncingCf(true);
+                    try {
+                      const next = await syncCloudflareZones();
+                      setCf(next);
+                      toast.success(`Synced ${next.zones.length} Cloudflare zone(s)`);
+                    } catch (e: any) {
+                      toast.error(e.message || 'Sync failed');
+                    } finally {
+                      setSyncingCf(false);
+                    }
+                  }}
+                  className="text-xs gap-1.5"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${syncingCf ? 'animate-spin' : ''}`} />
+                  Sync
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    const ok = await confirmModal({
+                      title: 'Disconnect Cloudflare',
+                      message: 'Remove Cloudflare API token? AI Copilot will no longer be able to manage Cloudflare DNS/Tunnels.',
+                      variant: 'danger',
+                      confirmText: t('common.delete')
+                    });
+                    if (!ok) return;
+                    await disconnectCloudflare();
+                    setCf({ connected: false, zones: [] });
+                    toast.success('Cloudflare disconnected');
+                  }}
+                  className="flex-1 text-xs text-red-500 hover:text-red-600 hover:bg-red-500/10 gap-1.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{t('integrations.disconnect')}</span>
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => setShowCfModal(true)}
+                className="w-full text-xs gap-1.5"
+              >
+                <Cloud className="w-3.5 h-3.5" />
+                <span>Connect Cloudflare</span>
+              </Button>
+            )}
+          </div>
+        </Card>
+
         {/* GitLab Card */}
         <Card className="p-5 flex flex-col justify-between border-[var(--border)] opacity-60">
           <div className="space-y-4">
@@ -372,6 +503,100 @@ export default function IntegrationsPage() {
                   className="text-xs gap-1.5"
                 >
                   {submittingToken ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>{t('integrations.verifying')}</span>
+                    </>
+                  ) : (
+                    <span>{t('integrations.saveAndConnect')}</span>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Connect Cloudflare Modal */}
+      {showCfModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-[var(--card)] border border-[var(--border)] metal rounded-xl max-w-lg w-full p-5 space-y-4 shadow-2xl text-[var(--foreground)]">
+            <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
+              <div className="flex items-center gap-2">
+                <Cloud className="w-4 h-4 text-[#F38020]" />
+                <h3 className="text-sm font-semibold text-[var(--foreground)]">Connect Cloudflare API</h3>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowCfModal(false)}
+                className="h-7 w-7 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!cfToken.trim()) {
+                  toast.error('Cloudflare API Token is required');
+                  return;
+                }
+                setSubmittingCf(true);
+                try {
+                  const saved = await connectCloudflareToken(cfToken.trim());
+                  setCf(saved);
+                  setCfToken('');
+                  setShowCfModal(false);
+                  toast.success(`Cloudflare connected (${saved.zones.length} zone(s) synced)`);
+                } catch (err: any) {
+                  toast.error(err.message || 'Invalid Cloudflare API token');
+                } finally {
+                  setSubmittingCf(false);
+                }
+              }}
+              className="space-y-4"
+            >
+              <div className="p-3 rounded-lg bg-[var(--muted)]/50 border border-[var(--border)] space-y-1.5 text-xs">
+                <div className="font-semibold text-[var(--foreground)]">Recommended API Token Permissions:</div>
+                <ul className="list-disc pl-4 space-y-0.5 text-[11px] text-[var(--muted-foreground)]">
+                  <li><code>Zone : Zone : Read</code> &amp; <code>Zone : DNS : Edit</code></li>
+                  <li><code>Zone : SSL and Certificates : Edit</code> &amp; <code>Zone : Cache Purge : Purge</code></li>
+                  <li><code>Account : Cloudflare Tunnel : Edit</code> (for Zero Trust Tunnels)</li>
+                </ul>
+                <a
+                  href={CF_TOKEN_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-[11px] text-amber-400 hover:underline pt-1"
+                >
+                  Create API Token in Cloudflare Dashboard <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-[var(--foreground)]">Cloudflare API Token</label>
+                <Input
+                  type="password"
+                  value={cfToken}
+                  onChange={(e) => setCfToken(e.target.value)}
+                  placeholder="Paste your Cloudflare API Token..."
+                  className="font-mono text-xs"
+                  autoFocus
+                />
+                <div className="flex items-center gap-1.5 text-[10px] text-[var(--muted-foreground)]">
+                  <Lock className="w-3 h-3" />
+                  <span>Encrypted at rest; never exposed to the browser or AI prompt.</span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--border)]">
+                <Button type="button" variant="outline" size="sm" onClick={() => setShowCfModal(false)} className="text-xs">
+                  {t('common.cancel')}
+                </Button>
+                <Button type="submit" size="sm" variant="default" disabled={submittingCf} className="text-xs gap-1.5">
+                  {submittingCf ? (
                     <>
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                       <span>{t('integrations.verifying')}</span>

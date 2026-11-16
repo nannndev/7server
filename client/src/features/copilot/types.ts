@@ -1,5 +1,6 @@
-/** One shell command the AI proposed in a ```bash block, and what happened to it. */
+/** One shell command or Cloudflare action the AI proposed, and what happened to it. */
 export interface CommandRun {
+  kind?: 'bash' | 'cloudflare';
   code: string;
   /** pending = waiting (auto-run queue or user approval) */
   status: 'pending' | 'running' | 'done' | 'skipped';
@@ -29,6 +30,8 @@ export interface ChatMessage {
   step?: number;
   /** outputs already sent back to the AI (loop guard) */
   fed?: boolean;
+  /** halted cleanly after hitting MAX_STEPS; user can click Continue */
+  stepLimit?: boolean;
   /** request failure: rendered as an error card, never sent back to the model */
   error?: CopilotError;
   /** resolved model that generated this assistant reply (e.g. "cc/claude-sonnet-4-6" or "groq/llama-3.3-70b-versatile") */
@@ -45,9 +48,24 @@ export interface CopilotContext {
   preferences?: ReturnType<typeof import('./preferences').preferencesPayload>;
 }
 
+export type CopilotRunMode = 'manual' | 'agent' | 'auto';
+
+export type CopilotBubbleAction =
+  | 'approve'
+  | 'approveAll'
+  | 'skip'
+  | 'stop'
+  | 'continue'
+  | 'retry'
+  | 'dismiss';
+
 export interface CopilotLiveStatus {
-  state: 'idle' | 'thinking' | 'executing' | 'approval' | 'done';
+  state: 'idle' | 'thinking' | 'executing' | 'approval' | 'limit' | 'done' | 'error';
+  mode?: CopilotRunMode;
   step?: number;
+  maxSteps?: number;
+  pendingCount?: number;
+  isRisky?: boolean;
   serverName?: string;
   command?: string;
   preview?: string;

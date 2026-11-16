@@ -49,6 +49,10 @@ export interface DeploySpec {
   env: Array<{ key: string; value: string }>;
   nodeMajor?: number;
   composeSidecar?: boolean;
+  healthCheckPath?: string;
+  postDeployCmd?: string;
+  autoSsl?: boolean;
+  commitSha?: string;
 }
 
 export const ENGINES: DeployEngine[] = ['docker', 'native_node', 'native_php', 'native_python', 'native_go', 'static'];
@@ -77,5 +81,32 @@ export function parseDeploySpec(body: any): DeploySpec {
   const exposure: ExposureType = body?.exposure === 'tunnel' ? 'tunnel' : body?.exposure === 'none' ? 'none' : 'public';
   const tunnelName = str(body?.tunnelName);
   const nodeMajor = Number.isInteger(body?.nodeMajor) && body.nodeMajor >= 4 && body.nodeMajor < 100 ? body.nodeMajor : undefined;
-  return { composeSidecar: body?.composeSidecar === true, nodeMajor, appName, repo, branch, rootDir, installCmd: str(body?.installCmd), buildCmd: str(body?.buildCmd), startCmd: str(body?.startCmd), port, domain, exposure, tunnelName, engine, env };
+  let healthCheckPath = str(body?.healthCheckPath);
+  if (healthCheckPath) {
+    if (!healthCheckPath.startsWith('/')) healthCheckPath = `/${healthCheckPath}`;
+    if (/[\s"'`\\<>]/.test(healthCheckPath)) throw badRequest('Invalid health check path');
+  }
+  const commitSha = str(body?.commitSha);
+  if (commitSha && !/^[0-9a-fA-F]{7,40}$/.test(commitSha)) throw badRequest('Invalid commit SHA');
+  return {
+    composeSidecar: body?.composeSidecar === true,
+    nodeMajor,
+    appName,
+    repo,
+    branch,
+    rootDir,
+    installCmd: str(body?.installCmd),
+    buildCmd: str(body?.buildCmd),
+    startCmd: str(body?.startCmd),
+    port,
+    domain,
+    exposure,
+    tunnelName,
+    engine,
+    env,
+    ...(healthCheckPath ? { healthCheckPath } : {}),
+    ...(str(body?.postDeployCmd) ? { postDeployCmd: str(body?.postDeployCmd) } : {}),
+    ...(body?.autoSsl === true ? { autoSsl: true } : {}),
+    ...(commitSha ? { commitSha } : {})
+  };
 }

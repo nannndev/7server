@@ -1,6 +1,25 @@
 import React, { useEffect, useState } from 'react';
-import { X, RefreshCw, Bell, Globe, ScrollText, Send, ShieldAlert, ExternalLink, Download, User } from 'lucide-react';
-import { fetchMonitor, saveMonitor, testDiscord, fetchUptime, runUptime, fetchAudit, exportAuditCsv, MonitorSettings, MonitorStatus, UptimeResult, AuditEntry } from '@/features/monitoring/api';
+import { X, RefreshCw, Bell, Globe, ScrollText, Send, ShieldAlert, ExternalLink, Download, User, Check, CheckCircle2, Trash2, Activity, Webhook, MessageSquare } from 'lucide-react';
+import {
+  acknowledgeAlertApi,
+  clearAlertHistoryApi,
+  fetchMonitor,
+  runMonitorPoll,
+  saveMonitor,
+  testCustomWebhook,
+  testDiscord,
+  testTelegram,
+  fetchUptime,
+  runUptime,
+  fetchAudit,
+  exportAuditCsv,
+  AlertHistoryEntry,
+  MonitorSettings,
+  MonitorStatus,
+  NotifyEvents,
+  UptimeResult,
+  AuditEntry
+} from '@/features/monitoring/api';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { TableSkeleton } from '@/shared/ui/skeleton';
@@ -31,7 +50,12 @@ export default function MonitoringPage({ tab, onTabChange, onThresholdsSaved, on
 
     const [settings, setSettings] = useState<MonitorSettings | null>(null);
     const [status, setStatus] = useState<MonitorStatus | null>(null);
+    const [alertHistory, setAlertHistory] = useState<AlertHistoryEntry[]>([]);
     const [tokenInput, setTokenInput] = useState('');
+    const [telegramTokenInput, setTelegramTokenInput] = useState('');
+    const [telegramChatInput, setTelegramChatInput] = useState('');
+    const [customWebhookInput, setCustomWebhookInput] = useState('');
+    const [pollingNow, setPollingNow] = useState(false);
     const [saving, setSaving] = useState(false);
 
     const [uptime, setUptime] = useState<UptimeResult[]>([]);
@@ -52,7 +76,9 @@ export default function MonitoringPage({ tab, onTabChange, onThresholdsSaved, on
         const d = await fetchMonitor();
         setSettings(d.settings);
         setStatus(d.status);
-        onAlertsChanged?.(d.status.activeAlerts.length);
+        setAlertHistory(d.history || []);
+        setTelegramChatInput(d.settings.telegramChatId || '');
+        onAlertsChanged?.(d.status.activeAlerts.filter((a) => !a.acknowledged).length);
     });
 
     const loadAudit = () => guard(async () => {
@@ -83,14 +109,38 @@ export default function MonitoringPage({ tab, onTabChange, onThresholdsSaved, on
         if (!settings) return;
         setSaving(true);
         await guard(async () => {
-            const next = await saveMonitor({ ...settings, discordWebhook: tokenInput || undefined });
+            const next = await saveMonitor({
+                ...settings,
+                discordWebhook: tokenInput || undefined,
+                telegramBotToken: telegramTokenInput || undefined,
+                telegramChatId: telegramChatInput,
+                customWebhookUrl: customWebhookInput || undefined
+            });
             setSettings(next);
             setTokenInput('');
+            setTelegramTokenInput('');
+            setCustomWebhookInput('');
             onThresholdsSaved(next.thresholds);
             setNotice(t('mon.saved'));
             setTimeout(() => setNotice(null), 2500);
         });
         setSaving(false);
+    };
+
+    const clearChannel = async (patch: { discordWebhook?: null; telegramBotToken?: null; telegramChatId?: null; customWebhookUrl?: null }) => {
+        await guard(async () => {
+            const next = await saveMonitor(patch);
+            setSettings(next);
+            if ('telegramChatId' in patch) setTelegramChatInput('');
+            setNotice(t('mon.saved'));
+            setTimeout(() => setNotice(null), 2500);
+        });
+    };
+
+    const toggleEvent = (key: keyof NotifyEvents) => {
+        if (!settings) return;
+        const curr = settings.notifyEvents || { cpu: true, mem: true, disk: true, down: true, ssl: true, http: true };
+        setSettings({ ...settings, notifyEvents: { ...curr, [key]: !curr[key] } });
     };
 
     const num = (k: 'intervalSec' | 'uptimeIntervalMin' | 'sslWarnDays') => (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -130,83 +180,355 @@ export default function MonitoringPage({ tab, onTabChange, onThresholdsSaved, on
 
                 <div key={tab} className="flex-1 overflow-auto p-4 fade-in">
                     {tab === 'alerts' && settings && (
-                        <div className="grid md:grid-cols-2 gap-6 text-xs">
-                            <section className="space-y-3">
-                                <h3 className="font-semibold text-sm">{t('monitoring.serverMonitor')}</h3>
-                                <p className="text-[var(--muted-foreground)]">
-                                    {t('monitoring.serverMonitorDesc')}
-                                    {t('mon.lastMetrics')} <b>{ago(t, status?.lastMetricsRun ?? null)}</b>, {t('mon.lastUptime')} <b>{ago(t, status?.lastUptimeRun ?? null)}</b>.
-                                </p>
-                                <label className="flex items-center gap-2">
-                                    <input type="checkbox" checked={settings.enabled} onChange={(e) => setSettings({ ...settings, enabled: e.target.checked })} />
-                                    {t('monitoring.enablePolling')}
-                                </label>
-                                <label className="flex items-center justify-between gap-2">
-                                    <span>{t('mon.metricsInterval')}</span>
-                                    <Input type="number" min={30} max={3600} value={settings.intervalSec} onChange={num('intervalSec')} className="h-7 w-24 text-xs" />
-                                </label>
-                                <label className="flex items-center justify-between gap-2">
-                                    <span>{t('mon.uptimeInterval')}</span>
-                                    <Input type="number" min={1} max={1440} value={settings.uptimeIntervalMin} onChange={num('uptimeIntervalMin')} className="h-7 w-24 text-xs" />
-                                </label>
-                                <label className="flex items-center justify-between gap-2">
-                                    <span>{t('mon.sslWarnDays')}</span>
-                                    <Input type="number" min={1} max={90} value={settings.sslWarnDays} onChange={num('sslWarnDays')} className="h-7 w-24 text-xs" />
-                                </label>
-                                <div className="space-y-1.5 pt-2 border-t border-[var(--border)]">
-                                    <span className="text-[var(--muted-foreground)]">{t('mon.thresholds')}</span>
-                                    {(['cpu', 'mem', 'disk'] as const).map((k) => (
-                                        <label key={k} className="flex items-center justify-between gap-2">
-                                            <span className="uppercase font-mono">{k === 'mem' ? 'RAM' : k}</span>
-                                            <Input
-                                                type="number" min={1} max={100} value={settings.thresholds[k]}
-                                                onChange={(e) => setSettings({ ...settings, thresholds: { ...settings.thresholds, [k]: Number(e.target.value) } })}
-                                                className="h-7 w-24 text-xs"
-                                            />
-                                        </label>
-                                    ))}
+                        <div className="space-y-5 text-xs">
+                            {/* Live Poller Status Strip */}
+                            <div className="rounded-xl border border-[var(--border)] bg-[var(--background)]/50 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                                        (status?.activeAlerts.length ?? 0) > 0
+                                            ? 'bg-red-500/15 text-red-500 border border-red-500/30'
+                                            : 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/30'
+                                    }`}>
+                                        <Activity className="w-4 h-4" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-2 font-semibold text-[var(--foreground)]">
+                                            <span>{t('monitoring.serverMonitor')}</span>
+                                            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+                                                settings.enabled ? 'bg-emerald-500/15 text-emerald-500' : 'bg-zinc-500/15 text-zinc-400'
+                                            }`}>
+                                                {settings.enabled ? 'ACTIVE' : 'PAUSED'}
+                                            </span>
+                                        </div>
+                                        <p className="text-[11px] text-[var(--muted-foreground)] truncate mt-0.5">
+                                            {t('mon.lastMetrics')} <b>{ago(t, status?.lastMetricsRun ?? null)}</b> · {t('mon.lastUptime')} <b>{ago(t, status?.lastUptimeRun ?? null)}</b>
+                                        </p>
+                                    </div>
                                 </div>
-                            </section>
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={pollingNow}
+                                        onClick={async () => {
+                                            setPollingNow(true);
+                                            await guard(async () => {
+                                                const d = await runMonitorPoll();
+                                                setSettings(d.settings);
+                                                setStatus(d.status);
+                                                setAlertHistory(d.history || []);
+                                                onAlertsChanged?.(d.status.activeAlerts.filter((a) => !a.acknowledged).length);
+                                            });
+                                            setPollingNow(false);
+                                        }}
+                                        className="h-8 gap-1.5"
+                                    >
+                                        <RefreshCw className={`w-3.5 h-3.5 ${pollingNow ? 'animate-spin' : ''}`} />
+                                        <span>{pollingNow ? t('alerts.checking') : t('alerts.checkNow')}</span>
+                                    </Button>
+                                    <Button size="sm" onClick={save} disabled={saving} className="h-8 btn-metal">
+                                        {saving ? t('mon.saving') : t('monitoring.saveSettings')}
+                                    </Button>
+                                </div>
+                            </div>
 
-                            <section className="space-y-3">
-                                <h3 className="font-semibold text-sm">{t('monitoring.discordTitle')}</h3>
-                                <p className="text-[var(--muted-foreground)]">
-                                    {t('monitoring.discordDesc')}
-                                </p>
-                                <label className="block space-y-1">
-                                    <span>{t('monitoring.webhookUrl')} {settings.hasDiscordWebhook && <span className="text-emerald-500">{t('mon.webhookSaved')}</span>}</span>
-                                    <Input
-                                        type="password" autoComplete="off" value={tokenInput}
-                                        placeholder={settings.hasDiscordWebhook ? t('mon.webhookKeep') : t('monitoring.webhookPlaceholder')}
-                                        onChange={(e) => setTokenInput(e.target.value)} className="h-8 text-xs font-mono"
-                                    />
-                                </label>
-                                <Button
-                                    variant="outline" size="sm" className="gap-1"
-                                    disabled={!settings.hasDiscordWebhook}
-                                    title={!settings.hasDiscordWebhook ? t('mon.webhookSaveFirst') : ''}
-                                    onClick={() => guard(async () => { await testDiscord(); setNotice(t('mon.pingSent')); setTimeout(() => setNotice(null), 3000); })}
-                                >
-                                    <Send className="w-3.5 h-3.5" /> {t('monitoring.testWebhook')}
-                                </Button>
+                            {notice && <div role="status" className="px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-xs">{notice}</div>}
 
-                                <div className="pt-3 border-t border-[var(--border)] space-y-1.5">
-                                    <span className="font-semibold">{t('monitoring.activeAlerts')} ({status?.activeAlerts.length ?? 0})</span>
-                                    {status?.activeAlerts.length ? (
-                                        status.activeAlerts.map((a) => (
-                                            <div key={a.key} className="text-red-500 bg-red-500/10 border border-red-500/20 rounded px-2 py-1">
-                                                {stripTags(a.message)} <span className="text-[var(--muted-foreground)]">· {t('mon.since', { ago: ago(t, a.since) })}</span>
+                            <div className="grid lg:grid-cols-2 gap-5">
+                                {/* Left Column: Thresholds, Intervals & Event Rules */}
+                                <div className="space-y-4">
+                                    <section className="rounded-xl border border-[var(--border)] bg-[var(--background)]/30 p-4 space-y-3.5">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <h3 className="font-semibold text-sm">{t('mon.thresholds')}</h3>
+                                            <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                                                <input type="checkbox" checked={settings.enabled} onChange={(e) => setSettings({ ...settings, enabled: e.target.checked })} className="rounded" />
+                                                <span className="text-[11px] font-medium">{t('monitoring.enablePolling')}</span>
+                                            </label>
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            {(['cpu', 'mem', 'disk'] as const).map((k) => {
+                                                const val = settings.thresholds[k];
+                                                return (
+                                                    <div key={k} className="space-y-1">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="uppercase font-mono font-semibold text-[11px]">{k === 'mem' ? 'RAM' : k}</span>
+                                                            <div className="flex items-center gap-1.5">
+                                                                <Input
+                                                                    type="number" min={1} max={100} value={val}
+                                                                    onChange={(e) => setSettings({ ...settings, thresholds: { ...settings.thresholds, [k]: Number(e.target.value) } })}
+                                                                    className="h-7 w-16 text-xs text-right font-mono"
+                                                                />
+                                                                <span className="text-[var(--muted-foreground)]">%</span>
+                                                            </div>
+                                                        </div>
+                                                        <input
+                                                            type="range"
+                                                            min={10}
+                                                            max={100}
+                                                            value={val}
+                                                            onChange={(e) => setSettings({ ...settings, thresholds: { ...settings.thresholds, [k]: Number(e.target.value) } })}
+                                                            className="w-full accent-emerald-500 cursor-pointer h-1.5"
+                                                        />
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+
+                                        <div className="grid grid-cols-3 gap-2 pt-2 border-t border-[var(--border)]/70">
+                                            <label className="space-y-1">
+                                                <span className="text-[10.5px] text-[var(--muted-foreground)] block truncate">{t('mon.metricsInterval')}</span>
+                                                <Input type="number" min={30} max={3600} value={settings.intervalSec} onChange={num('intervalSec')} className="h-7 text-xs font-mono" />
+                                            </label>
+                                            <label className="space-y-1">
+                                                <span className="text-[10.5px] text-[var(--muted-foreground)] block truncate">{t('mon.uptimeInterval')}</span>
+                                                <Input type="number" min={1} max={1440} value={settings.uptimeIntervalMin} onChange={num('uptimeIntervalMin')} className="h-7 text-xs font-mono" />
+                                            </label>
+                                            <label className="space-y-1">
+                                                <span className="text-[10.5px] text-[var(--muted-foreground)] block truncate">{t('mon.sslWarnDays')}</span>
+                                                <Input type="number" min={1} max={90} value={settings.sslWarnDays} onChange={num('sslWarnDays')} className="h-7 text-xs font-mono" />
+                                            </label>
+                                        </div>
+
+                                        <div className="pt-2 border-t border-[var(--border)]/70 space-y-2">
+                                            <div className="text-[11px] font-medium text-[var(--muted-foreground)]">{t('alerts.eventRules')}</div>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {(
+                                                    [
+                                                        ['cpu', 'alerts.evCpu'],
+                                                        ['mem', 'alerts.evMem'],
+                                                        ['disk', 'alerts.evDisk'],
+                                                        ['down', 'alerts.evDown'],
+                                                        ['http', 'alerts.evHttp'],
+                                                        ['ssl', 'alerts.evSsl']
+                                                    ] as [keyof NotifyEvents, any][]
+                                                ).map(([evKey, labelKey]) => {
+                                                    const on = (settings.notifyEvents || { cpu: true, mem: true, disk: true, down: true, ssl: true, http: true })[evKey];
+                                                    return (
+                                                        <button
+                                                            key={evKey}
+                                                            type="button"
+                                                            onClick={() => toggleEvent(evKey)}
+                                                            className={`px-2.5 py-1 rounded-full border text-[11px] inline-flex items-center gap-1 transition-colors cursor-pointer ${
+                                                                on
+                                                                    ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-500 font-medium'
+                                                                    : 'border-[var(--border)] text-[var(--muted-foreground)] opacity-65'
+                                                            }`}
+                                                        >
+                                                            {on && <Check className="w-3 h-3" />}
+                                                            <span>{t(labelKey)}</span>
+                                                        </button>
+                                                    );
+                                                })}
                                             </div>
-                                        ))
-                                    ) : (
-                                        <p className="text-[var(--muted-foreground)]">{t('monitoring.allNormal')}</p>
-                                    )}
-                                </div>
-                            </section>
+                                        </div>
+                                    </section>
 
-                            <div className="md:col-span-2 flex items-center gap-3 pt-3 border-t border-[var(--border)]">
-                                <Button onClick={save} disabled={saving}>{saving ? t('mon.saving') : t('monitoring.saveSettings')}</Button>
-                                {notice && <span role="status" className="text-emerald-500">{notice}</span>}
+                                    {/* Active Alerts & Alert Timeline */}
+                                    <section className="rounded-xl border border-[var(--border)] bg-[var(--background)]/30 p-4 space-y-3">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <h3 className="font-semibold text-sm flex items-center gap-2">
+                                                <Bell className="w-4 h-4 text-red-500" />
+                                                <span>{t('monitoring.activeAlerts')} ({status?.activeAlerts.length ?? 0})</span>
+                                            </h3>
+                                        </div>
+                                        {status?.activeAlerts.length ? (
+                                            <div className="space-y-1.5">
+                                                {status.activeAlerts.map((a) => (
+                                                    <div key={a.key} className={`rounded-lg border px-2.5 py-2 flex items-start justify-between gap-2 ${
+                                                        a.acknowledged ? 'border-[var(--border)] bg-[var(--muted)]/30 opacity-75' : 'border-red-500/25 bg-red-500/10 text-red-500'
+                                                    }`}>
+                                                        <div className="min-w-0">
+                                                            <div className="font-medium break-words">{stripTags(a.message)}</div>
+                                                            <div className="text-[10px] text-[var(--muted-foreground)] mt-0.5">
+                                                                {t('mon.since', { ago: ago(t, a.since) })}
+                                                                {a.acknowledged && ` · ${t('alerts.acked')}`}
+                                                            </div>
+                                                        </div>
+                                                        {!a.acknowledged && (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={async () => {
+                                                                    const nextStatus = await acknowledgeAlertApi(a.key);
+                                                                    setStatus(nextStatus);
+                                                                    onAlertsChanged?.(nextStatus.activeAlerts.filter((x) => !x.acknowledged).length);
+                                                                }}
+                                                                className="h-6 px-2 text-[10px] shrink-0"
+                                                            >
+                                                                <Check className="w-3 h-3 mr-1" />
+                                                                {t('alerts.ack')}
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-2 text-[var(--muted-foreground)] py-1">
+                                                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                                                <span>{t('monitoring.allNormal')}</span>
+                                            </div>
+                                        )}
+
+                                        <div className="pt-3 border-t border-[var(--border)]/70 space-y-2">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className="font-semibold text-[11px] uppercase tracking-wider text-[var(--muted-foreground)]">
+                                                    {t('alerts.recentHistory')}
+                                                </span>
+                                                {alertHistory.length > 0 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => guard(async () => { await clearAlertHistoryApi(); setAlertHistory([]); })}
+                                                        className="text-[10.5px] text-[var(--muted-foreground)] hover:text-red-500 inline-flex items-center gap-1 cursor-pointer"
+                                                    >
+                                                        <Trash2 className="w-3 h-3" />
+                                                        <span>{t('alerts.clearHistory')}</span>
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {alertHistory.length === 0 ? (
+                                                <p className="text-[11px] text-[var(--muted-foreground)] italic">{t('alerts.noHistory')}</p>
+                                            ) : (
+                                                <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
+                                                    {alertHistory.map((h) => (
+                                                        <div key={h.id} className="flex items-start justify-between gap-2 text-[11px] py-1 border-b border-[var(--border)]/40 last:border-0">
+                                                            <div className="flex items-start gap-2 min-w-0">
+                                                                <span className={`px-1.5 py-0.5 rounded text-[9.5px] font-mono shrink-0 ${
+                                                                    h.type === 'triggered' ? 'bg-red-500/15 text-red-500' : 'bg-emerald-500/15 text-emerald-500'
+                                                                }`}>
+                                                                    {h.type === 'triggered' ? t('alerts.triggered') : t('alerts.recovered')}
+                                                                </span>
+                                                                <span className="text-[var(--foreground)]/90 break-words">{h.message}</span>
+                                                            </div>
+                                                            <span className="text-[10px] font-mono text-[var(--muted-foreground)] shrink-0">
+                                                                {ago(t, h.ts)}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </section>
+                                </div>
+
+                                {/* Right Column: Notification Channels */}
+                                <div className="space-y-4">
+                                    {/* Discord Channel */}
+                                    <section className="rounded-xl border border-[var(--border)] bg-[var(--background)]/30 p-4 space-y-3">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2">
+                                                <MessageSquare className="w-4 h-4 text-indigo-400" />
+                                                <h3 className="font-semibold text-sm">{t('alerts.channelDiscord')}</h3>
+                                            </div>
+                                            {settings.hasDiscordWebhook && (
+                                                <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 text-[10px] font-medium">
+                                                    {t('alerts.configured')}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-[11px] text-[var(--muted-foreground)]">{t('monitoring.discordDesc')}</p>
+                                        <Input
+                                            type="password" autoComplete="off" value={tokenInput}
+                                            placeholder={settings.hasDiscordWebhook ? t('mon.webhookKeep') : t('monitoring.webhookPlaceholder')}
+                                            onChange={(e) => setTokenInput(e.target.value)} className="h-8 text-xs font-mono"
+                                        />
+                                        <div className="flex items-center gap-2">
+                                            <Button
+                                                variant="outline" size="sm" className="gap-1 h-7 text-[11px]"
+                                                disabled={!settings.hasDiscordWebhook}
+                                                onClick={() => guard(async () => { await testDiscord(); setNotice(t('mon.pingSent')); setTimeout(() => setNotice(null), 3000); })}
+                                            >
+                                                <Send className="w-3 h-3" /> {t('alerts.test')}
+                                            </Button>
+                                            {settings.hasDiscordWebhook && (
+                                                <Button variant="ghost" size="sm" className="h-7 text-[11px] text-red-500 hover:text-red-500" onClick={() => clearChannel({ discordWebhook: null })}>
+                                                    <Trash2 className="w-3 h-3 mr-1" /> {t('alerts.clear')}
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </section>
+
+                                    {/* Telegram Bot Channel */}
+                                    <section className="rounded-xl border border-[var(--border)] bg-[var(--background)]/30 p-4 space-y-3">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2">
+                                                <Send className="w-4 h-4 text-sky-400" />
+                                                <h3 className="font-semibold text-sm">{t('alerts.channelTelegram')}</h3>
+                                            </div>
+                                            {settings.hasTelegramBotToken && settings.telegramChatId && (
+                                                <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 text-[10px] font-medium">
+                                                    {t('alerts.configured')}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="grid sm:grid-cols-2 gap-2">
+                                            <label className="space-y-1">
+                                                <span className="text-[10.5px] text-[var(--muted-foreground)]">{t('alerts.telegramToken')}</span>
+                                                <Input
+                                                    type="password" autoComplete="off" value={telegramTokenInput}
+                                                    placeholder={settings.hasTelegramBotToken ? '•••••••• (saved)' : '123456:ABC-DEF...'}
+                                                    onChange={(e) => setTelegramTokenInput(e.target.value)} className="h-8 text-xs font-mono"
+                                                />
+                                            </label>
+                                            <label className="space-y-1">
+                                                <span className="text-[10.5px] text-[var(--muted-foreground)]">{t('alerts.telegramChatId')}</span>
+                                                <Input
+                                                    value={telegramChatInput}
+                                                    placeholder="-1001234567890"
+                                                    onChange={(e) => setTelegramChatInput(e.target.value)} className="h-8 text-xs font-mono"
+                                                />
+                                            </label>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Button
+                                                variant="outline" size="sm" className="gap-1 h-7 text-[11px]"
+                                                disabled={!settings.hasTelegramBotToken || !settings.telegramChatId}
+                                                onClick={() => guard(async () => { await testTelegram(); setNotice(t('mon.pingSent')); setTimeout(() => setNotice(null), 3000); })}
+                                            >
+                                                <Send className="w-3 h-3" /> {t('alerts.test')}
+                                            </Button>
+                                            {(settings.hasTelegramBotToken || settings.telegramChatId) && (
+                                                <Button variant="ghost" size="sm" className="h-7 text-[11px] text-red-500 hover:text-red-500" onClick={() => clearChannel({ telegramBotToken: null, telegramChatId: null })}>
+                                                    <Trash2 className="w-3 h-3 mr-1" /> {t('alerts.clear')}
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </section>
+
+                                    {/* Custom JSON Webhook Channel */}
+                                    <section className="rounded-xl border border-[var(--border)] bg-[var(--background)]/30 p-4 space-y-3">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2">
+                                                <Webhook className="w-4 h-4 text-emerald-400" />
+                                                <h3 className="font-semibold text-sm">{t('alerts.channelWebhook')}</h3>
+                                            </div>
+                                            {settings.hasCustomWebhook && (
+                                                <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 text-[10px] font-medium">
+                                                    {t('alerts.configured')}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <Input
+                                            type="password" autoComplete="off" value={customWebhookInput}
+                                            placeholder={settings.hasCustomWebhook ? t('mon.webhookKeep') : 'https://hooks.slack.com/services/... or https://ntfy.sh/topic'}
+                                            onChange={(e) => setCustomWebhookInput(e.target.value)} className="h-8 text-xs font-mono"
+                                        />
+                                        <div className="flex items-center gap-2">
+                                            <Button
+                                                variant="outline" size="sm" className="gap-1 h-7 text-[11px]"
+                                                disabled={!settings.hasCustomWebhook}
+                                                onClick={() => guard(async () => { await testCustomWebhook(); setNotice(t('mon.pingSent')); setTimeout(() => setNotice(null), 3000); })}
+                                            >
+                                                <Send className="w-3 h-3" /> {t('alerts.test')}
+                                            </Button>
+                                            {settings.hasCustomWebhook && (
+                                                <Button variant="ghost" size="sm" className="h-7 text-[11px] text-red-500 hover:text-red-500" onClick={() => clearChannel({ customWebhookUrl: null })}>
+                                                    <Trash2 className="w-3 h-3 mr-1" /> {t('alerts.clear')}
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </section>
+                                </div>
                             </div>
                         </div>
                     )}

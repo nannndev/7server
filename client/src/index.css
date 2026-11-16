@@ -374,29 +374,71 @@ html.light .shimmer-effect::after {
 .sidebar-scroll { scrollbar-width: thin; }
 .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
 
-/* Copilot drawer: spring-ish slide + fade, children cascade in after the panel lands. */
+/* Copilot drawer: macOS Dock-style emerge from / minimize into character origin */
 .copilot-drawer {
-  transform: translateX(104%);
-  opacity: .6;
-  transition: transform 340ms cubic-bezier(.32,.72,0,1), opacity 240ms ease, width 260ms cubic-bezier(.32,.72,0,1);
-  will-change: transform;
+  transform-origin: center center;
+  transform: translate3d(var(--copilot-dx, 0px), var(--copilot-dy, 120px), 0) scale(0.05, 0.08);
+  border-radius: 36px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 220ms ease,
+    width 260ms cubic-bezier(.32,.72,0,1);
+  will-change: transform, opacity, border-radius;
 }
-.copilot-drawer.is-open { transform: none; opacity: 1; }
+.copilot-drawer.is-open {
+  transform: translate3d(0, 0, 0) scale(1);
+  border-radius: 0;
+  opacity: 1;
+  pointer-events: auto;
+}
 .copilot-drawer > * {
   opacity: 0;
-  transform: translateX(14px);
-  transition: opacity 260ms ease, transform 380ms cubic-bezier(.32,.72,0,1);
+  transform: translateY(8px);
+  transition: opacity 220ms ease, transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .copilot-drawer.is-open > * { opacity: 1; transform: none; }
-.copilot-drawer.is-open > :nth-child(1) { transition-delay: 70ms; }
-.copilot-drawer.is-open > :nth-child(2) { transition-delay: 120ms; }
+.copilot-drawer.is-open > :nth-child(1) { transition-delay: 90ms; }
+.copilot-drawer.is-open > :nth-child(2) { transition-delay: 130ms; }
 .copilot-drawer.is-open > :nth-child(3) { transition-delay: 170ms; }
-.copilot-drawer.is-open > :nth-child(4) { transition-delay: 220ms; }
-/* new messages slide up softly */
-.copilot-msg { animation: copilot-msg-in 320ms cubic-bezier(.32,.72,0,1) both; }
+.copilot-drawer.is-open > :nth-child(4) { transition-delay: 210ms; }
+/* new messages slide up softly with spring-like deceleration */
+.copilot-msg { animation: copilot-msg-in 340ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 @keyframes copilot-msg-in {
-  from { opacity: 0; transform: translateY(8px) scale(.99); }
-  to { opacity: 1; transform: none; }
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* smooth wave typing indicator */
+.copilot-dot-wave {
+  animation: copilot-dot-wave 1.25s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+@keyframes copilot-dot-wave {
+  0%, 60%, 100% { transform: translateY(0) scale(0.85); opacity: 0.45; }
+  30% { transform: translateY(-4px) scale(1.1); opacity: 1; }
+}
+
+/* gentle pulse ring on bot avatar while thinking/streaming */
+.copilot-stream-glow {
+  animation: copilot-stream-glow 1.8s ease-in-out infinite;
+}
+@keyframes copilot-stream-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.28); }
+  50% { box-shadow: 0 0 0 5px rgba(16, 185, 129, 0); }
+}
+
+/* subtle hover lift for interactive chat chips */
+.copilot-chip {
+  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1), border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+}
+.copilot-chip:hover {
+  transform: translateY(-1px);
+}
+.copilot-chip:active {
+  transform: translateY(0) scale(0.985);
 }
 
 @media (prefers-reduced-motion: reduce) {

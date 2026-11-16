@@ -116,4 +116,30 @@ assert.deepEqual(kiloFreeModels([
   { id: 'cohere/north:free', pricing: { prompt: '0', completion: '0' } },
   { id: 'anthropic/claude-sonnet-4', pricing: { prompt: '0.000003', completion: '0.000015' } }
 ]), ['cohere/north:free']);
+
+// Per-provider auto mode ("km/auto", "cx/auto"): walks models only within that chosen provider.
+const { buildProviderAutoChain } = await import('./subscription.js');
+assert.deepEqual(
+  buildProviderAutoChain('copilot', ['gpt-5-mini', 'gpt-4o', 'gpt-4.1']),
+  ['gpt-4.1', 'gpt-4o', 'gpt-5-mini']
+);
+const kimiTriedModels: string[] = [];
+globalThis.fetch = (async (url: any, init: any) => {
+  const u = String(url);
+  if (u === KIMI.chatUrl) {
+    const body = JSON.parse(String(init?.body || '{}'));
+    kimiTriedModels.push(body.model);
+    if (kimiTriedModels.length === 1) {
+      return new Response('{"error":{"message":"model rate limited"}}', { status: 429 });
+    }
+    return new Response(`data: ${JSON.stringify({ choices: [{ delta: { content: 'fallback within kimi ok' } }] })}\n\ndata: [DONE]\n\n`, { headers: { 'content-type': 'text/event-stream' } });
+  }
+  return new Response('unexpected provider hit', { status: 599 });
+}) as any;
+text = await ask('km/auto');
+assert.equal(kimiTriedModels.length, 2, 'km/auto tried first model then fell back within kimi');
+assert.equal(kimiTriedModels[0], 'kimi-for-coding');
+assert.equal(kimiTriedModels[1], 'kimi-for-coding-highspeed');
+assert.match(text, /fallback within kimi ok/);
+
 console.log('copilot auto ok');

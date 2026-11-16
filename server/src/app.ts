@@ -28,8 +28,10 @@ import { aiGatewayPublicRoutes, aiGatewayManagementRoutes } from './modules/ai-g
 import { usersRoutes } from './modules/users/routes.js';
 import { firewallRoutes } from './modules/firewall/routes.js';
 import { gitPublicRoutes, gitManagementRoutes } from './modules/git/routes.js';
+import { deployWebhookRoutes } from './modules/processes/routes.js';
 import { systemRoutes } from './modules/system/routes.js';
 import { tunnelsRoutes } from './modules/tunnels/routes.js';
+import { cloudflareRoutes } from './modules/cloudflare/routes.js';
 
 export function createApp() {
   const app = express();
@@ -39,11 +41,12 @@ export function createApp() {
 
   // Same-origin via Vite proxy; set CORS_ORIGIN only if the UI is served elsewhere.
   if (config.corsOrigin) app.use(cors({ origin: config.corsOrigin }));
-  app.use(express.json({ limit: '5mb' }));
+  app.use(express.json({ limit: '5mb', verify: (req: any, _res, buf) => { req.rawBody = buf; } }));
 
   // Public AI Gateway endpoints (authenticated via Virtual API Key)
   app.use('/api/ai', aiGatewayPublicRoutes);
   app.use('/api', gitPublicRoutes);
+  app.use('/api', deployWebhookRoutes);
 
   app.post('/api/login', loginHandler);
   // First run: no user exists yet -> the UI shows "create admin" (see modules/users/setup.ts).
@@ -65,7 +68,7 @@ export function createApp() {
   // Order matters where paths overlap (e.g. /servers/test and /servers/batch-exec vs /servers/:id):
   // this is the order the routes had in the old single-file server.
   app.use('/api', usersRoutes, firewallRoutes, aiGatewayManagementRoutes, gitManagementRoutes, monitoringRoutes, transferRoutes, serversRoutes, diagnosticsRoutes, metricsRoutes, processesRoutes,
-    logsRoutes, filesRoutes, dockerRoutes, databasesRoutes, execRoutes, softwareRoutes, cronRoutes, certificateRoutes, securityRoutes, backupRoutes, systemRoutes, tunnelsRoutes);
+    logsRoutes, filesRoutes, dockerRoutes, databasesRoutes, execRoutes, softwareRoutes, cronRoutes, certificateRoutes, securityRoutes, backupRoutes, systemRoutes, tunnelsRoutes, cloudflareRoutes);
 
   app.use(errorHandler);
 

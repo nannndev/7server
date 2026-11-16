@@ -1,6 +1,16 @@
 // Run: npx tsx src/monitor.test.ts
 import assert from 'node:assert/strict';
-import { pickDomains, validateWebhook, esc } from './monitor.js';
+import {
+  acknowledgeAlert,
+  clearAlertHistory,
+  evaluateMetrics,
+  getActiveAlerts,
+  getAlertHistory,
+  pickDomains,
+  validateCustomWebhook,
+  validateWebhook,
+  esc
+} from './monitor.js';
 import { auditSummary } from '../../infra/audit.js';
 
 assert.deepEqual(
@@ -24,5 +34,24 @@ for (const bad of ['http://discord.com/api/webhooks/1/x', 'https://evil.com/api/
 
 // Discord markdown escaping keeps names literal.
 assert.equal(esc('my_app *prod* `x`'), 'my\\_app \\*prod\\* \\`x\\`');
+
+// Custom webhook validation
+assert.equal(validateCustomWebhook('https://ntfy.sh/7server-alerts'), 'https://ntfy.sh/7server-alerts');
+assert.throws(() => validateCustomWebhook('ftp://bad.example.com'));
+
+// Alert trigger, acknowledge & recovery history
+clearAlertHistory();
+evaluateMetrics('srv-test', 'test-1', { cpuUsagePercent: 95, memory: { usedPercent: 40 }, disk: { usedPercent: 50 } }, { cpu: 90, mem: 90, disk: 90 });
+let active = getActiveAlerts();
+assert.ok(active.some((a) => a.key === 'srv:test-1:cpu' && !a.acknowledged));
+assert.equal(acknowledgeAlert('srv:test-1:cpu'), true);
+assert.equal(getActiveAlerts().find((a) => a.key === 'srv:test-1:cpu')?.acknowledged, true);
+
+evaluateMetrics('srv-test', 'test-1', { cpuUsagePercent: 25, memory: { usedPercent: 40 }, disk: { usedPercent: 50 } }, { cpu: 90, mem: 90, disk: 90 });
+assert.equal(getActiveAlerts().some((a) => a.key === 'srv:test-1:cpu'), false);
+const hist = getAlertHistory();
+assert.equal(hist[0].type, 'recovered');
+assert.equal(hist[1].type, 'triggered');
+clearAlertHistory();
 
 console.log('monitor tests ok');

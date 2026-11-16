@@ -131,10 +131,10 @@ export const COPY = {
           title: 'Deploy Git apps, point domains or tunnels, and control Docker',
           summary: 'Connect a GitHub Personal Access Token to auto-discover repositories, branches, and monorepo root folders, point domains or zero-trust tunnels in 1 click, or manage containers, Nginx SSL, databases, and SFTP files.',
           details: [
-            'Full-width Git Deployment Studio with framework preset detection (Next.js, Node, Laravel, Docker, Go, Python)',
+            'Full-width Git Deployment Studio with framework preset detection, custom healthcheck paths, post-deploy hooks, and Auto-SSL',
+            '1-Click Redeploy, Deploy History & instant Commit Rollback, GitHub Push Auto-Deploy Webhooks, Live App Logs, and quick .env Editor',
             'Smart pointing: 1-click Nginx virtual hosts with DNS pre-flight checks on public VPS, or Cloudflare Tunnels behind NAT',
             'Start, stop, restart, and inspect logs for Docker containers, systemd services, and PM2 workers',
-            'Multi-tab xterm.js browser terminal with 1-click command shortcuts',
           ],
           sshLabel: 'Remote Operations & Git Deploy Pipeline',
           sshCommands: [
@@ -150,9 +150,10 @@ export const COPY = {
           title: 'Ask the AI Copilot — it checks first and asks before acting',
           summary: 'When a server is slow or a container crashes, ask the Copilot. Powered by a built-in DevOps Engineer skill, custom SKILL.md playbooks, and /compact context compaction, it runs safe read-only diagnostics automatically and waits for your approval before making any change.',
           details: [
-            'Connect multiple accounts per provider (Claude, ChatGPT/Codex, Copilot, Gemini, Kimi, Kilo, Muse, Nous) with ordered #1 → #2 rotation on 429 rate limits',
+            'Connect multiple accounts per provider with per-account ON/OFF toggles, custom models per provider, and ordered #1 → #2 rotation on 429 rate limits',
+            'Direct Cloudflare API access for DNS records, Zero Trust Tunnels, SSL modes & cache purge alongside SSH commands',
             'Built-in DevOps Engineer skill + custom SKILL.md playbooks & /compact context compaction for long debugging sessions',
-            'Read-only commands execute automatically; any command that mutates state requires your explicit click to run',
+            'Read-only diagnostics execute automatically; any mutating SSH or Cloudflare action waits for your explicit click to run',
           ],
           sshLabel: 'AI Copilot Diagnostic & Approval Flow',
           sshCommands: [

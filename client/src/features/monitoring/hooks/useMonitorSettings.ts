@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ServerItem, ServerMetrics } from '@/features/servers';
-import { fetchMonitor, type Thresholds } from '@/features/monitoring/api';
+import { acknowledgeAlertApi, fetchMonitor, type ActiveAlert, type AlertHistoryEntry, type Thresholds } from '@/features/monitoring/api';
 
 export const DEFAULT_THRESHOLDS: Thresholds = { cpu: 90, mem: 90, disk: 90 };
 
@@ -20,16 +20,35 @@ export function getAlerts(m: ServerMetrics | null | undefined, t: Thresholds): s
 export function useMonitorSettings(servers: ServerItem[]) {
   const [thresholds, setThresholds] = useState<Thresholds>(DEFAULT_THRESHOLDS);
   const [activeAlertCount, setActiveAlertCount] = useState(0);
+  const [activeAlerts, setActiveAlerts] = useState<ActiveAlert[]>([]);
+  const [alertHistory, setAlertHistory] = useState<AlertHistoryEntry[]>([]);
   const notified = useRef<Set<string>>(new Set());
 
+  const sync = useCallback(() => {
+    fetchMonitor()
+      .then((d) => {
+        setThresholds(d.settings.thresholds);
+        setActiveAlerts(d.status.activeAlerts || []);
+        setActiveAlertCount(d.status.activeAlerts.filter((a) => !a.acknowledged).length);
+        setAlertHistory(d.history || []);
+      })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
-    const sync = () =>
-      fetchMonitor()
-        .then((d) => { setThresholds(d.settings.thresholds); setActiveAlertCount(d.status.activeAlerts.length); })
-        .catch(() => {});
     sync();
     const t = setInterval(sync, 60000);
     return () => clearInterval(t);
+  }, [sync]);
+
+  const ackAlert = useCallback(async (key: string) => {
+    try {
+      const nextStatus = await acknowledgeAlertApi(key);
+      setActiveAlerts(nextStatus.activeAlerts || []);
+      setActiveAlertCount((nextStatus.activeAlerts || []).filter((a) => !a.acknowledged).length);
+    } catch {
+      // ignore
+    }
   }, []);
 
   useEffect(() => {
@@ -53,6 +72,10 @@ export function useMonitorSettings(servers: ServerItem[]) {
     setThresholds,
     activeAlertCount,
     setActiveAlertCount,
+    activeAlerts,
+    alertHistory,
+    ackAlert,
+    syncMonitor: sync,
     alertsFor: (s: ServerItem) => getAlerts(s.metrics, thresholds)
   };
 }

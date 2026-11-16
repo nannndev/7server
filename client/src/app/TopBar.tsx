@@ -15,6 +15,9 @@ import { exportServers, importServers } from '@/features/servers/api';
 import { Button } from '@/shared/ui/button';
 import { toast } from '@/shared/ui/toast';
 import { useI18n, LANGS, type Lang } from '@/shared/i18n';
+import { VersionUpdateBadge, type VersionInfo } from './VersionUpdateNotifier';
+import { NotificationBell } from '@/features/monitoring/components/NotificationBell';
+import type { ActiveAlert, AlertHistoryEntry } from '@/features/monitoring/api';
 
 interface TopBarProps {
   route: Route;
@@ -36,6 +39,13 @@ interface TopBarProps {
   onOpenUsers?: () => void;
   onOpenSessions?: () => void;
   onOpenChangePassword?: () => void;
+  versionInfo?: VersionInfo | null;
+  versionChecking?: boolean;
+  onCheckVersion?: (force?: boolean) => void;
+  activeAlerts?: ActiveAlert[];
+  alertHistory?: AlertHistoryEntry[];
+  unreadAlertCount?: number;
+  onAckAlert?: (key: string) => void;
 }
 
 export default function TopBar({
@@ -57,7 +67,14 @@ export default function TopBar({
   copilotStatus,
   onOpenUsers,
   onOpenSessions,
-  onOpenChangePassword
+  onOpenChangePassword,
+  versionInfo,
+  versionChecking,
+  onCheckVersion,
+  activeAlerts = [],
+  alertHistory = [],
+  unreadAlertCount = 0,
+  onAckAlert
 }: TopBarProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -290,13 +307,33 @@ export default function TopBar({
           )}
         </div>
 
+        {onCheckVersion && (
+          <VersionUpdateBadge
+            info={versionInfo ?? null}
+            checking={Boolean(versionChecking)}
+            onCheck={onCheckVersion}
+          />
+        )}
+
+        {onAckAlert && (
+          <NotificationBell
+            activeAlerts={activeAlerts}
+            alertHistory={alertHistory}
+            unreadCount={unreadAlertCount}
+            onAck={onAckAlert}
+            onOpenAlertsPage={() => navigate({ page: 'monitoring', tab: 'alerts' })}
+          />
+        )}
+
         <Button
           variant="outline"
           size="sm"
           onClick={onToggleCopilot}
           className={`relative gap-1.5 transition-colors ${
-            copilotStatus?.state === 'approval'
-              ? 'border-amber-500/60 text-amber-400 bg-amber-500/10'
+            copilotStatus?.state === 'approval' || copilotStatus?.state === 'limit'
+              ? 'border-amber-500/60 text-amber-500 dark:text-amber-400 bg-amber-500/10'
+              : copilotStatus?.state === 'error'
+              ? 'border-red-500/60 text-red-500 dark:text-red-400 bg-red-500/10'
               : copilotStatus?.state === 'executing' || copilotStatus?.state === 'thinking'
               ? 'border-sky-500/50 text-[var(--foreground)] bg-sky-500/10'
               : 'border-[var(--rim)] text-[var(--foreground)] hover:text-[var(--foreground)] hover:bg-[var(--foreground)]/[0.06]'
@@ -309,6 +346,10 @@ export default function TopBar({
                 ? 'text-sky-400 animate-spin'
                 : copilotStatus?.state === 'approval'
                 ? 'text-amber-400 animate-bounce'
+                : copilotStatus?.state === 'limit'
+                ? 'text-amber-400'
+                : copilotStatus?.state === 'error'
+                ? 'text-red-400'
                 : 'text-[var(--foreground)] animate-pulse'
             }`}
             style={{ animationDuration: copilotStatus?.state === 'executing' || copilotStatus?.state === 'thinking' ? '2.5s' : undefined }}
@@ -320,13 +361,19 @@ export default function TopBar({
               ? 'Copilot · Thinking...'
               : copilotStatus?.state === 'approval'
               ? 'Copilot · Needs Approval'
+              : copilotStatus?.state === 'limit'
+              ? 'Copilot · Paused'
+              : copilotStatus?.state === 'error'
+              ? 'Copilot · Error'
               : 'Copilot'}
           </span>
           {copilotStatus && copilotStatus.state !== 'idle' && (
             <span
               className={`w-2 h-2 rounded-full ${
-                copilotStatus.state === 'approval'
+                copilotStatus.state === 'approval' || copilotStatus.state === 'limit'
                   ? 'bg-amber-400 animate-ping'
+                  : copilotStatus.state === 'error'
+                  ? 'bg-red-500 animate-pulse'
                   : copilotStatus.state === 'done'
                   ? 'bg-emerald-400'
                   : 'bg-sky-400 animate-pulse'

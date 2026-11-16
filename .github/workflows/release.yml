@@ -39,10 +39,19 @@ jobs:
       - run: npx tsc --noEmit -p . && cd ../client && npx tsc --noEmit -p .
         working-directory: server
       - run: npm test
-      - run: npm run build:npm
+      - run: npm run pack:npm
+      - name: Locate tarball & compute SHA256
+        run: |
+          TGZ=$(ls packages/npm/sevenserver-*.tgz | head -n1)
+          [ -f "$TGZ" ] || { echo "tarball not found"; exit 1; }
+          SHA=$(sha256sum "$TGZ" | awk '{print $1}')
+          echo "TARBALL_PATH=$TGZ" >> "$GITHUB_ENV"
+          echo "TARBALL_NAME=$(basename "$TGZ")" >> "$GITHUB_ENV"
+          echo "TARBALL_SHA256=$SHA" >> "$GITHUB_ENV"
 
       # Trusted Publishing (OIDC, no token) needs npm >= 11.5.1; falls back to NPM_TOKEN if that secret is set.
       - name: Publish to npm
+        continue-on-error: true
         run: npm install -g npm@^11.5.1 --no-audit --no-fund && npm publish --provenance --access public --tag "$NPM_TAG" --loglevel verbose
         working-directory: packages/npm
         env:
@@ -55,10 +64,17 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/login-action@v4
+        if: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ghcr.io/${{ github.repository_owner }}/7server
+          images: |
+            ghcr.io/${{ github.repository_owner }}/7server
+            ${{ secrets.DOCKERHUB_USERNAME != '' && format('{0}/7server', secrets.DOCKERHUB_USERNAME) || '' }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -78,4 +94,25 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           pre=""; [ "$NPM_TAG" = next ] && pre="--prerelease"
-          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes --verify-tag $pre
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$TARBALL_PATH" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$TARBALL_PATH" --title "$GITHUB_REF_NAME" --generate-notes --verify-tag $pre
+          fi
+
+      - name: Update Homebrew Tap
+        if: ${{ secrets.HOMEBREW_TAP_TOKEN != '' && env.NPM_TAG == 'latest' }}
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/nannndev/homebrew-tap.git" /tmp/homebrew-tap
+          mkdir -p /tmp/homebrew-tap/Formula
+          sed -e "s|v0\.3\.1/sevenserver-0\.3\.1\.tgz|${GITHUB_REF_NAME}/${TARBALL_NAME}|g" \
+              -e "s|REPLACE_WITH_TARBALL_SHA256|${TARBALL_SHA256}|g" \
+              packages/homebrew/sevenserver.rb > /tmp/homebrew-tap/Formula/sevenserver.rb
+          cd /tmp/homebrew-tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/sevenserver.rb
+          git commit -m "sevenserver ${VERSION}" || exit 0
+          git push origin HEAD

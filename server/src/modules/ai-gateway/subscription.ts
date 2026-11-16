@@ -49,6 +49,54 @@ export const comboName = (model: unknown) => {
   return m.startsWith(COMBO_PREFIX) && m.length > COMBO_PREFIX.length ? m.slice(COMBO_PREFIX.length) : null;
 };
 
+/** Safe default fallback order across connected subscription providers for global Auto mode. */
+export const PROVIDER_AUTO_DEFAULTS: [OAuthProviderId, string][] = [
+  ['claude', 'claude-sonnet-5-5'],
+  ['copilot', 'gpt-4.1'],
+  ['codex', 'gpt-5.6-sol'],
+  ['kimi', 'kimi-for-coding'],
+  ['gemini-cli', 'gemini-2.5-flash'],
+  ['kilocode', 'openrouter/free'],
+  ['muse', 'muse-spark-1.3'],
+  ['nous', 'meituan/longcat-2.0:free']
+];
+
+const PREFERRED_PROVIDER_AUTO: Partial<Record<OAuthProviderId, string[]>> = {
+  claude: ['claude-sonnet-5-5', 'claude-sonnet-5', 'claude-haiku-4-5-20251001', 'claude-opus-5-5'],
+  copilot: ['gpt-4.1', 'gpt-4o', 'gpt-4o-mini', 'gpt-5-mini', 'gpt-5.5'],
+  codex: ['gpt-5.6-sol', 'gpt-6-sol', 'gpt-5.6-terra', 'gpt-6.1-sol'],
+  kilocode: ['openrouter/free', 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free', 'cohere/north-mini-code:free']
+};
+
+/** Builds an ordered list of candidate models within a single provider for `<alias>/auto`. */
+export function buildProviderAutoChain(prov: OAuthProviderId, liveList?: string[], maxCandidates = 5): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const push = (m?: string) => {
+    if (!m || m === 'auto' || seen.has(m)) return;
+    seen.add(m);
+    out.push(m);
+  };
+
+  const def = PROVIDER_AUTO_DEFAULTS.find(([p]) => p === prov)?.[1];
+  const prefs = PREFERRED_PROVIDER_AUTO[prov] || [];
+  const hasLive = Array.isArray(liveList) && liveList.length > 0;
+
+  if (hasLive) {
+    for (const c of prefs) if (liveList.includes(c)) push(c);
+    if (def && liveList.includes(def)) push(def);
+    if (prov === 'kilocode' || prov === 'nous') {
+      for (const m of liveList) if (m.endsWith(':free') || m.includes('/free')) push(m);
+    }
+    for (const m of liveList) push(m);
+  } else {
+    push(def);
+    for (const c of prefs) push(c);
+    for (const m of MODELS[prov] || []) push(m);
+  }
+  return out.slice(0, maxCandidates);
+}
+
 async function call(provider: OAuthProviderId, cred: OAuthCredential, model: string, req: ChatRequest, signal: AbortSignal) {
   const json = (url: string, headers: Record<string, string>, body: unknown) =>
     fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body), signal });
@@ -126,10 +174,16 @@ function resetOf(up: globalThis.Response, text: string): number | undefined {
 export interface ChatOutcome { inTok: number; outTok: number; status: number; error?: string }
 
 /** Runs one chat request and writes an OpenAI-shaped response (JSON or SSE) to `res`. */
-export async function subscriptionChat(req: Request, res: Response, body: ChatRequest, target: { provider: OAuthProviderId; model: string }): Promise<ChatOutcome> {
+export async function subscriptionChat(
+  req: Request,
+  res: Response,
+  body: ChatRequest,
+  target: { provider: OAuthProviderId; model: string },
+  strategy: 'ordered' | 'round_robin' = 'ordered'
+): Promise<ChatOutcome> {
   const { provider, model } = target;
   const publicModel = `${ALIAS_OF[provider]}/${model}`;
-  const candidates = orderedAccountsFor(provider);
+  const candidates = orderedAccountsFor(provider, strategy);
   if (!candidates.length) throw new UpstreamError(503, `Akun ${provider} belum login. Hubungkan di 7Server → AI Gateway.`);
 
   const ctrl = new AbortController();
@@ -321,8 +375,14 @@ export const mergeBetas = (client?: string) =>
  * Forwards an Anthropic Messages request to the logged-in Claude account and pipes the reply back
  * unchanged (JSON or SSE). `path` is '/v1/messages' or '/v1/messages/count_tokens'.
  */
-export async function claudeMessages(req: Request, res: Response, body: any, path = '/v1/messages'): Promise<ChatOutcome> {
-  const candidates = orderedAccountsFor('claude');
+export async function claudeMessages(
+  req: Request,
+  res: Response,
+  body: any,
+  path = '/v1/messages',
+  strategy: 'ordered' | 'round_robin' = 'ordered'
+): Promise<ChatOutcome> {
+  const candidates = orderedAccountsFor('claude', strategy);
   if (!candidates.length) throw new UpstreamError(503, 'Akun Claude belum login. Hubungkan di 7Server → AI Gateway.');
   const ctrl = new AbortController();
   res.on('close', () => { if (!res.writableFinished) ctrl.abort(); });

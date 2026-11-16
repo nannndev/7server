@@ -1,327 +1,698 @@
-import React, { useEffect, useState } from 'react';
-import { Terminal, ShieldAlert, Sparkles } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Terminal,
+  ShieldAlert,
+  Sparkles,
+  CheckCircle2,
+  AlertTriangle,
+  Play,
+  SkipForward,
+  Square,
+  RotateCcw,
+  PauseCircle,
+  MessageSquare,
+  X
+} from 'lucide-react';
 import { useI18n } from '@/shared/i18n';
-import type { CopilotLiveStatus } from '../types';
+import type { CopilotBubbleAction, CopilotLiveStatus } from '../types';
+import { CopilotCharacter, type CharacterMood } from './CopilotCharacter';
 
 interface AiCopilotTriggerProps {
   open: boolean;
   onClick: () => void;
   status?: CopilotLiveStatus;
+  onAnchorChange?: (origin: { x: number; y: number }) => void;
+  onAction?: (action: CopilotBubbleAction) => void;
 }
 
-/** Expressive Cyber-SRE character avatar with state-driven visor eyes, antenna LED, and orbital rings. */
-function CopilotMascot({ state, hovered }: { state: CopilotLiveStatus['state']; hovered: boolean }) {
-  const [blink, setBlink] = useState(false);
-  const [lookOffset, setLookOffset] = useState(0);
-
-  // Natural idle blinking & subtle eye glance
-  useEffect(() => {
-    if (state !== 'idle') return;
-    const blinkInterval = window.setInterval(() => {
-      setBlink(true);
-      window.setTimeout(() => setBlink(false), 160);
-    }, 3600);
-    const lookInterval = window.setInterval(() => {
-      const dirs = [-1.5, 0, 1.5, 0];
-      setLookOffset(dirs[Math.floor(Math.random() * dirs.length)]);
-    }, 2800);
-    return () => {
-      window.clearInterval(blinkInterval);
-      window.clearInterval(lookInterval);
-    };
-  }, [state]);
-
-  const ledColor =
-    state === 'executing'
-      ? '#10b981'
-      : state === 'thinking'
-      ? '#38bdf8'
-      : state === 'approval'
-      ? '#f59e0b'
-      : state === 'done'
-      ? '#34d399'
-      : '#a1a1aa';
-
-  return (
-    <div
-      className="relative w-9 h-9 flex items-center justify-center shrink-0 select-none"
-      style={{
-        animation:
-          state === 'idle'
-            ? 'mascot-float 3.2s ease-in-out infinite'
-            : state === 'done'
-            ? 'mascot-hop 650ms ease-out'
-            : undefined
-      }}
-    >
-      {/* Outer animated orbital ring when active */}
-      {(state === 'thinking' || state === 'executing') && (
-        <span
-          className={`absolute inset-0 rounded-full border-2 border-dashed animate-spin ${
-            state === 'executing' ? 'border-emerald-400/70' : 'border-sky-400/70'
-          }`}
-          style={{ animationDuration: state === 'executing' ? '3s' : '4s' }}
-        />
-      )}
-      {state === 'approval' && (
-        <span className="absolute inset-0 rounded-full border-2 border-amber-400/80 animate-ping opacity-40" />
-      )}
-      {state === 'done' && (
-        <span className="absolute inset-0 rounded-full border-2 border-emerald-400/70 animate-pulse" />
-      )}
-
-      <svg viewBox="0 0 36 36" className="w-8 h-8 overflow-visible drop-shadow-sm">
-        {/* Antenna stem & glowing tip */}
-        <line x1="18" y1="3" x2="18" y2="7.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="opacity-70" />
-        <circle
-          cx="18"
-          cy="3"
-          r="2.3"
-          fill={ledColor}
-          className={state !== 'idle' ? 'animate-ping' : ''}
-          style={{ animationDuration: '1.8s', transformOrigin: '18px 3px' }}
-        />
-        <circle cx="18" cy="3" r="2.1" fill={ledColor} />
-
-        {/* Side ear pods */}
-        <rect x="3.5" y="14" width="2.5" height="7" rx="1.2" fill="currentColor" className="opacity-50" />
-        <rect x="30" y="14" width="2.5" height="7" rx="1.2" fill="currentColor" className="opacity-50" />
-
-        {/* Bot head shell */}
-        <rect
-          x="6"
-          y="7.5"
-          width="24"
-          height="20"
-          rx="6.5"
-          fill="#18181b"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          className="opacity-95"
-        />
-
-        {/* Inner dark visor screen */}
-        <rect x="8.5" y="10.5" width="19" height="12.5" rx="4" fill="#09090b" stroke={ledColor} strokeWidth="0.9" strokeOpacity="0.55" />
-
-        {/* Visor Expressions based on state */}
-        {state === 'executing' ? (
-          /* Terminal `>_` eyes when executing SSH commands */
-          <g fill="#34d399">
-            <path d="M11.2 14.2 L14.5 16.5 L11.2 18.8" fill="none" stroke="#34d399" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            <rect x="17.5" y="17.5" width="5.2" height="1.8" rx="0.8" className="animate-pulse" />
-          </g>
-        ) : state === 'thinking' ? (
-          /* Animated synapse/wave bars when streaming/thinking */
-          <g fill="#38bdf8">
-            <rect x="11.5" y="14" width="2.2" height="5.5" rx="1" className="animate-pulse" />
-            <rect x="15.2" y="12.5" width="2.2" height="8.5" rx="1" className="animate-bounce" style={{ animationDuration: '0.7s' }} />
-            <rect x="18.9" y="13.5" width="2.2" height="6.5" rx="1" className="animate-pulse" style={{ animationDelay: '150ms' }} />
-            <rect x="22.6" y="14.5" width="2.2" height="4.5" rx="1" className="animate-bounce" style={{ animationDuration: '0.9s' }} />
-          </g>
-        ) : state === 'approval' ? (
-          /* Alert `! !` eyes when waiting for user approval */
-          <g fill="#fbbf24">
-            <rect x="13" y="12.8" width="2.2" height="4.5" rx="1" />
-            <circle cx="14.1" cy="19.3" r="1.1" />
-            <rect x="20.8" y="12.8" width="2.2" height="4.5" rx="1" />
-            <circle cx="21.9" cy="19.3" r="1.1" />
-          </g>
-        ) : state === 'done' || hovered ? (
-          /* Happy `^ ^` eyes when task finishes or user hovers */
-          <g fill="none" stroke={state === 'done' ? '#34d399' : '#38bdf8'} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M11.5 17.5 Q13.8 13.8 16 17.5" />
-            <path d="M20 17.5 Q22.2 13.8 24.5 17.5" />
-          </g>
-        ) : (
-          /* Idle blinking & glancing cyber eyes */
-          <g transform={`translate(${lookOffset}, 0)`} fill="#e4e4e7">
-            <ellipse cx="13.8" cy="16.5" rx="2.1" ry={blink ? 0.35 : 2.5} style={{ transition: 'ry 90ms ease' }} />
-            <ellipse cx="22.2" cy="16.5" rx="2.1" ry={blink ? 0.35 : 2.5} style={{ transition: 'ry 90ms ease' }} />
-            {!blink && (
-              <>
-                <circle cx="14.5" cy="15.6" r="0.7" fill="#38bdf8" />
-                <circle cx="22.9" cy="15.6" r="0.7" fill="#38bdf8" />
-              </>
-            )}
-          </g>
-        )}
-
-        {/* Subtle mouth / status line */}
-        <path
-          d={state === 'done' || hovered ? 'M15 25 Q18 26.8 21 25' : 'M15.5 25.2 H20.5'}
-          stroke={ledColor}
-          strokeWidth="1.3"
-          strokeLinecap="round"
-          fill="none"
-          opacity="0.75"
-        />
-      </svg>
-    </div>
-  );
-}
+const POS_STORAGE_KEY = '7server_copilot_char_pos';
+const CHAR_W = 74;
+const CHAR_H = 82;
+const MARGIN = 14;
 
 const IDLE_QUIPS: Record<'en' | 'id', string[]> = {
-  en: ['SRE Agent Ready', 'Watching your servers...', 'All quiet. I like quiet.', 'Need a hand? ⌘J', 'Standing by for orders'],
-  id: ['Asisten SRE Siap', 'Mengawasi server kamu...', 'Aman terkendali 👌', 'Butuh bantuan? ⌘J', 'Siap menerima perintah']
+  en: ['Need a hand? (⌘J)', 'Watching your servers...', 'All systems quiet ✨', 'Ask me anything!'],
+  id: ['Butuh bantuan? (⌘J)', 'Mengawasi server kamu...', 'Semua aman terkendali ✨', 'Tanya apa aja!']
 };
 
-export default function AiCopilotTrigger({ open, onClick, status }: AiCopilotTriggerProps) {
+function clampPosition(x: number, y: number): { x: number; y: number } {
+  if (typeof window === 'undefined') return { x, y };
+  const maxX = Math.max(MARGIN, window.innerWidth - CHAR_W - MARGIN);
+  const maxY = Math.max(MARGIN, window.innerHeight - CHAR_H - MARGIN);
+  return {
+    x: Math.min(maxX, Math.max(MARGIN, x)),
+    y: Math.min(maxY, Math.max(MARGIN, y))
+  };
+}
+
+function getInitialPosition(): { x: number; y: number } {
+  if (typeof window === 'undefined') return { x: 24, y: 24 };
+  try {
+    const raw = localStorage.getItem(POS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (typeof parsed?.x === 'number' && typeof parsed?.y === 'number') {
+        return clampPosition(parsed.x, parsed.y);
+      }
+    }
+  } catch {
+    // ignore invalid storage
+  }
+  return clampPosition(window.innerWidth - CHAR_W - 24, window.innerHeight - CHAR_H - 22);
+}
+
+export default function AiCopilotTrigger({
+  open,
+  onClick,
+  status,
+  onAnchorChange,
+  onAction
+}: AiCopilotTriggerProps) {
   const { t, locale } = useI18n();
   const [hovered, setHovered] = useState(false);
   const [quipIdx, setQuipIdx] = useState(0);
+  const [pos, setPos] = useState<{ x: number; y: number }>(getInitialPosition);
+  const [dragging, setDragging] = useState(false);
+  const [dragTilt, setDragTilt] = useState(0);
+  const [look, setLook] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [idleAction, setIdleAction] = useState<'none' | 'jump' | 'run'>('none');
+  const [runDir, setRunDir] = useState<1 | -1>(-1);
+  const [hiddenForDrawer, setHiddenForDrawer] = useState(open);
+
+  const posRef = useRef(pos);
+  posRef.current = pos;
+
+  const dragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+    lastX: number;
+    moved: boolean;
+  } | null>(null);
+  const tiltDecayRef = useRef<number>(0);
+  const hoverTimerRef = useRef<number>(0);
+
+  const enterHover = () => {
+    window.clearTimeout(hoverTimerRef.current);
+    setHovered(true);
+  };
+
+  const leaveHover = () => {
+    window.clearTimeout(hoverTimerRef.current);
+    hoverTimerRef.current = window.setTimeout(() => setHovered(false), 140);
+  };
+
+  useEffect(() => () => window.clearTimeout(hoverTimerRef.current), []);
 
   const state = status?.state || 'idle';
+  const mode = status?.mode || 'agent';
 
-  // Rotate a small personality quip while idle so the mascot feels alive.
+  const triggerOpen = () => {
+    setIdleAction('none');
+    onAnchorChange?.({
+      x: posRef.current.x + CHAR_W / 2,
+      y: posRef.current.y + CHAR_H / 2
+    });
+    onClick();
+  };
+
+  // Report character center coordinates for macOS Dock-style drawer origin animation
+  useEffect(() => {
+    onAnchorChange?.({ x: pos.x + CHAR_W / 2, y: pos.y + CHAR_H / 2 });
+  }, [pos.x, pos.y, onAnchorChange]);
+
+  // Delay reveal slightly when drawer closes so minimize-into-character finishes cleanly
+  useEffect(() => {
+    if (open) {
+      setHiddenForDrawer(true);
+      setIdleAction('none');
+      return;
+    }
+    const tm = window.setTimeout(() => setHiddenForDrawer(false), 210);
+    return () => window.clearTimeout(tm);
+  }, [open]);
+
+  // Smooth global cursor eye tracking while character is visible
+  useEffect(() => {
+    if (open) return;
+    let rafId = 0;
+    const onPointerMove = (e: PointerEvent) => {
+      if (rafId) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = 0;
+        const headX = posRef.current.x + CHAR_W / 2;
+        const headY = posRef.current.y + 30;
+        const nx = Math.max(-1, Math.min(1, (e.clientX - headX) / 220));
+        const ny = Math.max(-1, Math.min(1, (e.clientY - headY) / 180));
+        setLook((prev) =>
+          Math.abs(prev.x - nx) < 0.03 && Math.abs(prev.y - ny) < 0.03
+            ? prev
+            : { x: nx, y: ny }
+        );
+      });
+    };
+    window.addEventListener('pointermove', onPointerMove, { passive: true });
+    return () => {
+      if (rafId) window.cancelAnimationFrame(rafId);
+      window.removeEventListener('pointermove', onPointerMove);
+    };
+  }, [open]);
+
+  // Autonomous playful jump & run behavior while idle
+  useEffect(() => {
+    if (state !== 'idle' || hovered || dragging || open) {
+      setIdleAction('none');
+      return;
+    }
+
+    let timeoutId = 0;
+    let actionTimeoutId = 0;
+    let rafId = 0;
+    let cancelled = false;
+
+    const scheduleNext = () => {
+      const waitMs = 6500 + Math.random() * 5500;
+      timeoutId = window.setTimeout(() => {
+        if (cancelled) return;
+        const doJump = Math.random() < 0.45;
+        if (doJump) {
+          setIdleAction('jump');
+          actionTimeoutId = window.setTimeout(() => {
+            if (cancelled) return;
+            setIdleAction('none');
+            scheduleNext();
+          }, 1150);
+          return;
+        }
+
+        // Run horizontally within safe viewport bounds
+        const cur = posRef.current;
+        const maxX = Math.max(MARGIN, window.innerWidth - CHAR_W - MARGIN);
+        const dir: 1 | -1 =
+          cur.x < maxX * 0.25 ? 1 : cur.x > maxX * 0.75 ? -1 : Math.random() < 0.5 ? 1 : -1;
+        const distance = 90 + Math.random() * 110;
+        const clampedTarget = clampPosition(cur.x + dir * distance, cur.y);
+        const actualDist = clampedTarget.x - cur.x;
+        if (Math.abs(actualDist) < 28) {
+          // Fallback to jump if cornered on a tiny viewport
+          setIdleAction('jump');
+          actionTimeoutId = window.setTimeout(() => {
+            if (cancelled) return;
+            setIdleAction('none');
+            scheduleNext();
+          }, 1100);
+          return;
+        }
+
+        setRunDir(actualDist >= 0 ? 1 : -1);
+        setIdleAction('run');
+        const startX = cur.x;
+        const startY = cur.y;
+        const duration = 1450;
+        const t0 = performance.now();
+
+        const step = (now: number) => {
+          if (cancelled) return;
+          const elapsed = now - t0;
+          const p = Math.min(1, elapsed / duration);
+          // Smooth ease-in-out
+          const eased = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+          const next = clampPosition(startX + actualDist * eased, startY);
+          setPos(next);
+          if (p < 1) {
+            rafId = window.requestAnimationFrame(step);
+          } else {
+            try {
+              localStorage.setItem(POS_STORAGE_KEY, JSON.stringify(next));
+            } catch {
+              // ignore storage quota errors
+            }
+            setIdleAction('none');
+            scheduleNext();
+          }
+        };
+        rafId = window.requestAnimationFrame(step);
+      }, waitMs);
+    };
+
+    scheduleNext();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+      window.clearTimeout(actionTimeoutId);
+      if (rafId) window.cancelAnimationFrame(rafId);
+    };
+  }, [state, hovered, dragging, open]);
+
+  // Rotate idle greeting quips occasionally
   useEffect(() => {
     if (state !== 'idle' || open) return;
-    const id = window.setInterval(() => setQuipIdx((i) => i + 1), 8000);
+    const id = window.setInterval(() => setQuipIdx((i) => i + 1), 9000);
     return () => window.clearInterval(id);
   }, [state, open]);
 
-  if (open) return null;
-  const isBusy = state === 'thinking' || state === 'executing';
+  // Keep character inside viewport when browser window resizes
+  useEffect(() => {
+    const onResize = () => {
+      setPos((prev) => clampPosition(prev.x, prev.y));
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // Global drag listeners while dragging
+  useEffect(() => {
+    if (!dragging) return;
+
+    const onPointerMove = (e: PointerEvent) => {
+      const d = dragRef.current;
+      if (!d || e.pointerId !== d.pointerId) return;
+
+      const dxTotal = e.clientX - d.startX;
+      const dyTotal = e.clientY - d.startY;
+      if (!d.moved && Math.hypot(dxTotal, dyTotal) > 5) {
+        d.moved = true;
+      }
+
+      const nextPos = clampPosition(d.originX + dxTotal, d.originY + dyTotal);
+      setPos(nextPos);
+
+      // Subtle tilt proportional to horizontal velocity
+      const vx = e.clientX - d.lastX;
+      d.lastX = e.clientX;
+      setDragTilt(Math.max(-16, Math.min(16, vx * 1.15)));
+      window.clearTimeout(tiltDecayRef.current);
+      tiltDecayRef.current = window.setTimeout(() => setDragTilt(0), 90);
+    };
+
+    const onPointerUp = (e: PointerEvent) => {
+      const d = dragRef.current;
+      if (!d || e.pointerId !== d.pointerId) return;
+
+      dragRef.current = null;
+      setDragging(false);
+      setDragTilt(0);
+
+      if (d.moved) {
+        const finalPos = clampPosition(d.originX + (e.clientX - d.startX), d.originY + (e.clientY - d.startY));
+        setPos(finalPos);
+        try {
+          localStorage.setItem(POS_STORAGE_KEY, JSON.stringify(finalPos));
+        } catch {
+          // ignore storage quota errors
+        }
+      } else {
+        triggerOpen();
+      }
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+    };
+  }, [dragging, onClick]);
+
+  if (open || hiddenForDrawer) return null;
+
   const isId = locale === 'id';
+  const mood: CharacterMood = dragging
+    ? 'dragging'
+    : state !== 'idle'
+    ? state
+    : hovered
+    ? 'hovered'
+    : idleAction === 'jump'
+    ? 'jumping'
+    : idleAction === 'run'
+    ? 'running'
+    : 'idle';
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // Only primary mouse button or touch
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
+    e.preventDefault();
+    dragRef.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      originX: pos.x,
+      originY: pos.y,
+      lastX: e.clientX,
+      moved: false
+    };
+    setDragging(true);
+  };
+
+  // Determine bubble visibility, compact vs expanded state, and smart placement
+  const hasActionBubble = state !== 'idle';
+  const showIdleHoverBubble = state === 'idle' && hovered && !dragging;
+  const showBubble = (hasActionBubble || showIdleHoverBubble) && !dragging;
+  const isExpanded = hovered;
+
+  const placeBubbleBelow = pos.y < 185;
+  const alignBubbleRight = typeof window !== 'undefined' ? pos.x > window.innerWidth / 2 : true;
 
   const statusHeadline =
     state === 'executing'
       ? isId
-        ? `Menjalankan command${status?.serverName ? ` · ${status.serverName}` : ''}`
-        : `Running command${status?.serverName ? ` · ${status.serverName}` : ''}`
+        ? `SSH${status?.serverName ? ` · ${status.serverName}` : '...'}`
+        : `SSH${status?.serverName ? ` · ${status.serverName}` : '...'}`
       : state === 'thinking'
       ? isId
-        ? `AI sedang menganalisa...${status?.step && status.step > 1 ? ` (Langkah ${status.step})` : ''}`
-        : `Copilot is thinking...${status?.step && status.step > 1 ? ` (Step ${status.step})` : ''}`
+        ? `Thinking...${status?.step && status.step > 1 ? ` · #${status.step}` : ''}`
+        : `Thinking...${status?.step && status.step > 1 ? ` · #${status.step}` : ''}`
       : state === 'approval'
       ? isId
-        ? 'Menunggu persetujuanmu!'
-        : 'Waiting for your approval!'
+        ? `Butuh izin!${(status?.pendingCount || 1) > 1 ? ` (${status?.pendingCount})` : ''}`
+        : `Needs approval!${(status?.pendingCount || 1) > 1 ? ` (${status?.pendingCount})` : ''}`
+      : state === 'limit'
+      ? isId
+        ? `Limit ${status?.maxSteps || 8} step`
+        : `Limit ${status?.maxSteps || 8} steps`
+      : state === 'error'
+      ? isId
+        ? 'Ada kendala!'
+        : 'Error!'
       : state === 'done'
       ? isId
-        ? 'Selesai! Klik untuk lihat hasil'
-        : 'Done! Click to view reply'
-      : 'AI Copilot';
+        ? 'Selesai!'
+        : 'Done!'
+      : IDLE_QUIPS[isId ? 'id' : 'en'][quipIdx % IDLE_QUIPS[isId ? 'id' : 'en'].length];
 
-  const borderTone =
-    state === 'executing'
-      ? 'border-emerald-500/60 shadow-emerald-500/20'
+  const bubbleBorderColor =
+    state === 'approval' || state === 'limit'
+      ? 'border-amber-500/60'
+      : state === 'error'
+      ? 'border-red-500/60'
+      : state === 'executing' || state === 'done'
+      ? 'border-emerald-500/55'
       : state === 'thinking'
-      ? 'border-sky-500/60 shadow-sky-500/20'
-      : state === 'approval'
-      ? 'border-amber-500/70 shadow-amber-500/25 animate-bounce'
-      : state === 'done'
-      ? 'border-emerald-500/60 shadow-emerald-500/20'
+      ? 'border-sky-500/55'
+      : 'border-[var(--border)]';
+
+  const bubbleShadow =
+    state === 'approval' || state === 'limit'
+      ? 'shadow-amber-500/15'
+      : state === 'error'
+      ? 'shadow-red-500/15'
+      : state === 'executing' || state === 'done'
+      ? 'shadow-emerald-500/15'
+      : state === 'thinking'
+      ? 'shadow-sky-500/15'
       : '';
 
   return (
-    <div className="fixed bottom-5 right-6 z-40 flex flex-col items-end gap-2">
-      {/* Speech Bubble Callout above the button while working or waiting for approval.
-          Hidden when done: the pill below already says "Reply Ready!", so the bubble would just stack a duplicate. */}
-      {state !== 'idle' && state !== 'done' && (
-        <button
-          type="button"
-          onClick={onClick}
-          className={`max-w-[300px] text-left rounded-2xl border px-3.5 py-2.5 shadow-2xl backdrop-blur-md bg-[var(--card)]/95 transition-all hover:scale-[1.02] cursor-pointer animate-[pop-in_200ms_ease-out] ${
-            state === 'approval'
-              ? 'border-amber-500/50'
-              : state === 'executing'
-              ? 'border-emerald-500/45'
-              : 'border-sky-500/45'
-          }`}
+    <div
+      style={{
+        left: pos.x,
+        top: pos.y,
+        width: CHAR_W,
+        height: CHAR_H,
+        touchAction: 'none'
+      }}
+      onMouseEnter={enterHover}
+      onMouseLeave={leaveHover}
+      className="fixed z-40 select-none"
+    >
+      {/* Speech Bubble Callout: compact pill by default, expands smoothly on hover */}
+      {showBubble && (
+        <div
+          onMouseEnter={enterHover}
+          onMouseLeave={leaveHover}
+          className={`absolute ${
+            placeBubbleBelow ? 'top-full pt-2' : 'bottom-full pb-2'
+          } ${alignBubbleRight ? 'right-0' : 'left-0'} z-20`}
         >
-          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--foreground)]">
-            {state === 'executing' && <Terminal className="w-3.5 h-3.5 text-emerald-400 shrink-0 animate-pulse" />}
-            {state === 'thinking' && <Sparkles className="w-3.5 h-3.5 text-sky-400 shrink-0 animate-spin" style={{ animationDuration: '3s' }} />}
-            {state === 'approval' && <ShieldAlert className="w-3.5 h-3.5 text-amber-400 shrink-0 animate-bounce" />}
-            <span className="truncate">{statusHeadline}</span>
-          </div>
+          <div
+            className={`relative text-left border shadow-xl backdrop-blur-md bg-[var(--card)]/95 transition-all duration-200 ease-out animate-[pop-in_150ms_ease-out] ${bubbleBorderColor} ${bubbleShadow} ${
+              isExpanded
+                ? 'w-max min-w-[230px] max-w-[290px] rounded-2xl px-3.5 py-2.5 shadow-2xl'
+                : 'w-max max-w-[225px] rounded-full px-2.5 py-1.5'
+            }`}
+          >
+            {/* Speech Bubble Tail Pointer */}
+            <span
+              aria-hidden
+              className={`absolute w-2.5 h-2.5 rotate-45 bg-[var(--card)] ${bubbleBorderColor} ${
+                placeBubbleBelow
+                  ? '-top-[6px] border-l border-t'
+                  : '-bottom-[6px] border-r border-b'
+              } ${alignBubbleRight ? 'right-7' : 'left-7'}`}
+            />
 
-          {status?.command && (state === 'executing' || state === 'approval') ? (
-            <div className="mt-1.5 rounded-lg bg-zinc-950 border border-zinc-800 px-2 py-1 font-mono text-[10.5px] text-emerald-300 truncate">
-              <span className="text-zinc-500 mr-1">$</span>
-              {status.command}
+            {/* Clickable Compact Header / Title opens full drawer */}
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={triggerOpen}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  triggerOpen();
+                }
+              }}
+              className="cursor-pointer group/hdr relative z-10"
+            >
+              <div className="flex items-center justify-between gap-2 text-[11.5px] font-semibold text-[var(--foreground)]">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  {state === 'executing' && <Terminal className="w-3.5 h-3.5 text-emerald-500 shrink-0 animate-pulse" />}
+                  {state === 'thinking' && (
+                    <Sparkles className="w-3.5 h-3.5 text-sky-500 shrink-0 animate-spin" style={{ animationDuration: '3s' }} />
+                  )}
+                  {state === 'approval' && <ShieldAlert className="w-3.5 h-3.5 text-amber-500 shrink-0 animate-bounce" />}
+                  {state === 'limit' && <PauseCircle className="w-3.5 h-3.5 text-amber-500 shrink-0 animate-pulse" />}
+                  {state === 'error' && <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />}
+                  {state === 'done' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />}
+                  <span className="truncate group-hover/hdr:underline decoration-[var(--muted-foreground)]/50">
+                    {statusHeadline}
+                  </span>
+                </div>
+                <span
+                  className={`shrink-0 rounded-full font-mono uppercase border ${
+                    isExpanded ? 'px-1.5 py-0.5 text-[9.5px]' : 'px-1.5 py-0 text-[9px]'
+                  } ${
+                    mode === 'auto'
+                      ? 'bg-amber-500/15 text-amber-500 border-amber-500/35'
+                      : mode === 'manual'
+                      ? 'bg-sky-500/15 text-sky-500 border-sky-500/35'
+                      : 'bg-emerald-500/15 text-emerald-500 border-emerald-500/35'
+                  }`}
+                >
+                  {mode === 'auto' ? '⚡ Auto' : mode}
+                </span>
+              </div>
+
+              {/* Expanded Preview / Command Snippet (only visible on hover) */}
+              {isExpanded && (
+                <>
+                  {status?.command && (state === 'executing' || state === 'approval') ? (
+                    <div
+                      className={`mt-1.5 rounded-lg bg-[var(--muted)] border px-2 py-1 font-mono text-[10.5px] truncate max-w-[255px] text-[var(--foreground)] ${
+                        status?.isRisky && state === 'approval'
+                          ? 'border-red-500/50'
+                          : 'border-[var(--border)]'
+                      }`}
+                    >
+                      <span className="text-emerald-500 font-bold mr-1">$</span>
+                      {status.command}
+                    </div>
+                  ) : state === 'limit' ? (
+                    <p className="mt-1 text-[11px] text-[var(--muted-foreground)] leading-snug">
+                      {isId ? 'Eksekusi dijeda sementara. Lanjutkan langkah berikutnya?' : 'Loop paused safely. Continue for more steps?'}
+                    </p>
+                  ) : status?.preview && hasActionBubble ? (
+                    <p className="mt-1 text-[11px] text-[var(--muted-foreground)] line-clamp-2 leading-snug">
+                      {status.preview}
+                    </p>
+                  ) : state === 'idle' ? (
+                    <p className="mt-0.5 text-[10.5px] text-[var(--muted-foreground)]">
+                      {isId ? 'Klik untuk buka chat · Geser untuk pindah' : 'Click to open chat · Drag to move'}
+                    </p>
+                  ) : null}
+                </>
+              )}
             </div>
-          ) : status?.preview ? (
-            <p className="mt-1 text-[11px] text-[var(--muted-foreground)] line-clamp-2 leading-snug">
-              {status.preview}
-            </p>
-          ) : null}
-        </button>
-      )}
 
-      {/* Main Character Floating Pill */}
-      <button
-        type="button"
-        onClick={onClick}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        style={{ animationDuration: state === 'approval' ? '1.4s' : undefined }}
-        className={`relative flex items-center gap-2.5 pl-2.5 pr-3.5 py-2 rounded-full btn-metal border shadow-2xl hover:scale-105 active:scale-95 transition-all duration-200 group cursor-pointer ${borderTone}`}
-        title={t('copilot.openTitle')}
-        aria-label={t('copilot.openAria')}
-      >
-        <CopilotMascot state={state} hovered={hovered} />
+            {/* Inline Action Controls (only expanded on hover) */}
+            {isExpanded && hasActionBubble && (
+              <div className="mt-2 pt-2 border-t border-[var(--border)]/70 flex items-center justify-between gap-1.5 relative z-10">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {state === 'approval' && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onAction?.('approve');
+                        }}
+                        className={`px-2 py-1 rounded-lg text-[10.5px] font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer ${
+                          status?.isRisky
+                            ? 'bg-red-600 hover:bg-red-500 text-white'
+                            : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                        }`}
+                      >
+                        <Play className="w-2.5 h-2.5 fill-current" />
+                        <span>{status?.isRisky ? (isId ? 'Jalankan (!)' : 'Run (!)') : isId ? 'Izinkan' : 'Approve'}</span>
+                      </button>
+                      {(status?.pendingCount || 0) > 1 && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onAction?.('approveAll');
+                          }}
+                          className="px-2 py-1 rounded-lg text-[10.5px] font-semibold bg-amber-500/15 hover:bg-amber-500/25 text-amber-500 border border-amber-500/40 inline-flex items-center gap-1 transition-colors cursor-pointer"
+                        >
+                          <Play className="w-2.5 h-2.5" />
+                          <span>{isId ? 'Semua' : 'All'}</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onAction?.('skip');
+                        }}
+                        className="px-2 py-1 rounded-lg text-[10.5px] font-medium bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[var(--foreground)] border border-[var(--border)] inline-flex items-center gap-1 transition-colors cursor-pointer"
+                      >
+                        <SkipForward className="w-2.5 h-2.5" />
+                        <span>{isId ? 'Lewati' : 'Skip'}</span>
+                      </button>
+                    </>
+                  )}
 
-        <div className="flex flex-col items-start text-left">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-semibold tracking-wide leading-none">
-              {isBusy
-                ? state === 'executing'
-                  ? isId
-                    ? 'Menjalankan SSH...'
-                    : 'Running SSH...'
-                  : isId
-                  ? 'Sedang mikir...'
-                  : 'Thinking...'
-                : state === 'approval'
-                ? isId
-                  ? 'Butuh Izin!'
-                  : 'Needs Approval!'
-                : state === 'done'
-                ? isId
-                  ? 'Selesai!'
-                  : 'Reply Ready!'
-                : 'AI Copilot'}
-            </span>
-            {isBusy && (
-              <span className="inline-flex items-center gap-0.5">
-                <span className="w-1 h-1 rounded-full bg-current animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-1 h-1 rounded-full bg-current animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-1 h-1 rounded-full bg-current animate-bounce" style={{ animationDelay: '300ms' }} />
-              </span>
+                  {state === 'limit' && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAction?.('continue');
+                      }}
+                      className="px-2.5 py-1 rounded-lg text-[10.5px] font-semibold bg-amber-500 hover:bg-amber-400 text-zinc-950 shadow-sm inline-flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <Play className="w-2.5 h-2.5 fill-current" />
+                      <span>Continue</span>
+                    </button>
+                  )}
+
+                  {(state === 'thinking' || state === 'executing') && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAction?.('stop');
+                      }}
+                      className="px-2 py-1 rounded-lg text-[10.5px] font-semibold bg-red-600 hover:bg-red-500 text-white shadow-sm inline-flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <Square className="w-2.5 h-2.5 fill-current" />
+                      <span>{isId ? 'Hentikan' : 'Stop'}</span>
+                    </button>
+                  )}
+
+                  {state === 'error' && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAction?.('retry');
+                      }}
+                      className="px-2 py-1 rounded-lg text-[10.5px] font-semibold bg-red-600 hover:bg-red-500 text-white shadow-sm inline-flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <RotateCcw className="w-2.5 h-2.5" />
+                      <span>{isId ? 'Coba lagi' : 'Retry'}</span>
+                    </button>
+                  )}
+
+                  {state === 'done' && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        triggerOpen();
+                      }}
+                      className="px-2.5 py-1 rounded-lg text-[10.5px] font-semibold bg-emerald-600 hover:bg-emerald-500 text-white inline-flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <MessageSquare className="w-2.5 h-2.5" />
+                      <span>{isId ? 'Lihat hasil' : 'View'}</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  {state !== 'done' && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        triggerOpen();
+                      }}
+                      title={isId ? 'Buka chat lengkap' : 'Open full chat'}
+                      className="px-1.5 py-1 rounded-lg text-[10.5px] font-medium text-[var(--foreground)]/80 hover:text-[var(--foreground)] hover:bg-[var(--muted)] inline-flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <MessageSquare className="w-3 h-3" />
+                      <span>Chat</span>
+                    </button>
+                  )}
+                  {(state === 'done' || state === 'error') && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAction?.('dismiss');
+                      }}
+                      title={isId ? 'Tutup notif' : 'Dismiss'}
+                      className="p-1 rounded-lg text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] transition-colors cursor-pointer"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              </div>
             )}
           </div>
-          <span className="text-[10px] opacity-75 leading-tight mt-0.5">
-            {isBusy && status?.step
-              ? `Step ${status.step}/8 · ${status.serverName || 'VPS'}`
-              : state === 'approval'
-              ? isId
-                ? 'Klik untuk review command'
-                : 'Click to review command'
-              : state === 'done'
-              ? isId
-                ? 'Klik untuk buka chat'
-                : 'Click to open chat'
-              : (() => {
-                  const quips = IDLE_QUIPS[isId ? 'id' : 'en'];
-                  return quips[quipIdx % quips.length];
-                })()}
-          </span>
         </div>
+      )}
 
-        <kbd className="hidden sm:inline-block text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/15 border border-white/10 ml-0.5">
-          ⌘J
-        </kbd>
+      {/* Draggable Interactive Character Body */}
+      <div
+        role="button"
+        tabIndex={0}
+        onPointerDown={handlePointerDown}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            triggerOpen();
+          }
+        }}
+        title={`${t('copilot.openTitle')} (Drag to move)`}
+        aria-label={t('copilot.openAria')}
+        className={`relative w-full h-full flex items-center justify-center outline-none transition-transform duration-150 ${
+          dragging
+            ? 'cursor-grabbing scale-110'
+            : 'cursor-grab hover:scale-105 active:scale-95'
+        }`}
+      >
+        <CopilotCharacter mood={mood} mode={mode} dragTilt={dragTilt} look={look} runDir={runDir} />
 
-        {/* Unread / Attention Badge Dot */}
-        {(state === 'approval' || state === 'done') && (
+        {/* Unread / Attention Badge Dot on shoulder */}
+        {(state === 'approval' || state === 'limit' || state === 'done' || state === 'error') && !dragging && (
           <span
-            className={`absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-[var(--background)] ${
-              state === 'approval' ? 'bg-amber-400 animate-ping' : 'bg-emerald-400'
+            className={`absolute top-2 right-2 w-3 h-3 rounded-full border-2 border-[var(--background)] ${
+              state === 'approval' || state === 'limit'
+                ? 'bg-amber-400 animate-ping'
+                : state === 'error'
+                ? 'bg-red-500 animate-pulse'
+                : 'bg-emerald-400'
             }`}
           />
         )}
-      </button>
+      </div>
     </div>
   );
 }

@@ -27,8 +27,117 @@ if [ -z "$COMPOSE_FILE" ] && [ "$PWD" != ${sq(appDir)} ]; then
 fi
 
 if [ -n "$COMPOSE_FILE" ]; then
-  # If compose file references .env.prod, copy .env to .env.prod
-  if [ -f .env ] && [ ! -f .env.prod ] && grep -q "env_file:.*\\.env\\.prod" "$COMPOSE_FILE"; then cp .env .env.prod; fi
+  # Sync .env into every referenced env_file in COMPOSE_FILE (any syntax) and attach .env to non-DB services via override
+  rm -f .7server-compose.override.yml 2>/dev/null || true
+  if [ -f .env ] && command -v node >/dev/null 2>&1; then
+    node -e '
+      const fs = require("fs");
+      const path = require("path");
+      const composePath = fs.realpathSync(path.resolve(process.argv[1]));
+      const composeDir = path.dirname(composePath);
+      const rootDir = fs.realpathSync(process.cwd());
+      const dotEnvPath = path.resolve(rootDir, ".env");
+      if (!fs.existsSync(dotEnvPath)) process.exit(0);
+
+      const cleanEnvLines = (txt) => txt.replace(/\\r/g, "").split("\\n");
+      const mergeEnv = (baseTxt, overTxt) => {
+        const map = new Map();
+        for (const src of [baseTxt, overTxt]) {
+          for (const line of cleanEnvLines(src)) {
+            const m = line.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
+            if (m) map.set(m[1], line);
+          }
+        }
+        return Array.from(map.values()).join("\\n") + "\\n";
+      };
+
+      const dotEnvTxt = fs.readFileSync(dotEnvPath, "utf8");
+      const ymlLines = fs.readFileSync(composePath, "utf8").split(/\\r?\\n/);
+      const dbOnlyRe = /^(postgres|postgresql|pg|db|database|mysql|mariadb|redis|valkey|keydb|mongo|mongodb|minio|rabbitmq|mq|kafka|zookeeper|opensearch|elasticsearch|elastic|meilisearch|typesense|qdrant|milvus|mailpit|mailhog|adminer|pgadmin|phpmyadmin|redis-commander)$/i;
+
+      const referencedFiles = new Set();
+      const services = [];
+      let inServices = false, curSvc = "", inEnvFile = false, envFileIndent = 0;
+
+      const unquote = (s) => s.trim().replace(/^["\\x27]|["\\x27]$/g, "");
+      for (const line of ymlLines) {
+        if (/^services:\\s*(#.*)?$/.test(line)) { inServices = true; curSvc = ""; inEnvFile = false; continue; }
+        if (/^[A-Za-z0-9_-]+:/.test(line)) { inServices = false; curSvc = ""; inEnvFile = false; continue; }
+        if (!inServices) continue;
+
+        const sm = line.match(/^  ([A-Za-z0-9_.-]+):\\s*(#.*)?$/);
+        if (sm) {
+          curSvc = sm[1];
+          services.push(curSvc);
+          inEnvFile = false;
+          continue;
+        }
+        if (!curSvc) continue;
+
+        const efHead = line.match(/^(\\s*)env_file:\\s*(.*?)(#.*)?$/);
+        if (efHead) {
+          envFileIndent = efHead[1].length;
+          const rest = (efHead[2] || "").trim();
+          if (rest.startsWith("[") && rest.endsWith("]")) {
+            for (const item of rest.slice(1, -1).split(",")) {
+              const p = unquote(item);
+              if (p) referencedFiles.add(p);
+            }
+            inEnvFile = false;
+          } else if (rest) {
+            const p = unquote(rest);
+            if (p) referencedFiles.add(p);
+            inEnvFile = false;
+          } else {
+            inEnvFile = true;
+          }
+          continue;
+        }
+
+        if (inEnvFile) {
+          if (!line.trim() || /^\\s*#/.test(line)) continue;
+          const ind = (line.match(/^(\\s*)/) || ["", ""])[1].length;
+          if (ind <= envFileIndent && !/^\\s*-/.test(line)) {
+            inEnvFile = false;
+          } else {
+            const li = line.match(/^\\s*-\\s*(?:path:\\s*)?(.+?)\\s*(#.*)?$/);
+            if (li) {
+              const p = unquote(li[1]);
+              if (p && !/^required:/i.test(p)) referencedFiles.add(p);
+            } else {
+              const pm = line.match(/^\\s*path:\\s*(.+?)\\s*(#.*)?$/);
+              if (pm) referencedFiles.add(unquote(pm[1]));
+            }
+            continue;
+          }
+        }
+      }
+
+      for (const rel of referencedFiles) {
+        if (!rel || /^\\$\\{/.test(rel)) continue;
+        const resolved = path.resolve(composeDir, rel);
+        if (resolved === dotEnvPath) continue;
+        if (!resolved.startsWith(rootDir + path.sep) && resolved !== rootDir) continue;
+        const existing = fs.existsSync(resolved) ? fs.readFileSync(resolved, "utf8") : "";
+        fs.mkdirSync(path.dirname(resolved), { recursive: true });
+        fs.writeFileSync(resolved, mergeEnv(existing, dotEnvTxt), { mode: 0o644 });
+        console.log("Synced .env overrides -> " + path.relative(rootDir, resolved));
+      }
+
+      const appServices = services.filter((s) => !dbOnlyRe.test(s));
+      if (appServices.length > 0) {
+        const overrideLines = ["services:"];
+        for (const s of appServices) {
+          overrideLines.push("  " + s + ":", "    env_file:", "      - " + JSON.stringify(dotEnvPath));
+        }
+        fs.writeFileSync(path.resolve(rootDir, ".7server-compose.override.yml"), overrideLines.join("\\n") + "\\n", { mode: 0o644 });
+      }
+    ' "$COMPOSE_FILE" || true
+  fi
+  COMPOSE_ENV_FLAG=""
+  [ -f .env ] && COMPOSE_ENV_FLAG="--env-file .env"
+  COMPOSE_OVERRIDE_FLAG=""
+  [ -f .7server-compose.override.yml ] && COMPOSE_OVERRIDE_FLAG="-f .7server-compose.override.yml"
   # Replace deprecated / blocked quay.io MinIO images with public working images
   sed -i 's|quay.io/minio/minio:latest|cgr.dev/chainguard/minio:latest|g' "$COMPOSE_FILE" 2>/dev/null || true
   sed -i 's|quay.io/minio/minio|cgr.dev/chainguard/minio:latest|g' "$COMPOSE_FILE" 2>/dev/null || true
@@ -59,12 +168,13 @@ if [ -n "$COMPOSE_FILE" ]; then
   fi
 
   # Clean up any broken or previously half-started containers from compose
-  CP_PROJECT=$( (grep -E '^[[:space:]]*name:' "$COMPOSE_FILE" 2>/dev/null || true) | head -n 1 | awk '{gsub(/[\\x22\\x27]/, ""); print $NF}')
+  CP_PROJECT=$( (grep -E '^name:' "$COMPOSE_FILE" 2>/dev/null || true) | head -n 1 | awk '{gsub(/[\\x22\\x27]/, ""); print $NF}')
   # No -v here: keeping volumes preserves database data across redeploys
   if [ -n "$CP_PROJECT" ]; then
     docker compose -p "$CP_PROJECT" -f "$COMPOSE_FILE" down --remove-orphans 2>/dev/null || true
   fi
   docker compose -p ${name} -f "$COMPOSE_FILE" down --remove-orphans 2>/dev/null || docker compose -f "$COMPOSE_FILE" down --remove-orphans 2>/dev/null || true
+  docker ps -a --filter "label=com.docker.compose.project=7server-${s.appName}" -q | xargs -r docker rm -f >/dev/null 2>&1 || true
 
   # Actively force remove any container matching container_name: from compose file to eliminate name collisions
   for cn in $( (grep -E '^[[:space:]]*container_name:' "$COMPOSE_FILE" 2>/dev/null || true) | awk '{gsub(/[\\x22\\x27]/, ""); print $NF}'); do
@@ -77,7 +187,7 @@ if [ -n "$COMPOSE_FILE" ]; then
     (docker ps --format '{{.Ports}}' 2>/dev/null || true) | (grep -oE ':[0-9]+->' || true) | tr -d ':>-'
   ) | sort -un | tr '\\n' ' ' )
 
-  # Rewrite compose file: map main app port to ${s.port}, and auto-resolve any host port collisions (e.g. postgres 5432)
+  # Rewrite compose file: map main app service port to ${s.port}, and auto-resolve any host port collisions (e.g. postgres 5432, minio 9000)
   if command -v node >/dev/null 2>&1; then
     node -e '
       const fs = require("fs");
@@ -85,11 +195,54 @@ if [ -n "$COMPOSE_FILE" ]; then
       const targetPort = parseInt(process.argv[2], 10);
       const bindPrefix = process.argv[3] || "";
       const usedPortsList = (process.argv[4] || "").split(/\\s+/).map((p) => parseInt(p, 10)).filter(Boolean);
+      const appHint = (process.argv[5] || "").toLowerCase();
       const usedSet = new Set(usedPortsList);
 
-      const dbPorts = new Set([5432, 3306, 6379, 27017]);
-      let yml = fs.readFileSync(file, "utf8");
-      let replacedMain = false;
+      const infraPorts = new Set([5432, 5433, 3306, 6379, 6380, 27017, 9000, 9001, 5672, 15672, 9200, 9300, 9600, 1025, 8025, 7700, 4222, 8222, 2181, 11211]);
+      const infraSvcRe = /^(postgres|postgresql|pg|db|database|mysql|mariadb|redis|valkey|keydb|mongo|mongodb|minio|rabbitmq|mq|kafka|zookeeper|opensearch|elasticsearch|elastic|meilisearch|typesense|qdrant|milvus|mailpit|mailhog|adminer|pgadmin|phpmyadmin|redis-commander|migrate|migrations|seeder|seed|init|setup|worker|cron|scheduler)$/i;
+      const appSvcRe = /^(app|web|api|backend|frontend|server|main|gateway)$/i;
+      const portRe = /^(\\s*-\\s*["\\x27]?)(?:(\\d{1,3}(?:\\.\\d{1,3}){3}):)?(?:\\$\\{[^}:]+(?::-?(\\d+))?\\}|(\\d+)):(\\d+|\\$\\{[^}:]+(?::-?(\\d+))?\\})(\\/(?:tcp|udp))?(["\\x27]?\\s*)(#.*)?$/;
+
+      const raw = fs.readFileSync(file, "utf8");
+      const lines = raw.split(/\\r?\\n/);
+      const svcMeta = {};
+      const candidates = [];
+      let inServices = false;
+      let curSvc = "";
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (/^services:\\s*(#.*)?$/.test(line)) { inServices = true; curSvc = ""; continue; }
+        if (/^[A-Za-z0-9_-]+:/.test(line)) { inServices = false; curSvc = ""; continue; }
+        if (!inServices) continue;
+
+        const svcMatch = line.match(/^  ([A-Za-z0-9_.-]+):\\s*(#.*)?$/);
+        if (svcMatch) {
+          curSvc = svcMatch[1];
+          if (!svcMeta[curSvc]) svcMeta[curSvc] = { hasBuild: false };
+          continue;
+        }
+        if (curSvc && /^    build\\s*:/.test(line)) svcMeta[curSvc].hasBuild = true;
+
+        const pm = curSvc ? line.match(portRe) : null;
+        if (pm) {
+          const hPort = parseInt(pm[3] || pm[4] || pm[6] || pm[5], 10);
+          const cPort = parseInt(pm[6] || pm[5], 10);
+          candidates.push({ lineIdx: i, svc: curSvc, hPort, cPort, isInfraPort: infraPorts.has(hPort) || infraPorts.has(cPort) });
+        }
+      }
+
+      const pickMain = () => {
+        const nonInfra = candidates.filter((c) => !c.isInfraPort && !infraSvcRe.test(c.svc));
+        const byHint = nonInfra.find((c) => appHint && (c.svc.toLowerCase() === appHint || appHint.includes(c.svc.toLowerCase())));
+        if (byHint) return byHint.lineIdx;
+        const byAppNameOrBuild = nonInfra.find((c) => appSvcRe.test(c.svc) || svcMeta[c.svc]?.hasBuild);
+        if (byAppNameOrBuild) return byAppNameOrBuild.lineIdx;
+        if (nonInfra.length) return nonInfra[0].lineIdx;
+        const anyNonInfraPort = candidates.find((c) => !c.isInfraPort);
+        return anyNonInfraPort ? anyNonInfraPort.lineIdx : -1;
+      };
+      const mainIdx = pickMain();
 
       function getFree(start) {
         let p = start;
@@ -98,34 +251,37 @@ if [ -n "$COMPOSE_FILE" ]; then
         return p;
       }
 
-      yml = yml.replace(/^(\\s*-\\s*["\\x27]?)(?:(\\d{1,3}(?:\\.\\d{1,3}){3}):)?(?:\\$\\{[^}:]+(?::-?(\\d+))?\\}|(\\d+)):(\\d+)(\\/(?:tcp|udp))?(["\\x27]?\\s*)(?:#.*)?$/gm, (m, pre, ip, defEnvPort, hPortStr, cPortStr, proto, suf) => {
-        const hPort = parseInt(defEnvPort || hPortStr || cPortStr, 10);
-        const cPort = parseInt(cPortStr, 10);
+      for (let i = 0; i < lines.length; i++) {
+        const pm = lines[i].match(portRe);
+        if (!pm) continue;
+        const [, pre, , defHostPort, hPortStr, cSpec, defContPort, proto, suf, comment] = pm;
+        const hPort = parseInt(defHostPort || hPortStr || defContPort || cSpec, 10);
 
-        if (!replacedMain && !dbPorts.has(hPort) && !dbPorts.has(cPort)) {
-          replacedMain = true;
+        if (i === mainIdx) {
           usedSet.add(targetPort);
-          return \`\${pre}\${bindPrefix}\${targetPort}:\${cPort}\${proto || ""}\${suf}\`;
+          lines[i] = \`\${pre}\${bindPrefix}\${targetPort}:\${cSpec}\${proto || ""}\${suf}\${comment || ""}\`;
+          continue;
         }
 
         if (usedSet.has(hPort)) {
           const newHPort = getFree(hPort >= 5000 ? hPort + 1 : hPort + 10000);
-          console.log(\`Port \${hPort} is already in use on host; remapping compose service port to 127.0.0.1:\${newHPort}:\${cPort}\`);
-          return \`\${pre}127.0.0.1:\${newHPort}:\${cPort}\${proto || ""}\${suf}\`;
+          console.log(\`Port \${hPort} is already in use on host; remapping compose service port to 127.0.0.1:\${newHPort}:\${cSpec}\`);
+          lines[i] = \`\${pre}127.0.0.1:\${newHPort}:\${cSpec}\${proto || ""}\${suf}\${comment || ""}\`;
         } else {
           usedSet.add(hPort);
-          return m;
         }
-      });
-      fs.writeFileSync(file, yml);
-    ' "$COMPOSE_FILE" "${s.port}" "${bindPrefix}" "$USED_PORTS" 2>/dev/null || true
+      }
+      fs.writeFileSync(file, lines.join("\\n"));
+    ' "$COMPOSE_FILE" "${s.port}" "${bindPrefix}" "$USED_PORTS" ${sq(s.appName)} 2>/dev/null || true
   fi
   export HOST=0.0.0.0
   if (grep -qE '^[[:space:]]*profiles:' "$COMPOSE_FILE" 2>/dev/null || true); then
     export COMPOSE_PROFILES="*"
   fi
-  if ! docker compose -p ${name} -f "$COMPOSE_FILE" up -d --build; then
+  if ! docker compose -p ${name} -f "$COMPOSE_FILE" \${COMPOSE_OVERRIDE_FLAG} \${COMPOSE_ENV_FLAG} up -d --build; then
     echo "Docker compose up encountered an error. Collecting container logs..."
+    docker compose -p ${name} -f "$COMPOSE_FILE" \${COMPOSE_OVERRIDE_FLAG} \${COMPOSE_ENV_FLAG} ps -a 2>/dev/null || true
+    docker compose -p ${name} -f "$COMPOSE_FILE" \${COMPOSE_OVERRIDE_FLAG} \${COMPOSE_ENV_FLAG} logs --tail 35 --no-color 2>&1 || true
     for cn in $( (grep -E '^[[:space:]]*container_name:' "$COMPOSE_FILE" 2>/dev/null || true) | awk '{gsub(/[\\x22\\x27]/, ""); print $NF}'); do
       echo "=== Container logs for $cn ==="
       docker logs --tail 30 "$cn" 2>&1 || true
@@ -184,6 +340,8 @@ else
     sleep 2
     code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:${s.port}/ || true)
     [ -n "$code" ] && [ "$code" != "000" ] && break
+    CSTATE=$(docker inspect -f '{{.State.Status}}' ${name} 2>/dev/null || true)
+    [ "$CSTATE" = "exited" ] || [ "$CSTATE" = "dead" ] && break
   done
   if [ -z "$code" ] || [ "$code" = "000" ]; then
     CPID=$(docker inspect -f '{{.State.Pid}}' ${name} 2>/dev/null || true)
@@ -196,6 +354,8 @@ else
       echo "Container listens internally on port $ACTUAL_CPORT (not $CPORT); remapping host :${s.port} -> container :$ACTUAL_CPORT..."
       docker rm -f ${name} >/dev/null 2>&1 || true
       docker run -d --name ${name} --restart unless-stopped --env-file .env \\
+        \${VOL_FLAG} \\
+        --add-host=host.docker.internal:host-gateway \\
         -e PORT="$ACTUAL_CPORT" -e NITRO_PORT="$ACTUAL_CPORT" -e NUXT_PORT="$ACTUAL_CPORT" \\
         -e HOST=0.0.0.0 -e NITRO_HOST=0.0.0.0 -e NUXT_HOST=0.0.0.0 -e HOSTNAME=0.0.0.0 \\
         -p ${bindPrefix}${s.port}:"$ACTUAL_CPORT" ${name}

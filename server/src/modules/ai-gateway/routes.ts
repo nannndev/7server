@@ -2,20 +2,25 @@ import { Router, type Request, type Response } from 'express';
 import {
   handleAnthropicMessages,
   handleOpenAiChatCompletions,
-  handleListModels
+  handleOpenAiResponses,
+  handleOpenAiEmbeddings,
+  handlePlaygroundChat,
+  handleListModels,
+  isValidComboTarget
 } from './service.js';
 import { handleCopilotChat } from './copilot.js';
 import { verifyProviderConnection } from './verifier.js';
 import { internalOnly } from './internalOnly.js';
 import { startLogin, completeLogin, pollDeviceLogin, isOAuthProvider } from './oauth.js';
-import { listAccounts, saveAccount, removeAccount, reorderAccounts, getCredential } from './accounts.js';
-import { accountModels, ALIAS_OF, MODELS, resolveModel } from './subscription.js';
+import { listAccounts, saveAccount, removeAccount, reorderAccounts, toggleAccount, getCredential } from './accounts.js';
+import { accountModels, ALIAS_OF, MODELS } from './subscription.js';
 import { usageOf } from './usage.js';
 import { listenForCallback } from './callbackServer.js';
 import {
   getAllKeys,
   publicKey,
   createVirtualKey,
+  updateVirtualKey,
   deleteVirtualKey,
   toggleVirtualKey,
   getClientConfig,
@@ -24,9 +29,13 @@ import {
   connectProvider,
   disconnectProvider,
   reorderProviderKeys,
+  toggleProviderKeyAccount,
+  addProviderCustomModel,
+  removeProviderCustomModel,
   getUsageLogs,
   clearUsageLogs,
-  getGatewayStats
+  getGatewayStats,
+  getUsageAnalytics
 } from './store.js';
 
 import { need } from '../../http/auth.js';
@@ -55,6 +64,20 @@ aiGatewayPublicRoutes.post(
   }
 );
 
+aiGatewayPublicRoutes.post(
+  ['/v1/responses', '/responses', '/v1/v1/responses'],
+  (req: Request, res: Response) => {
+    handleOpenAiResponses(req, res);
+  }
+);
+
+aiGatewayPublicRoutes.post(
+  ['/v1/embeddings', '/embeddings', '/v1/v1/embeddings'],
+  (req: Request, res: Response) => {
+    handleOpenAiEmbeddings(req, res);
+  }
+);
+
 aiGatewayPublicRoutes.get(
   ['/v1/models', '/models', '/v1/v1/models'],
   (req: Request, res: Response) => {
@@ -80,9 +103,32 @@ aiGatewayManagementRoutes.get('/ai-gateway/keys', (req: Request, res: Response) 
 });
 
 aiGatewayManagementRoutes.post('/ai-gateway/keys', (req: Request, res: Response) => {
-  const { name, allowedProviders } = req.body || {};
-  const newKey = createVirtualKey(String(name || ''), allowedProviders);
+  const { name, allowedProviders, rateLimitPerMin, maxBudgetUsd, maxTokens, expiresAt } = req.body || {};
+  const newKey = createVirtualKey(String(name || ''), allowedProviders, {
+    rateLimitPerMin,
+    maxBudgetUsd,
+    maxTokens,
+    expiresAt
+  });
   res.json({ key: newKey });
+});
+
+aiGatewayManagementRoutes.patch('/ai-gateway/keys/:id', (req: Request, res: Response) => {
+  const { name, enabled, allowedProviders, rateLimitPerMin, maxBudgetUsd, maxTokens, expiresAt } = req.body || {};
+  const updated = updateVirtualKey(String(req.params.id), {
+    name,
+    enabled,
+    allowedProviders,
+    rateLimitPerMin,
+    maxBudgetUsd,
+    maxTokens,
+    expiresAt
+  });
+  if (!updated) {
+    res.status(404).json({ error: 'Virtual key not found' });
+    return;
+  }
+  res.json({ key: updated });
 });
 
 aiGatewayManagementRoutes.delete('/ai-gateway/keys/:id', (req: Request, res: Response) => {
@@ -147,6 +193,34 @@ aiGatewayManagementRoutes.post('/ai-gateway/providers/:providerId/reorder', (req
   res.json({ config: updatedConfig });
 });
 
+aiGatewayManagementRoutes.patch('/ai-gateway/providers/:providerId/keys/:keyId/toggle', (req: Request, res: Response) => {
+  const providerId = String(req.params.providerId) as any;
+  const keyId = String(req.params.keyId);
+  const enabled = req.body?.enabled !== false;
+  const updatedConfig = toggleProviderKeyAccount(providerId, keyId, enabled);
+  res.json({ config: updatedConfig });
+});
+
+aiGatewayManagementRoutes.post('/ai-gateway/providers/:providerId/custom-models', (req: Request, res: Response) => {
+  const providerId = String(req.params.providerId) as any;
+  const model = typeof req.body?.model === 'string' ? req.body.model.trim() : '';
+  if (!model) { res.status(400).json({ error: 'model is required' }); return; }
+  const updatedConfig = addProviderCustomModel(providerId, model);
+  res.json({ config: updatedConfig });
+});
+
+aiGatewayManagementRoutes.delete('/ai-gateway/providers/:providerId/custom-models', (req: Request, res: Response) => {
+  const providerId = String(req.params.providerId) as any;
+  const model = typeof req.body?.model === 'string'
+    ? req.body.model.trim()
+    : typeof req.query?.model === 'string'
+      ? req.query.model.trim()
+      : '';
+  if (!model) { res.status(400).json({ error: 'model is required' }); return; }
+  const updatedConfig = removeProviderCustomModel(providerId, model);
+  res.json({ config: updatedConfig });
+});
+
 aiGatewayManagementRoutes.get('/ai-gateway/usage', (req: Request, res: Response) => {
   const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 100));
   const logs = getUsageLogs(limit);
@@ -163,6 +237,22 @@ aiGatewayManagementRoutes.get('/ai-gateway/stats', (req: Request, res: Response)
   res.json({ stats });
 });
 
+aiGatewayManagementRoutes.get('/ai-gateway/analytics', (req: Request, res: Response) => {
+  const rawRange = String(req.query.range || '30d');
+  const range = rawRange === '1d' || rawRange === '7d' || rawRange === '30d' || rawRange === 'all' ? rawRange : '30d';
+  const tzOffsetMin = req.query.tzOffset !== undefined ? Number(req.query.tzOffset) : 0;
+  const provider = req.query.provider ? String(req.query.provider) : undefined;
+  const model = req.query.model ? String(req.query.model) : undefined;
+  const keyId = req.query.keyId ? String(req.query.keyId) : undefined;
+  const analytics = getUsageAnalytics(range, { tzOffsetMin, provider, model, keyId });
+  res.json({ analytics });
+});
+
+// Admin Web Playground endpoint (SSE or JSON chat test via the gateway pipeline)
+aiGatewayManagementRoutes.post('/ai-gateway/playground', (req: Request, res: Response) => {
+  handlePlaygroundChat(req, res);
+});
+
 // ------------------- SUBSCRIPTION ACCOUNTS (OAuth login, 9Router style) -------------------
 const oauthProvider = (req: Request, res: Response) => {
   const p = String(req.params.provider);
@@ -171,8 +261,16 @@ const oauthProvider = (req: Request, res: Response) => {
 };
 
 aiGatewayManagementRoutes.get('/ai-gateway/accounts', async (_req: Request, res: Response) => {
-  // Live catalogs (Copilot policy, Kilo free models) so the pickers only offer models the account can use.
-  res.json({ accounts: listAccounts(), models: { ...MODELS, ...(await accountModels()) }, aliases: ALIAS_OF });
+  // Live catalogs (Copilot policy, Kilo free models) + user custom models per provider.
+  const baseModels: Record<string, string[]> = { ...MODELS, ...(await accountModels()) };
+  const cfg = getClientConfig();
+  for (const p of Object.keys(ALIAS_OF) as Array<keyof typeof ALIAS_OF>) {
+    const custom = cfg.providers?.[p]?.customModels || [];
+    if (custom.length) {
+      baseModels[p] = Array.from(new Set([...(baseModels[p] || []), ...custom]));
+    }
+  }
+  res.json({ accounts: listAccounts(), models: baseModels, aliases: ALIAS_OF });
 });
 
 aiGatewayManagementRoutes.post('/ai-gateway/accounts/:provider/start', async (req: Request, res: Response) => {
@@ -219,6 +317,14 @@ aiGatewayManagementRoutes.post('/ai-gateway/accounts/:provider/reorder', (req: R
   res.json({ accounts: reorderAccounts(p, accountIds) });
 });
 
+aiGatewayManagementRoutes.patch('/ai-gateway/accounts/:provider/toggle', (req: Request, res: Response) => {
+  const p = oauthProvider(req, res); if (!p) return;
+  const accountId = typeof req.body?.accountId === 'string' ? req.body.accountId : '';
+  if (!accountId) { res.status(400).json({ error: 'accountId is required' }); return; }
+  const enabled = req.body?.enabled !== false;
+  res.json({ accounts: toggleAccount(p, accountId, enabled) });
+});
+
 aiGatewayManagementRoutes.delete('/ai-gateway/accounts/:provider', (req: Request, res: Response) => {
   const p = oauthProvider(req, res); if (!p) return;
   const accountId = req.query.accountId ? String(req.query.accountId) : (req.body?.accountId ? String(req.body.accountId) : undefined);
@@ -228,7 +334,30 @@ aiGatewayManagementRoutes.delete('/ai-gateway/accounts/:provider', (req: Request
 
 aiGatewayManagementRoutes.get('/ai-gateway/accounts/usage', async (req: Request, res: Response) => {
   const fresh = req.query.fresh === '1';
-  const usage = await Promise.all(listAccounts().map((a) => usageOf(a.provider, fresh, a.id)));
+  const tzOffsetMin = Number.isFinite(Number(req.query.tzOffset)) ? Number(req.query.tzOffset) : 0;
+  const [usageList, todayAnalytics, allAnalytics] = await Promise.all([
+    Promise.all(listAccounts().map((a) => usageOf(a.provider, fresh, a.id))),
+    Promise.resolve(getUsageAnalytics('1d', { tzOffsetMin })),
+    Promise.resolve(getUsageAnalytics('all', { tzOffsetMin }))
+  ]);
+
+  const todayMap = new Map(todayAnalytics.byProvider.map((r) => [r.key.toLowerCase(), r]));
+  const allMap = new Map(allAnalytics.byProvider.map((r) => [r.key.toLowerCase(), r]));
+
+  const usage = usageList.map((u) => {
+    const k = String(u.provider).toLowerCase();
+    const tRow = todayMap.get(k);
+    const aRow = allMap.get(k);
+    return {
+      ...u,
+      gatewayStats: {
+        todayRequests: tRow?.requests || 0,
+        todayTokens: tRow?.totalTokens || 0,
+        totalRequests: aRow?.requests || 0,
+        totalTokens: aRow?.totalTokens || 0
+      }
+    };
+  });
   res.json({ usage });
 });
 
@@ -240,8 +369,8 @@ aiGatewayManagementRoutes.put('/ai-gateway/combos/:name', (req: Request, res: Re
   const name = String(req.params.name || '').trim();
   if (!/^[a-z0-9][a-z0-9._-]{0,39}$/.test(name)) { res.status(400).json({ error: 'Name: 1–40 chars, lowercase letters, digits, . _ -' }); return; }
   const targets = Array.isArray(req.body?.targets) ? req.body.targets.map((t: unknown) => String(t).trim()).filter(Boolean) : [];
-  const bad = targets.filter((t: string) => !resolveModel(t));
-  if (!targets.length || targets.length > 8 || bad.length) { res.status(400).json({ error: bad.length ? `Not a subscription model: ${bad.join(', ')}` : 'Give 1–8 targets like cc/claude-sonnet-5' }); return; }
+  const bad = targets.filter((t: string) => !isValidComboTarget(t));
+  if (!targets.length || targets.length > 8 || bad.length) { res.status(400).json({ error: bad.length ? `Unknown provider/model target: ${bad.join(', ')}` : 'Give 1–8 targets like cc/claude-sonnet-5 or openai/gpt-4o' }); return; }
   const combos = { ...(getInternalConfig().combos || {}), [name]: targets };
   saveGatewayConfig({ combos });
   res.json({ combos });

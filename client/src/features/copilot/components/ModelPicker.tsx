@@ -223,7 +223,7 @@ const PROVIDER_MAP: Record<string, ProviderMetaInfo> = {
   }
 };
 
-export type ModelTag = 'FREE' | 'REASONING' | 'CODING' | 'FAST';
+export type ModelTag = 'AUTO' | 'FREE' | 'REASONING' | 'CODING' | 'FAST';
 
 export interface ParsedModelItem {
   id: string;
@@ -234,6 +234,7 @@ export interface ParsedModelItem {
   provider: ProviderMetaInfo;
   tags: ModelTag[];
   subtitle?: string;
+  isProviderAuto?: boolean;
 }
 
 export function getProviderMeta(prefix: string): ProviderMetaInfo {
@@ -253,12 +254,17 @@ export function parseModelItem(id: string, combos?: Record<string, string[]>): P
   const prefix = slashIdx > 0 ? id.slice(0, slashIdx) : 'auto';
   const rawName = slashIdx > 0 ? id.slice(slashIdx + 1) : id;
   const provider = getProviderMeta(prefix);
+  const isProviderAuto = prefix !== 'auto' && rawName === 'auto';
 
   const tags: ModelTag[] = [];
-  if (/:free$/i.test(rawName)) tags.push('FREE');
-  if (/(^|[-/])(o1|o3|o4|r1|reasoner|reasoning|thinking|qwq)([-/]|$)/i.test(rawName)) tags.push('REASONING');
-  if (/(codex|coder|coding|codestral|devstral|starcoder)/i.test(rawName)) tags.push('CODING');
-  if (/(mini|flash|haiku|instant|nano|air|lite|fast|lightning|turbo)/i.test(rawName)) tags.push('FAST');
+  if (isProviderAuto) {
+    tags.push('AUTO');
+  } else {
+    if (/:free$/i.test(rawName)) tags.push('FREE');
+    if (/(^|[-/])(o1|o3|o4|r1|reasoner|reasoning|thinking|qwq)([-/]|$)/i.test(rawName)) tags.push('REASONING');
+    if (/(codex|coder|coding|codestral|devstral|starcoder)/i.test(rawName)) tags.push('CODING');
+    if (/(mini|flash|haiku|instant|nano|air|lite|fast|lightning|turbo)/i.test(rawName)) tags.push('FAST');
+  }
 
   let withoutFree = rawName.replace(/:free$/i, '');
   let subVendor: string | undefined;
@@ -268,8 +274,9 @@ export function parseModelItem(id: string, combos?: Record<string, string[]>): P
     withoutFree = withoutFree.slice(innerSlash + 1);
   }
 
-  const subtitle =
-    prefix === 'auto' && combos?.[rawName]
+  const subtitle = isProviderAuto
+    ? `Auto-pick & fallback within ${provider.shortLabel}`
+    : prefix === 'auto' && combos?.[rawName]
       ? combos[rawName].join(' → ')
       : undefined;
 
@@ -277,11 +284,12 @@ export function parseModelItem(id: string, combos?: Record<string, string[]>): P
     id,
     prefix,
     rawName,
-    cleanName: withoutFree,
+    cleanName: isProviderAuto ? `Auto (${provider.shortLabel})` : withoutFree,
     subVendor,
     provider,
     tags,
-    subtitle
+    subtitle,
+    isProviderAuto
   };
 }
 
@@ -339,6 +347,7 @@ export function ModelPicker({
   const [activeFilter, setActiveFilter] = useState<string>('all');
   const [pinned, setPinned] = useState<string[]>(loadPinnedModels);
   const [highlightIdx, setHighlightIdx] = useState<number>(0);
+  const [popoverBox, setPopoverBox] = useState<{ left: number; width: number }>({ left: 0, width: 390 });
 
   const containerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -445,13 +454,34 @@ export function ModelPicker({
     return () => document.removeEventListener('mousedown', onMouseDown);
   }, [open]);
 
-  // Auto-focus search input when opened
+  // Auto-focus search input and clamp popover horizontally within bounds/viewport when opened
   useEffect(() => {
-    if (open) {
-      setTimeout(() => searchInputRef.current?.focus(), 20);
-    } else {
+    if (!open) {
       setSearch('');
+      return;
     }
+    const updatePosition = () => {
+      const el = containerRef.current;
+      if (!el) return;
+      const trigRect = el.getBoundingClientRect();
+      const boundsEl = el.closest('[data-picker-bounds]');
+      const boundsRect = boundsEl ? boundsEl.getBoundingClientRect() : null;
+      const bLeft = boundsRect ? boundsRect.left : 12;
+      const bRight = boundsRect ? boundsRect.right : window.innerWidth - 12;
+      const availW = Math.max(240, bRight - bLeft);
+      const width = Math.min(390, availW);
+      let targetLeft = trigRect.left;
+      if (targetLeft + width > bRight) targetLeft = bRight - width;
+      if (targetLeft < bLeft) targetLeft = bLeft;
+      setPopoverBox({ left: Math.round(targetLeft - trigRect.left), width: Math.round(width) });
+    };
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    const tId = window.setTimeout(() => searchInputRef.current?.focus(), 20);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.clearTimeout(tId);
+    };
   }, [open]);
 
   const togglePin = (e: React.MouseEvent, id: string) => {
@@ -523,7 +553,9 @@ export function ModelPicker({
               <span className="font-mono text-[10px] px-1 py-px rounded bg-[var(--muted)] text-[var(--muted-foreground)] shrink-0">
                 {currentParsed.prefix}
               </span>
-              <span className="truncate font-mono text-[11px]">{currentParsed.cleanName}</span>
+              <span className={`truncate font-mono text-[11px] ${currentParsed.isProviderAuto ? 'text-emerald-500 font-semibold' : ''}`}>
+                {currentParsed.isProviderAuto ? 'auto' : currentParsed.cleanName}
+              </span>
             </>
           ) : (
             <>
@@ -557,8 +589,9 @@ export function ModelPicker({
       {open && (
         <div
           onKeyDown={handleKeyDown}
-          className={`fixed sm:absolute z-50 left-2 right-2 sm:left-0 sm:right-auto sm:w-[390px] rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-2xl overflow-hidden flex flex-col animate-[pop-in_150ms_ease-out] ${
-            placement === 'top' ? 'bottom-16 sm:bottom-full sm:mb-2' : 'top-auto sm:top-full mt-1.5'
+          style={{ left: popoverBox.left, width: popoverBox.width }}
+          className={`absolute z-50 rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-2xl overflow-hidden flex flex-col animate-[pop-in_150ms_ease-out] ${
+            placement === 'top' ? 'bottom-full mb-2' : 'top-full mt-1.5'
           }`}
         >
           {/* Search Bar */}
@@ -787,6 +820,8 @@ function ModelOptionRow({
           ? 'bg-[var(--foreground)]/[0.08] text-[var(--foreground)] font-medium'
           : highlighted
           ? 'bg-[var(--muted)]/70 text-[var(--foreground)]'
+          : item.isProviderAuto
+          ? 'bg-emerald-500/[0.04] hover:bg-emerald-500/[0.09] text-[var(--foreground)] border border-emerald-500/20'
           : 'hover:bg-[var(--muted)]/50 text-[var(--foreground)]'
       }`}
     >
@@ -841,6 +876,13 @@ function ModelOptionRow({
 }
 
 function TagPill({ tag }: { tag: ModelTag }) {
+  if (tag === 'AUTO') {
+    return (
+      <span className="text-[8.5px] font-mono font-semibold px-1.5 py-px rounded bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 flex items-center gap-0.5 shrink-0">
+        <Sparkles className="w-2.5 h-2.5" /> PER-PROVIDER
+      </span>
+    );
+  }
   if (tag === 'FREE') {
     return (
       <span className="text-[8.5px] font-mono font-semibold px-1 py-px rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shrink-0">

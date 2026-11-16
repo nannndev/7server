@@ -24,7 +24,7 @@ export const SERVER_TABS = [
   'terminal'
 ] as const;
 export const MONITOR_TABS = ['alerts', 'uptime', 'audit'] as const;
-export const AI_GATEWAY_TABS = ['providers', 'keys', 'quickstart', 'usage', 'config'] as const;
+export const AI_GATEWAY_TABS = ['providers', 'keys', 'quickstart', 'playground', 'usage', 'config'] as const;
 export const USERS_TABS = ['users', 'roles', 'sessions'] as const;
 
 export type FleetView = (typeof FLEET_VIEWS)[number];
