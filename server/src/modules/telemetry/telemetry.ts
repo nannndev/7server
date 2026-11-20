@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { dataFile } from '../../config.js';
 
-const TELEMETRY_URL = process.env.SEVENSERVER_TELEMETRY_URL || 'https://sevenserver-telemetry.ekaprasetya2244.workers.dev/api/v1/ping';
+const TELEMETRY_URL = process.env.SEVENSERVER_TELEMETRY_URL || '';
 const APP_VERSION = process.env.npm_package_version || '0.2.0';
 
 /**
@@ -48,7 +48,8 @@ export function isTelemetryDisabled(): boolean {
  * Never throws, never blocks startup, times out after 4 seconds.
  */
 export async function sendTelemetryPing(overrideUrl?: string): Promise<boolean> {
-  if (isTelemetryDisabled() && !overrideUrl) return false;
+  const targetUrl = overrideUrl || TELEMETRY_URL;
+  if (!targetUrl || (isTelemetryDisabled() && !overrideUrl)) return false;
 
   const instanceId = getOrCreateInstanceId();
   const payload = {
@@ -58,8 +59,6 @@ export async function sendTelemetryPing(overrideUrl?: string): Promise<boolean> 
     arch: process.arch,
     node: process.version
   };
-
-  const targetUrl = overrideUrl || TELEMETRY_URL;
 
   try {
     const res = await fetch(targetUrl, {
@@ -85,7 +84,7 @@ let timer: NodeJS.Timeout | null = null;
  * Performs a single silent ping 5 seconds after launch, then schedules every 24h.
  */
 export function startTelemetry() {
-  if (isTelemetryDisabled()) return;
+  if (!TELEMETRY_URL || isTelemetryDisabled()) return;
 
   const initialTimer = setTimeout(() => {
     sendTelemetryPing().catch(() => {});
