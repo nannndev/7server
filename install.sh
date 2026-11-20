@@ -78,12 +78,15 @@ need_cmd curl || err "curl is required."
 need_cmd tar || err "tar is required."
 
 VERSION=$(resolve_version)
-TARBALL_URL="https://github.com/${REPO}/releases/download/v${VERSION}/sevenserver-${VERSION}.tgz"
-TMP_TGZ=$(mktemp /tmp/sevenserver-XXXXXX.tgz)
+TARBALL_URL="https://github.com/${REPO}/releases/download/v${VERSION}/nannndev-7server-${VERSION}.tgz"
+TMP_TGZ=$(mktemp /tmp/7server-XXXXXX.tgz)
 trap 'rm -f "$TMP_TGZ"' EXIT
 
 log "Downloading 7Server v${VERSION} from GitHub Releases..."
-curl -fL "$TARBALL_URL" -o "$TMP_TGZ" || err "Failed to download ${TARBALL_URL}"
+if ! curl -fL "$TARBALL_URL" -o "$TMP_TGZ" 2>/dev/null; then
+  LEGACY_URL="https://github.com/${REPO}/releases/download/v${VERSION}/sevenserver-${VERSION}.tgz"
+  curl -fL "$LEGACY_URL" -o "$TMP_TGZ" || err "Failed to download tarball for v${VERSION}"
+fi
 
 log "Installing into ${INSTALL_DIR}..."
 rm -rf "${INSTALL_DIR}.new"

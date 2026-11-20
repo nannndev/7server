@@ -208,7 +208,7 @@ async function checkForUpdate() {
   const line = `Update available ${c.dim(pkg.version)} → ${c.green(latest)}`;
   const run = source === 'npm'
     ? `npm install -g ${pkg.name}`
-    : `brew upgrade sevenserver  # or: npm i -g https://github.com/nannndev/7server/releases/download/v${latest}/sevenserver-${latest}.tgz`;
+    : `brew upgrade sevenserver  # or: npm i -g @nannndev/7server@latest`;
   return `  ${c.yellow('↑')} ${line}\n    ${c.dim('run')} ${c.bold(run)}\n    ${c.dim(`changes: https://github.com/nannndev/7server/releases/tag/v${latest}`)}\n`;
 }
 

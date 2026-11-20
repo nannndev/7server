@@ -70,9 +70,12 @@ const stateColor = (c: DockerContainer) =>
 
 const barColor = (v: number) => (v >= 90 ? 'bg-red-500' : v >= 70 ? 'bg-amber-400' : 'bg-emerald-500');
 
-// Only public host bindings become links (127.0.0.1 binds aren't reachable from the browser).
+// Parse both public host bindings (0.0.0.0 / ::) and localhost-bound ports (127.0.0.1) for Nginx/Tunnel visibility.
 const hostPorts = (ports: string) =>
   [...new Set([...ports.matchAll(/(?:0\.0\.0\.0|\[::\]):(\d+)->/g)].map((m) => m[1]))];
+
+const localPorts = (ports: string) =>
+  [...new Set([...ports.matchAll(/127\.0\.0\.1:(\d+)->(\d+)/g)].map((m) => `${m[1]}→${m[2]}`))];
 
 export default function DockerPanel({
   serverId,
@@ -97,6 +100,7 @@ export default function DockerPanel({
   const [output, setOutput] = useState<{ title: string; text: string; ok: boolean } | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [inspect, setInspect] = useState<DockerInspect | null>(null);
+  const [inspectEnvFilter, setInspectEnvFilter] = useState('');
   const [inspectGeneric, setInspectGeneric] = useState<{ title: string; data: any } | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
 
@@ -710,20 +714,47 @@ export default function DockerPanel({
 
   return (
     <div className="space-y-4">
-      {/* Top Telemetry Summary Cards */}
+      {/* Top Telemetry Summary Cards (clickable quick filters) */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          [t('docker.containers'), `${running}/${containers.length}`, t('docker.subRunning')],
-          [t('docker.unhealthy'), String(unhealthy), unhealthy ? t('docker.subUnhealthy') : t('docker.subHealthy')],
-          [t('docker.totalCpu'), `${totalCpu.toFixed(1)}%`, t('docker.allContainers')],
-          ['Docker', `v${data?.version}`, `compose ${data?.composeVersion || '–'}`]
-        ].map(([label, value, sub], i) => (
-          <div key={label} className="p-3 rounded-lg border border-[var(--border)] bg-[var(--card)]">
-            <div className="text-[11px] text-[var(--muted-foreground)]">{label}</div>
-            <div className={`text-xl font-bold font-mono ${i === 1 && unhealthy ? 'text-amber-500' : ''}`}>{value}</div>
-            <div className="text-[10px] text-[var(--muted-foreground)]">{sub}</div>
-          </div>
-        ))}
+        <button
+          type="button"
+          onClick={() => { setView('containers'); setStateFilter('all'); }}
+          className="p-3 rounded-lg border border-[var(--border)] bg-[var(--card)] hover:border-emerald-500/40 text-left transition-colors"
+        >
+          <div className="text-[11px] text-[var(--muted-foreground)]">{t('docker.containers')}</div>
+          <div className="text-xl font-bold font-mono text-emerald-500">{running}<span className="text-sm text-[var(--muted-foreground)] font-normal">/{containers.length}</span></div>
+          <div className="text-[10px] text-[var(--muted-foreground)]">{t('docker.subRunning')}</div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => { setView('containers'); setStateFilter(unhealthy ? 'unhealthy' : 'all'); }}
+          className="p-3 rounded-lg border border-[var(--border)] bg-[var(--card)] hover:border-amber-500/40 text-left transition-colors"
+        >
+          <div className="text-[11px] text-[var(--muted-foreground)]">{t('docker.unhealthy')}</div>
+          <div className={`text-xl font-bold font-mono ${unhealthy ? 'text-amber-500' : ''}`}>{unhealthy}</div>
+          <div className="text-[10px] text-[var(--muted-foreground)]">{unhealthy ? t('docker.subUnhealthy') : t('docker.subHealthy')}</div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setView('compose')}
+          className="p-3 rounded-lg border border-[var(--border)] bg-[var(--card)] hover:border-sky-500/40 text-left transition-colors"
+        >
+          <div className="text-[11px] text-[var(--muted-foreground)]">{t('docker.compose')}</div>
+          <div className="text-xl font-bold font-mono">{composeProjects.length}</div>
+          <div className="text-[10px] text-[var(--muted-foreground)]">CPU {totalCpu.toFixed(1)}% total</div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setView('disk')}
+          className="p-3 rounded-lg border border-[var(--border)] bg-[var(--card)] hover:border-[var(--rim)] text-left transition-colors"
+        >
+          <div className="text-[11px] text-[var(--muted-foreground)]">Docker Engine</div>
+          <div className="text-xl font-bold font-mono">v{data?.version}</div>
+          <div className="text-[10px] text-[var(--muted-foreground)]">compose {data?.composeVersion || '–'} · {data?.images.length || 0} images</div>
+        </button>
       </div>
 
       {/* Main Navigation Toolbar */}
@@ -892,13 +923,21 @@ export default function DockerPanel({
                         {list.map((c) => {
                           const isRunning = c.state === 'running';
                           const links = hostPorts(c.ports);
+                          const locals = localPorts(c.ports);
                           return (
                             <tr key={c.id} className="hover:bg-[var(--muted)]/40">
                               <td className="py-1.5 px-3">
                                 <div className="flex items-center gap-2">
                                   <span className={`w-2 h-2 rounded-full shrink-0 ${stateColor(c)}`} aria-hidden />
                                   <div className="min-w-0">
-                                    <div className="font-semibold font-mono truncate sensitive">{c.name}</div>
+                                    <button
+                                      type="button"
+                                      onClick={() => { navigator.clipboard.writeText(c.name); toast.success(`Copied ${c.name}`); }}
+                                      title="Click to copy container name"
+                                      className="font-semibold font-mono truncate sensitive hover:text-sky-400 text-left block max-w-full"
+                                    >
+                                      {c.name}
+                                    </button>
                                     <div className="text-[10px] text-[var(--muted-foreground)] font-mono truncate max-w-xs flex items-center gap-1" title={c.image}>
                                       <BrandIcon name={c.image} className="w-3 h-3" />
                                       <span className="sensitive">{c.image}</span>
@@ -933,12 +972,28 @@ export default function DockerPanel({
                                 ) : <span className="text-[var(--muted-foreground)]">–</span>}
                               </td>
                               <td className="py-1.5 px-3 font-mono text-[10px]">
-                                {links.length ? (
+                                {(links.length > 0 || locals.length > 0) ? (
                                   <div className="flex flex-wrap gap-1">
                                     {links.map((p) => (
                                       <a key={p} href={`http://${serverHost}:${p}`} target="_blank" rel="noopener noreferrer"
-                                        className="px-1.5 rounded bg-[var(--muted)] border border-[var(--border)] hover:underline sensitive">:{p}</a>
+                                        className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 hover:underline inline-flex items-center gap-0.5 sensitive">
+                                        :{p} <ExternalLink className="w-2.5 h-2.5" />
+                                      </a>
                                     ))}
+                                    {locals.map((lp) => {
+                                      const hp = lp.split('→')[0];
+                                      return (
+                                        <button
+                                          key={lp}
+                                          type="button"
+                                          onClick={() => { navigator.clipboard.writeText(`127.0.0.1:${hp}`); toast.success(`Copied 127.0.0.1:${hp}`); }}
+                                          title="Localhost-bound port (proxied via Nginx / Tunnel). Click to copy."
+                                          className="px-1.5 py-0.5 rounded bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] hover:border-sky-500/40 sensitive"
+                                        >
+                                          127.0.0.1:{lp}
+                                        </button>
+                                      );
+                                    })}
                                   </div>
                                 ) : <span className="text-[var(--muted-foreground)] sensitive" title={c.ports}>{c.ports ? t('docker.internal') : '–'}</span>}
                               </td>
@@ -1321,12 +1376,22 @@ export default function DockerPanel({
               </section>
             ))}
             <section>
-              <div className="flex items-center mb-1">
+              <div className="flex items-center gap-2 mb-1.5">
                 <h4 className="font-semibold flex-1">{t('docker.inspEnv', { n: inspect.env.length })}</h4>
                 <span className="text-[10px] text-[var(--muted-foreground)]">{t('docker.secretsMasked')}</span>
               </div>
+              {inspect.env.length > 0 && (
+                <Input
+                  value={inspectEnvFilter}
+                  onChange={(e) => setInspectEnvFilter(e.target.value)}
+                  placeholder="Filter env vars..."
+                  className="h-7 text-[11px] font-mono mb-2"
+                />
+              )}
               <ul className="font-mono space-y-0.5 break-all">
-                {inspect.env.map((e) => (
+                {inspect.env
+                  .filter((e) => !inspectEnvFilter.trim() || `${e.key}=${e.value}`.toLowerCase().includes(inspectEnvFilter.toLowerCase()))
+                  .map((e) => (
                   <li key={e.key}>
                     <span className="text-sky-600">{e.key}</span>=<span className={e.masked ? 'text-[var(--muted-foreground)]' : ''}>{e.value}</span>
                   </li>

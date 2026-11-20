@@ -87,7 +87,7 @@ export function VersionUpdateBadge({
 
   if (!info) return null;
 
-  const updateCmd = 'npm i -g sevenserver@latest';
+  const updateCmd = 'npm i -g @nannndev/7server@latest';
   const copyCmd = () => {
     navigator.clipboard?.writeText(updateCmd).then(() => {
       setCopied(true);

@@ -101,7 +101,7 @@ export const COPY = {
           ],
           sshLabel: 'Local Host Initialization',
           sshCommands: [
-            { cmd: 'npx sevenserver', out: '✓ SQLite ready (~/.7server/7server.db)\n✓ Vault key verified (~/.7server/secret.key)\n✓ Dashboard listening on http://127.0.0.1:5001' },
+            { cmd: 'npx @nannndev/7server', out: '✓ SQLite ready (~/.7server/7server.db)\n✓ Vault key verified (~/.7server/secret.key)\n✓ Dashboard listening on http://127.0.0.1:5001' },
           ],
           screenshot: '/screenshots/fleet-rack.png',
           screenshotTitle: '3D Server Rack & Fleet Overview',
@@ -499,7 +499,7 @@ export const COPY = {
           ],
           sshLabel: 'Inisialisasi Host Lokal',
           sshCommands: [
-            { cmd: 'npx sevenserver', out: '✓ SQLite siap (~/.7server/7server.db)\n✓ Kunci brankas terverifikasi (~/.7server/secret.key)\n✓ Dashboard aktif di http://127.0.0.1:5001' },
+            { cmd: 'npx @nannndev/7server', out: '✓ SQLite siap (~/.7server/7server.db)\n✓ Kunci brankas terverifikasi (~/.7server/secret.key)\n✓ Dashboard aktif di http://127.0.0.1:5001' },
           ],
           screenshot: '/screenshots/fleet-rack.png',
           screenshotTitle: 'Rak Server 3D & Ringkasan Armada VPS',

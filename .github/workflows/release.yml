@@ -1,5 +1,5 @@
 # Runs when a version tag is pushed (node scripts/release.mjs patch && git push origin main vX.Y.Z).
-# npm auth: Trusted Publishing (npmjs.com > sevenserver > Settings > Trusted Publisher: nannndev/7server, release.yml).
+# npm auth: Trusted Publishing (npmjs.com > @nannndev/7server > Settings > Trusted Publisher: nannndev/7server, release.yml) or NPM_TOKEN secret.
 name: Release
 on:
   push:
@@ -42,12 +42,13 @@ jobs:
       - run: npm run pack:npm
       - name: Locate tarball & compute SHA256
         run: |
-          TGZ=$(ls packages/npm/sevenserver-*.tgz | head -n1)
+          TGZ=$(ls packages/npm/*-*.tgz packages/npm/*.tgz 2>/dev/null | head -n1)
           [ -f "$TGZ" ] || { echo "tarball not found"; exit 1; }
           SHA=$(sha256sum "$TGZ" | awk '{print $1}')
           echo "TARBALL_PATH=$TGZ" >> "$GITHUB_ENV"
           echo "TARBALL_NAME=$(basename "$TGZ")" >> "$GITHUB_ENV"
           echo "TARBALL_SHA256=$SHA" >> "$GITHUB_ENV"
+          cp "$TGZ" "packages/npm/sevenserver-${VERSION}.tgz"
 
       # Trusted Publishing (OIDC, no token) needs npm >= 11.5.1; falls back to NPM_TOKEN if that secret is set.
       - name: Publish to npm
@@ -107,10 +108,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           pre=""; [ "$NPM_TAG" = next ] && pre="--prerelease"
+          LEGACY_TGZ="packages/npm/sevenserver-${VERSION}.tgz"
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" "$TARBALL_PATH" --clobber
+            gh release upload "$GITHUB_REF_NAME" "$TARBALL_PATH" "$LEGACY_TGZ" --clobber
           else
-            gh release create "$GITHUB_REF_NAME" "$TARBALL_PATH" --title "$GITHUB_REF_NAME" --generate-notes --verify-tag $pre
+            gh release create "$GITHUB_REF_NAME" "$TARBALL_PATH" "$LEGACY_TGZ" --title "$GITHUB_REF_NAME" --generate-notes --verify-tag $pre
           fi
 
       - name: Update Homebrew Tap
@@ -120,7 +122,10 @@ jobs:
         run: |
           git clone "https://x-access-token:${TAP_TOKEN}@github.com/nannndev/homebrew-tap.git" /tmp/homebrew-tap
           mkdir -p /tmp/homebrew-tap/Formula
-          sed -e "s|v0\.3\.1/sevenserver-0\.3\.1\.tgz|${GITHUB_REF_NAME}/${TARBALL_NAME}|g" \
+          sed -E \
+              -e "s|download/[^/]+/[^\"]+\.tgz|download/${GITHUB_REF_NAME}/${TARBALL_NAME}|g" \
+              -e "s|v0\.3\.1/sevenserver-0\.3\.1\.tgz|${GITHUB_REF_NAME}/${TARBALL_NAME}|g" \
+              -e "s|sha256 \"[0-9a-f]{64}\"|sha256 \"${TARBALL_SHA256}\"|g" \
               -e "s|REPLACE_WITH_TARBALL_SHA256|${TARBALL_SHA256}|g" \
               packages/homebrew/sevenserver.rb > /tmp/homebrew-tap/Formula/sevenserver.rb
           cd /tmp/homebrew-tap

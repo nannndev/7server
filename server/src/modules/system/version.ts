@@ -38,7 +38,7 @@ export function getCurrentVersion(): string {
     try {
       if (!fs.existsSync(file)) continue;
       const pkg = JSON.parse(fs.readFileSync(file, 'utf8'));
-      if (pkg?.name === 'sevenserver' && typeof pkg.version === 'string' && pkg.version.trim()) {
+      if ((pkg?.name === 'sevenserver' || pkg?.name === '@nannndev/7server') && typeof pkg.version === 'string' && pkg.version.trim()) {
         return pkg.version.trim().replace(/^v/i, '');
       }
     } catch {
@@ -114,7 +114,7 @@ export async function checkLatestVersion(force = false): Promise<VersionCheckRes
 
   // 2. Fallback to npm registry
   try {
-    const res = await fetch('https://registry.npmjs.org/sevenserver/latest', {
+    const res = await fetch('https://registry.npmjs.org/@nannndev/7server/latest', {
       headers: { Accept: 'application/json' },
       signal: AbortSignal.timeout(4000)
     });
@@ -126,7 +126,7 @@ export async function checkLatestVersion(force = false): Promise<VersionCheckRes
           currentVersion,
           latestVersion: latestRaw,
           updateAvailable: compareSemver(latestRaw, currentVersion) > 0,
-          releaseUrl: `https://www.npmjs.com/package/sevenserver/v/${latestRaw}`,
+          releaseUrl: `https://www.npmjs.com/package/@nannndev/7server/v/${latestRaw}`,
           checkedAt,
           source: 'npm'
         };

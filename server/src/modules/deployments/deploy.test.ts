@@ -219,6 +219,7 @@ console.log('nginx reload fallback ok');
     assert.ok(syncedProd.includes('KEEP_EXISTING=1'), `existing keys preserved in .env.prod:\n${syncedProd}`);
     const overrideYml = fs.readFileSync(path.join(tmpDir, '.7server-compose.override.yml'), 'utf8');
     assert.ok(overrideYml.includes('  app:') && overrideYml.includes('  migrate:') && overrideYml.includes('  seeder:'), `app/migrate/seeder receive override .env:\n${overrideYml}`);
+    assert.ok(overrideYml.includes('HOST: "0.0.0.0"'), `override injects HOST=0.0.0.0:\n${overrideYml}`);
     assert.ok(!overrideYml.includes('  postgres:'), `postgres skipped from app .env override:\n${overrideYml}`);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });

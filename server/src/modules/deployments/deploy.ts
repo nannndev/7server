@@ -244,8 +244,14 @@ NGINX_BRIDGE_EOF
           ;;
       esac
       if [ -n "$pub" ]; then
+        if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
+          ufw allow ${s.port}/tcp >/dev/null 2>&1 || true
+        fi
         ext=$(curl -s -o /dev/null -m 5 -w '%{http_code}' "http://$pub:${s.port}/" || true)
         echo "Check via http://$pub:${s.port}/ -> HTTP \${ext:-000}"
+        if [ -z "$ext" ] || [ "$ext" = "000" ]; then
+          echo "Warning: http://$pub:${s.port}/ is unreachable from the host public IP — check your cloud Security Group / firewall for TCP port ${s.port}."
+        fi
       fi`}
       break
     fi

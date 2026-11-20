@@ -128,7 +128,16 @@ if [ -n "$COMPOSE_FILE" ]; then
       if (appServices.length > 0) {
         const overrideLines = ["services:"];
         for (const s of appServices) {
-          overrideLines.push("  " + s + ":", "    env_file:", "      - " + JSON.stringify(dotEnvPath));
+          overrideLines.push(
+            "  " + s + ":",
+            "    env_file:",
+            "      - " + JSON.stringify(dotEnvPath),
+            "    environment:",
+            "      HOST: \\"0.0.0.0\\"",
+            "      HOSTNAME: \\"0.0.0.0\\"",
+            "      NITRO_HOST: \\"0.0.0.0\\"",
+            "      NUXT_HOST: \\"0.0.0.0\\""
+          );
         }
         fs.writeFileSync(path.resolve(rootDir, ".7server-compose.override.yml"), overrideLines.join("\\n") + "\\n", { mode: 0o644 });
       }
@@ -201,7 +210,7 @@ if [ -n "$COMPOSE_FILE" ]; then
       const infraPorts = new Set([5432, 5433, 3306, 6379, 6380, 27017, 9000, 9001, 5672, 15672, 9200, 9300, 9600, 1025, 8025, 7700, 4222, 8222, 2181, 11211]);
       const infraSvcRe = /^(postgres|postgresql|pg|db|database|mysql|mariadb|redis|valkey|keydb|mongo|mongodb|minio|rabbitmq|mq|kafka|zookeeper|opensearch|elasticsearch|elastic|meilisearch|typesense|qdrant|milvus|mailpit|mailhog|adminer|pgadmin|phpmyadmin|redis-commander|migrate|migrations|seeder|seed|init|setup|worker|cron|scheduler)$/i;
       const appSvcRe = /^(app|web|api|backend|frontend|server|main|gateway)$/i;
-      const portRe = /^(\\s*-\\s*["\\x27]?)(?:(\\d{1,3}(?:\\.\\d{1,3}){3}):)?(?:\\$\\{[^}:]+(?::-?(\\d+))?\\}|(\\d+)):(\\d+|\\$\\{[^}:]+(?::-?(\\d+))?\\})(\\/(?:tcp|udp))?(["\\x27]?\\s*)(#.*)?$/;
+      const portRe = /^(\\s*-\\s*["\\x27]?)(?:(\\d{1,3}(?:\\.\\d{1,3}){3}):)?(?:(?:\\$\\{[^}:]+(?::-?(\\d+))?\\}|(\\d+)):)?(\\d+|\\$\\{[^}:]+(?::-?(\\d+))?\\})(\\/(?:tcp|udp))?(["\\x27]?\\s*)(#.*)?$/;
 
       const raw = fs.readFileSync(file, "utf8");
       const lines = raw.split(/\\r?\\n/);
@@ -251,6 +260,8 @@ if [ -n "$COMPOSE_FILE" ]; then
         return p;
       }
 
+      let mainSvcName = "";
+      let mainContainerPort = "";
       for (let i = 0; i < lines.length; i++) {
         const pm = lines[i].match(portRe);
         if (!pm) continue;
@@ -260,6 +271,11 @@ if [ -n "$COMPOSE_FILE" ]; then
         if (i === mainIdx) {
           usedSet.add(targetPort);
           lines[i] = \`\${pre}\${bindPrefix}\${targetPort}:\${cSpec}\${proto || ""}\${suf}\${comment || ""}\`;
+          const foundCand = candidates.find((c) => c.lineIdx === i);
+          if (foundCand) {
+            mainSvcName = foundCand.svc;
+            if (/^\\d+$/.test(cSpec)) mainContainerPort = cSpec;
+          }
           continue;
         }
 
@@ -272,6 +288,21 @@ if [ -n "$COMPOSE_FILE" ]; then
         }
       }
       fs.writeFileSync(file, lines.join("\\n"));
+
+      // Keep container internal PORT synced to literal container port in compose override so app listens where Docker forwards
+      if (mainSvcName && mainContainerPort) {
+        const ovPath = path.resolve(process.cwd(), ".7server-compose.override.yml");
+        if (fs.existsSync(ovPath)) {
+          let ov = fs.readFileSync(ovPath, "utf8");
+          const marker = "  " + mainSvcName + ":\\n";
+          const idx = ov.indexOf(marker);
+          if (idx !== -1) {
+            const head = ov.slice(0, idx);
+            const tail = ov.slice(idx).replace("    environment:\\n", "    environment:\\n      PORT: \\"" + mainContainerPort + "\\"\\n");
+            fs.writeFileSync(ovPath, head + tail, { mode: 0o644 });
+          }
+        }
+      }
     ' "$COMPOSE_FILE" "${s.port}" "${bindPrefix}" "$USED_PORTS" ${sq(s.appName)} 2>/dev/null || true
   fi
   export HOST=0.0.0.0

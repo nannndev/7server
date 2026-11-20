@@ -61,7 +61,7 @@ async function updateStatsChannels() {
     } catch {}
 
     try {
-      const npm = await fetch('https://api.npmjs.org/downloads/point/last-month/sevenserver').then((r) => r.json());
+      const npm = await fetch('https://api.npmjs.org/downloads/point/last-month/@nannndev%2F7server').then((r) => r.json());
       if (npm && typeof npm.downloads === 'number') latestDownloads = npm.downloads;
     } catch {}
 
@@ -214,9 +214,9 @@ function getCommandEmbed(commandName) {
       description:
         'Pilih salah satu cara instalasi favorit kamu:\n\n' +
         '**1. Jalankan instan via npm (Node.js 22+):**\n' +
-        '```bash\nnpx sevenserver\n```\n' +
+        '```bash\nnpx @nannndev/7server\n```\n' +
         '**2. Instal global:**\n' +
-        '```bash\nnpm install -g sevenserver\n7server\n```\n' +
+        '```bash\nnpm install -g @nannndev/7server\n7server\n```\n' +
         '**3. Menggunakan Docker Compose:**\n' +
         '```bash\ngit clone https://github.com/nannndev/7server.git\ncd 7server && docker compose up -d\n```\n' +
         'Buka di browser: `http://127.0.0.1:5001`',

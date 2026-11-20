@@ -1,4 +1,4 @@
-# sevenserver
+# @nannndev/7server
 
 Installs the `7server` command.
 
@@ -11,7 +11,7 @@ Monitoring with Discord, Telegram, and custom webhook alerts, a browser terminal
 Needs Node.js 22.13 or newer.
 
 ```bash
-npm install -g sevenserver
+npm install -g @nannndev/7server
 7server
 ```
 

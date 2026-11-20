@@ -43,7 +43,7 @@ function useProjectStats() {
       })
       .catch(() => {});
 
-    fetch('https://api.npmjs.org/downloads/point/last-month/sevenserver')
+    fetch('https://api.npmjs.org/downloads/point/last-month/@nannndev%2F7server')
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (d && typeof d.downloads === 'number') {
@@ -343,7 +343,7 @@ function Hero({
             {t.ctaSecondary}
           </a>
           <div className="sm:ml-2 sm:flex-1 max-w-xs">
-            <CopyLine text="npx sevenserver" label={t.quickInstall} />
+            <CopyLine text="npx @nannndev/7server" label={t.quickInstall} />
           </div>
         </div>
 
@@ -364,7 +364,7 @@ function Hero({
             <span>{t.starsLabel}</span>
           </a>
           <span className="text-[var(--line-strong)]" aria-hidden>•</span>
-          <a href="https://www.npmjs.com/package/sevenserver" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-[var(--line)] hover:text-[var(--anatomy-strong)]">
+          <a href="https://www.npmjs.com/package/@nannndev/7server" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-[var(--line)] hover:text-[var(--anatomy-strong)]">
             <Download className="h-3.5 w-3.5 text-cyan-400" />
             <span className="font-semibold text-[var(--anatomy-strong)]">{downloads !== null ? `${downloads.toLocaleString()}+` : '680+'}</span>
             <span>{t.downloadsLabel}</span>
@@ -1042,7 +1042,7 @@ function Security({ lang }: { lang: Lang }) {
 }
 
 const INSTALL = {
-  npm: { label: 'npm', note: 'Node.js 22.13 or newer. Data lives in ~/.7server.', steps: [['Install', 'npm install -g sevenserver'], ['Run', '7server']] as [string, string][] },
+  npm: { label: 'npm', note: 'Node.js 22.13 or newer. Data lives in ~/.7server.', steps: [['Install', 'npm install -g @nannndev/7server'], ['Run', '7server']] as [string, string][] },
   script: { label: 'VPS Script', note: 'One-line Ubuntu/Debian VPS installer with systemd service setup.', steps: [['Install & start', 'curl -fsSL https://raw.githubusercontent.com/nannndev/7server/main/install.sh | bash']] as [string, string][] },
   brew: { label: 'Homebrew', note: 'macOS & Linuxbrew formula via nannndev/homebrew-tap.', steps: [['Tap & install', 'brew tap nannndev/tap && brew install sevenserver'], ['Run', '7server']] as [string, string][] },
   docker: { label: 'Docker', note: 'Best for a VPS. Data lives in the 7server-data volume; the port is bound to localhost, so put HTTPS in front.', steps: [['Get the compose file', `git clone ${REPO}.git && cd 7server`], ['Set a password', 'cp .env.docker.example .env'], ['Start', 'docker compose up -d']] as [string, string][] },
@@ -1105,8 +1105,8 @@ function GetStarted({ lang }: { lang: Lang }) {
           <a href={DISCORD} target="_blank" rel="noopener noreferrer" className="metal inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition-colors hover:border-[#5865F2] hover:text-[#5865F2]" style={{ color: 'var(--anatomy-strong)' }}>
             <DiscordIcon className="h-4 w-4 text-[#5865F2]" /> Join Discord Community
           </a>
-          <a href="https://www.npmjs.com/package/sevenserver" target="_blank" rel="noopener noreferrer" className="metal inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold" style={{ color: 'var(--anatomy-strong)' }}>
-            <Download className="h-4 w-4 text-cyan-400" /> sevenserver on npm
+          <a href="https://www.npmjs.com/package/@nannndev/7server" target="_blank" rel="noopener noreferrer" className="metal inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold" style={{ color: 'var(--anatomy-strong)' }}>
+            <Download className="h-4 w-4 text-cyan-400" /> @nannndev/7server on npm
             {downloads !== null && (
               <span className="rounded-full bg-[var(--line)] px-2 py-0.5 text-xs font-mono text-[var(--anatomy-muted)]">
                 {downloads.toLocaleString()}+

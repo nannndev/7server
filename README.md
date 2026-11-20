@@ -11,8 +11,8 @@
 
 <p align="center">
   <a href="https://github.com/nannndev/7server/actions/workflows/ci.yml"><img src="https://github.com/nannndev/7server/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://www.npmjs.com/package/sevenserver"><img src="https://img.shields.io/npm/v/sevenserver?label=npm" alt="npm"></a>
-  <a href="https://www.npmjs.com/package/sevenserver"><img src="https://img.shields.io/npm/dm/sevenserver?label=downloads&color=06b6d4" alt="npm downloads"></a>
+  <a href="https://www.npmjs.com/package/@nannndev/7server"><img src="https://img.shields.io/npm/v/@nannndev/7server?label=npm" alt="npm"></a>
+  <a href="https://www.npmjs.com/package/@nannndev/7server"><img src="https://img.shields.io/npm/dm/@nannndev/7server?label=downloads&color=06b6d4" alt="npm downloads"></a>
   <a href="https://github.com/nannndev/7server/pkgs/container/7server"><img src="https://img.shields.io/badge/docker-ghcr.io-blue" alt="Docker image"></a>
   <a href="https://discord.gg/AF2Hc56t3N"><img src="https://img.shields.io/badge/Discord-Join%20Community-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
 </p>
@@ -110,7 +110,7 @@ curl -fsSL https://raw.githubusercontent.com/nannndev/7server/main/install.sh | 
 Needs Node.js 22.13 or newer.
 
 ```bash
-npm install -g sevenserver
+npm install -g @nannndev/7server
 7server                      # http://127.0.0.1:5001, data in ~/.7server
 ```
 
@@ -167,7 +167,7 @@ client/src/
   features/    one folder per feature, matching the server modules
   shared/      UI kit, API client, i18n (English and Indonesian)
 landing/       the project website
-packages/npm/  the sevenserver npm package (bundled server + built dashboard)
+packages/npm/  the @nannndev/7server npm package (bundled server + built dashboard)
 ```
 
 Architecture notes: [backend](docs/backend-architecture.md), [frontend](docs/frontend-architecture.md), [roles and access](docs/rbac-and-access.md).
@@ -183,7 +183,7 @@ npm run release patch        # or minor, major, 1.2.3: bumps, commits and tags v
 git push origin main vX.Y.Z
 ```
 
-The tag starts the release workflow: it attaches the `.tgz` package to the GitHub Release, pushes the multi-arch image to GHCR, updates the Homebrew tap (`nannndev/homebrew-tap`), and publishes `sevenserver` to npm (Trusted Publishing, with provenance). Versions like `1.2.0-beta.1` go to the npm `next` tag and are marked as prereleases.
+The tag starts the release workflow: it attaches the `.tgz` package to the GitHub Release, pushes the multi-arch image to GHCR, updates the Homebrew tap (`nannndev/homebrew-tap`), and publishes `@nannndev/7server` to npm (Trusted Publishing, with provenance). Versions like `1.2.0-beta.1` go to the npm `next` tag and are marked as prereleases.
 
 Release notes are grouped by pull request label. Labels live in [.github/labels.yml](.github/labels.yml); pull requests are labeled by the files they touch and by their title prefix (`feat:` → enhancement, `fix:` → bug, `feat!:` → breaking).
 

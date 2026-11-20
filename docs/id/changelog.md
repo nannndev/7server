@@ -1,6 +1,6 @@
 # Catatan Rilis (Changelog)
 
-Seluruh pembaruan penting pada **7Server** (`sevenserver` di npm dan `ghcr.io/nannndev/7server`) terdokumentasi di halaman ini.
+Seluruh pembaruan penting pada **7Server** (`@nannndev/7server` di npm dan `ghcr.io/nannndev/7server`) terdokumentasi di halaman ini.
 
 ---
 

@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to **7Server** (`sevenserver` on npm and `ghcr.io/nannndev/7server`) are documented here.
+All notable changes to **7Server** (`@nannndev/7server` on npm and `ghcr.io/nannndev/7server`) are documented here.
 
 ---
 

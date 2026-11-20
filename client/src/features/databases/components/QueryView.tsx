@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Play, RefreshCw, Download, History, Trash2, ShieldCheck, ShieldAlert, WrapText } from 'lucide-react';
+import { Play, RefreshCw, Download, History, Trash2, ShieldCheck, ShieldAlert, WrapText, Code2, Sparkles, Eraser } from 'lucide-react';
 import { runDbQuery, QueryResult, DbConnection, DbEngine } from '@/features/databases/api';
 import DataGrid, { downloadResult } from '@/features/databases/components/DataGrid';
 import { confirmModal } from '@/shared/ui/confirm-dialog';
@@ -10,6 +10,33 @@ const PLACEHOLDER: Record<string, string> = {
   redis: 'GET mykey\nHGETALL user:1\nSCAN 0 MATCH session:* COUNT 100',
   js: 'db.users.find({"active": true}, {"name": 1})'
 };
+
+const SNIPPETS: Record<string, Array<{ label: string; code: string }>> = {
+  sql: [
+    { label: 'Select top 100 rows', code: 'SELECT * FROM table_name LIMIT 100;' },
+    { label: 'Count rows', code: 'SELECT COUNT(*) AS total FROM table_name;' },
+    { label: 'Explain query plan', code: 'EXPLAIN ANALYZE SELECT * FROM table_name LIMIT 50;' },
+    { label: 'Postgres active queries', code: "SELECT pid, state, now() - query_start AS duration, left(query, 120) AS query\nFROM pg_stat_activity\nWHERE state <> 'idle'\nORDER BY duration DESC;" },
+    { label: 'MySQL processlist', code: 'SHOW FULL PROCESSLIST;' }
+  ],
+  redis: [
+    { label: 'Scan keys (50)', code: 'SCAN 0 COUNT 50' },
+    { label: 'Database key count', code: 'DBSIZE' },
+    { label: 'Keyspace & memory info', code: 'INFO keyspace' }
+  ],
+  js: [
+    { label: 'List collections', code: 'db.getCollectionNames()' },
+    { label: 'Find latest 20 docs', code: 'db.collection_name.find({}).sort({_id: -1}).limit(20)' }
+  ]
+};
+
+function formatSqlQuick(sql: string): string {
+  return sql
+    .trim()
+    .replace(/\s+/g, ' ')
+    .replace(/\b(select|from|where|group by|order by|having|limit|offset|inner join|left join|right join|join|on|union all|union|insert into|values|update|set|delete from)\b/gi, (m) => `\n${m.toUpperCase()}`)
+    .trim();
+}
 
 const histKey = (cid: string) => `vps_hub_qhist:${cid}`;
 const loadHist = (cid: string): string[] => {
@@ -34,6 +61,7 @@ export default function QueryView({ conn, engine, database, text, onTextChange, 
   const [active, setActive] = useState(0);
   const [hist, setHist] = useState<string[]>(() => loadHist(conn.id));
   const [showHist, setShowHist] = useState(false);
+  const [showSnippets, setShowSnippets] = useState(false);
   const [editorH, setEditorH] = useState(180);
   const [wrap, setWrap] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -105,6 +133,36 @@ export default function QueryView({ conn, engine, database, text, onTextChange, 
           {conn.allowWrite ? <ShieldAlert className="w-3 h-3" /> : <ShieldCheck className="w-3 h-3" />} {conn.allowWrite ? t('db.writeMode') : t('db.readOnly')}
         </span>
         <div className="ml-auto flex items-center gap-1">
+          <div className="relative">
+            <button onClick={() => setShowSnippets((v) => !v)} aria-expanded={showSnippets} title="Quick Query Snippets"
+              className="h-7 px-2 rounded-md text-[11px] flex items-center gap-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--sidebar-hover)]">
+              <Code2 className="w-3.5 h-3.5" /> Snippets
+            </button>
+            {showSnippets && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setShowSnippets(false)} />
+                <div className="pop-in absolute right-0 mt-1 z-40 w-80 max-h-80 overflow-auto rounded-lg bg-[var(--card)] border border-[var(--border)] shadow-xl">
+                  {(SNIPPETS[engine.queryLanguage] || SNIPPETS.sql).map((sn) => (
+                    <button key={sn.label} onClick={() => { onTextChange(text.trim() ? `${text.trim()}\n\n${sn.code}` : sn.code); setShowSnippets(false); taRef.current?.focus(); }}
+                      className="w-full text-left px-3 py-2 border-b border-[var(--border)] last:border-0 hover:bg-[var(--sidebar-hover)]">
+                      <div className="text-[11px] font-medium text-[var(--foreground)]">{sn.label}</div>
+                      <div className="font-mono text-[10px] text-[var(--muted-foreground)] truncate mt-0.5">{sn.code}</div>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+          {engine.queryLanguage === 'sql' && (
+            <button onClick={() => text.trim() && onTextChange(formatSqlQuick(text))} disabled={!text.trim()} title="Format SQL"
+              className="h-7 px-2 rounded-md text-[11px] flex items-center gap-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--sidebar-hover)] disabled:opacity-40">
+              <Sparkles className="w-3.5 h-3.5" /> Format
+            </button>
+          )}
+          <button onClick={() => onTextChange('')} disabled={!text} title="Clear editor"
+            className="h-7 w-7 rounded-md flex items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--sidebar-hover)] disabled:opacity-40">
+            <Eraser className="w-3.5 h-3.5" />
+          </button>
           <button onClick={() => setWrap((w) => !w)} aria-pressed={wrap} title={t('db.wrapLines')}
             className={`h-7 w-7 rounded-md flex items-center justify-center hover:bg-[var(--sidebar-hover)] ${wrap ? 'text-[var(--accent-brand)]' : 'text-[var(--muted-foreground)]'}`}>
             <WrapText className="w-3.5 h-3.5" />
@@ -175,8 +233,12 @@ export default function QueryView({ conn, engine, database, text, onTextChange, 
               ))}
               <span className="ml-auto text-[11px] font-mono text-[var(--muted-foreground)] whitespace-nowrap">{result.ms} ms</span>
               {rs && (
-                <button onClick={() => downloadResult(rs, `query-${active + 1}`, 'csv')} title={t('db.exportCsv')}
-                  className="h-6 px-2 rounded text-[11px] flex items-center gap-1 text-[var(--muted-foreground)] hover:bg-[var(--sidebar-hover)]"><Download className="w-3 h-3" /> CSV</button>
+                <>
+                  <button onClick={() => downloadResult(rs, `query-${active + 1}`, 'csv')} title={t('db.exportCsv')}
+                    className="h-6 px-2 rounded text-[11px] flex items-center gap-1 text-[var(--muted-foreground)] hover:bg-[var(--sidebar-hover)]"><Download className="w-3 h-3" /> CSV</button>
+                  <button onClick={() => downloadResult(rs, `query-${active + 1}`, 'json')} title="Export JSON"
+                    className="h-6 px-2 rounded text-[11px] flex items-center gap-1 text-[var(--muted-foreground)] hover:bg-[var(--sidebar-hover)]"><Download className="w-3 h-3" /> JSON</button>
+                </>
               )}
             </div>
             {result.message && (

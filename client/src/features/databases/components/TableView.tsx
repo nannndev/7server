@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, Download, Table2, Columns3, FileCode2, Copy, Check, KeyRound } from 'lucide-react';
+import { RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, Download, Table2, Columns3, FileCode2, Copy, Check, KeyRound, Search } from 'lucide-react';
 import { browseDb, fetchDbStructure, BrowseResult, ObjectStructure, DbConnection, DbEngine } from '@/features/databases/api';
 import { cacheGet, cacheSet } from '@/shared/lib/cache';
 import DataGrid, { downloadResult } from '@/features/databases/components/DataGrid';
@@ -26,6 +26,7 @@ export default function TableView({ conn, engine, database, object, objectType, 
   const [sort, setSort] = useState<{ column: string; dir: 'asc' | 'desc' } | null>(null);
   const [whereInput, setWhereInput] = useState('');
   const [where, setWhere] = useState('');
+  const [quickSearch, setQuickSearch] = useState('');
   const [data, setData] = useState<BrowseResult | null>(() => cacheGet<BrowseResult>(`browse:${base}:0:100::`) ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -109,6 +110,18 @@ export default function TableView({ conn, engine, database, object, objectType, 
         )}
         {sub !== 'data' && <div className="flex-1" />}
 
+        {sub === 'data' && (
+          <div className="flex items-center gap-1 h-7 px-2 rounded-md border border-[var(--border)] bg-[var(--background)] w-40">
+            <Search className="w-3 h-3 text-[var(--muted-foreground)] shrink-0" />
+            <input
+              value={quickSearch}
+              onChange={(e) => setQuickSearch(e.target.value)}
+              placeholder="Quick filter..."
+              className="flex-1 min-w-0 bg-transparent text-[11px] font-mono outline-none"
+              aria-label="Quick filter loaded rows"
+            />
+          </div>
+        )}
         <div className="flex items-center gap-1 ml-auto">
           {sub === 'data' && data && (
             <>
@@ -131,7 +144,16 @@ export default function TableView({ conn, engine, database, object, objectType, 
         <>
           {error && <div role="alert" className="shrink-0 px-3 py-2 text-[11px] font-mono text-red-500 bg-red-500/10 border-b border-red-500/20 whitespace-pre-wrap">{error}</div>}
           {data ? (
-            <DataGrid rs={data} offset={offset} sort={isSql ? sort : null} onSort={isSql ? toggleSort : undefined} columnHint={keyOf} loading={loading} />
+            <DataGrid
+              rs={quickSearch.trim()
+                ? { ...data, rows: data.rows.filter((r) => r.some((cell) => String(cell ?? '').toLowerCase().includes(quickSearch.toLowerCase()))) }
+                : data}
+              offset={offset}
+              sort={isSql ? sort : null}
+              onSort={isSql ? toggleSort : undefined}
+              columnHint={keyOf}
+              loading={loading}
+            />
           ) : (
             <GridSkeleton />
           )}

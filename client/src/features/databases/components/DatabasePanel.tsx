@@ -453,14 +453,77 @@ export default function DatabasePanel({ serverId }: { serverId: string }) {
           )}
         </div>
 
-        {/* Context strip: which connection/database the active tab talks to */}
-        {active && connOf(active.connId) && (
-          <div className="shrink-0 h-7 px-3 flex items-center gap-1.5 text-[11px] text-[var(--muted-foreground)] border-b border-[var(--border)] font-mono">
-            <span>{connOf(active.connId)!.name}</span>
-            {active.database && <><ChevronRight className="w-3 h-3" /><span>{active.database}</span></>}
-            {active.kind === 'object' && <><ChevronRight className="w-3 h-3" /><span className="text-[var(--foreground)]">{active.object}</span></>}
-          </div>
-        )}
+        {/* Context strip: which connection/database the active tab talks to + quick actions */}
+        {active && (() => {
+          const ac = connOf(active.connId);
+          const aeng = ac && engineOf(ac.engine);
+          if (!ac) return null;
+          return (
+            <div className="shrink-0 h-8 px-3 flex items-center gap-1.5 text-[11px] text-[var(--muted-foreground)] border-b border-[var(--border)] bg-[var(--muted)]/20 font-mono">
+              <BrandIcon name={ac.engine} className="w-3.5 h-3.5 shrink-0" />
+              <span className="font-semibold text-[var(--foreground)] truncate">{ac.name}</span>
+              {active.database && <><ChevronRight className="w-3 h-3 shrink-0" /><span className="truncate">{active.database}</span></>}
+              {active.kind === 'object' && <><ChevronRight className="w-3 h-3 shrink-0" /><span className="text-sky-400 truncate">{active.object}</span></>}
+              <div className="ml-auto flex items-center gap-1 font-sans">
+                <button
+                  type="button"
+                  onClick={() => guard(async () => {
+                    await updateDbConnection(ac.id, { allowWrite: !ac.allowWrite });
+                    await loadConns();
+                    toast.success(ac.allowWrite ? 'Switched to Read-Only mode' : 'Write mode enabled');
+                  })}
+                  title="Toggle Read-Only / Write Mode for this connection"
+                  className={`h-5 px-2 rounded text-[10px] font-medium flex items-center gap-1 border transition-colors ${
+                    ac.allowWrite
+                      ? 'bg-amber-500/15 text-amber-500 border-amber-500/30 hover:bg-amber-500/25'
+                      : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/20'
+                  }`}
+                >
+                  {ac.allowWrite ? <ShieldAlert className="w-2.5 h-2.5" /> : <ShieldCheck className="w-2.5 h-2.5" />}
+                  {ac.allowWrite ? t('db.writeMode') : t('db.readOnly')}
+                </button>
+                {aeng?.canSchema && (
+                  <button
+                    type="button"
+                    onClick={() => openDbView(ac, active.database, 'diagram')}
+                    title={t('db.diagram')}
+                    className="h-5 px-1.5 rounded text-[10px] flex items-center gap-1 hover:bg-[var(--sidebar-hover)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                  >
+                    <Network className="w-3 h-3" /> ERD
+                  </button>
+                )}
+                {aeng?.canSchema && (
+                  <button
+                    type="button"
+                    onClick={() => openDbView(ac, active.database, 'props')}
+                    title={t('db.properties')}
+                    className="h-5 px-1.5 rounded text-[10px] flex items-center gap-1 hover:bg-[var(--sidebar-hover)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                  >
+                    <Info className="w-3 h-3" /> Info
+                  </button>
+                )}
+                {aeng?.canDump && active.database && (
+                  <button
+                    type="button"
+                    onClick={() => guard(() => dumpDb(ac.id, ac.name, active.database!))}
+                    title={t('db.dump')}
+                    className="h-5 px-1.5 rounded text-[10px] flex items-center gap-1 hover:bg-[var(--sidebar-hover)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                  >
+                    <Download className="w-3 h-3" /> Dump
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => editConn(ac)}
+                  title={t('db.settings')}
+                  className="h-5 w-5 rounded flex items-center justify-center hover:bg-[var(--sidebar-hover)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                >
+                  <Settings className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          );
+        })()}
 
         <div className="flex-1 min-h-0">
           {!active ? (
