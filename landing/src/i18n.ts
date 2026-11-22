@@ -93,7 +93,7 @@ export const COPY = {
           n: '01',
           badge: 'Self-Host in 60s',
           title: 'Start 7Server on your machine or a single VPS',
-          summary: 'Run one command via npm or Docker Compose. 7Server initializes a local SQLite database and a separate AES-256-GCM master key file.',
+          summary: 'Run one command via curl or Docker Compose. 7Server initializes a local SQLite database and a separate AES-256-GCM master key file.',
           details: [
             'No external cloud account or telemetry home-calling',
             'First visit creates your Admin account right in the browser',
@@ -101,7 +101,7 @@ export const COPY = {
           ],
           sshLabel: 'Local Host Initialization',
           sshCommands: [
-            { cmd: 'npx @nannndev/7server', out: '✓ SQLite ready (~/.7server/7server.db)\n✓ Vault key verified (~/.7server/secret.key)\n✓ Dashboard listening on http://127.0.0.1:5001' },
+            { cmd: 'curl -fsSL https://raw.githubusercontent.com/nannndev/7server/main/install.sh | bash', out: '✓ SQLite ready (/var/lib/7server/7server.db)\n✓ Vault key verified (/var/lib/7server/secret.key)\n✓ Dashboard listening on http://127.0.0.1:5001' },
           ],
           screenshot: '/screenshots/fleet-rack.png',
           screenshotTitle: '3D Server Rack & Fleet Overview',
@@ -491,7 +491,7 @@ export const COPY = {
           n: '01',
           badge: 'Self-Host dalam 60 Detik',
           title: 'Jalankan 7Server di komputer lokal atau satu VPS',
-          summary: 'Jalankan satu perintah lewat npm atau Docker Compose. 7Server menyiapkan database SQLite lokal dan file kunci utama AES-256-GCM secara terpisah.',
+          summary: 'Jalankan satu perintah lewat installer VPS atau Docker Compose. 7Server menyiapkan database SQLite lokal dan file kunci utama AES-256-GCM secara terpisah.',
           details: [
             'Tanpa perlu daftar akun cloud eksternal atau pengiriman data ke pihak ketiga',
             'Kunjungan pertama langsung membuat akun Admin Anda melalui browser',
@@ -499,7 +499,7 @@ export const COPY = {
           ],
           sshLabel: 'Inisialisasi Host Lokal',
           sshCommands: [
-            { cmd: 'npx @nannndev/7server', out: '✓ SQLite siap (~/.7server/7server.db)\n✓ Kunci brankas terverifikasi (~/.7server/secret.key)\n✓ Dashboard aktif di http://127.0.0.1:5001' },
+            { cmd: 'curl -fsSL https://raw.githubusercontent.com/nannndev/7server/main/install.sh | bash', out: '✓ SQLite siap (/var/lib/7server/7server.db)\n✓ Kunci brankas terverifikasi (/var/lib/7server/secret.key)\n✓ Dashboard aktif di http://127.0.0.1:5001' },
           ],
           screenshot: '/screenshots/fleet-rack.png',
           screenshotTitle: 'Rak Server 3D & Ringkasan Armada VPS',

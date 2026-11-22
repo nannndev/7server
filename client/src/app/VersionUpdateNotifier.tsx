@@ -87,7 +87,7 @@ export function VersionUpdateBadge({
 
   if (!info) return null;
 
-  const updateCmd = 'npm i -g @nannndev/7server@latest';
+  const updateCmd = 'curl -fsSL https://raw.githubusercontent.com/nannndev/7server/main/install.sh | sudo bash';
   const copyCmd = () => {
     navigator.clipboard?.writeText(updateCmd).then(() => {
       setCopied(true);

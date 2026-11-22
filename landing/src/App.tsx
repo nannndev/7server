@@ -16,10 +16,8 @@ const REPO = 'https://github.com/nannndev/7server';
 const DISCORD = 'https://discord.gg/AF2Hc56t3N';
 const LOGO = '/icons/icon-opt2-server-blade.png';
 
-let cachedStats: { stars: number | null; downloads: number | null; active: number | null } = {
+let cachedStats: { stars: number | null } = {
   stars: null,
-  downloads: null,
-  active: null,
 };
 let statsFetched = false;
 
@@ -40,26 +38,6 @@ function useProjectStats() {
           cachedStats = { ...cachedStats, stars: d.stargazers_count };
           setStats({ ...cachedStats });
         }
-      })
-      .catch(() => {});
-
-    fetch('https://api.npmjs.org/downloads/point/last-month/@nannndev%2F7server')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (d && typeof d.downloads === 'number') {
-          cachedStats = { ...cachedStats, downloads: d.downloads };
-          setStats({ ...cachedStats });
-        }
-      })
-      .catch(() => {});
-
-    fetch('https://sevenserver-telemetry.ekaprasetya2244.workers.dev/api/v1/stats')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        const total = typeof d?.total_installs === 'number' ? d.total_installs : (typeof d?.active_instances_30d === 'number' ? d.active_instances_30d : 0);
-        const count = Math.max(200, total);
-        cachedStats = { ...cachedStats, active: count };
-        setStats({ ...cachedStats });
       })
       .catch(() => {});
   }, []);
@@ -313,7 +291,7 @@ function Hero({
   onZoom: (item: { src: string; title: string; route?: string }) => void;
 }) {
   const shot = useShot();
-  const { stars, downloads, active } = useProjectStats();
+  const { stars } = useProjectStats();
   const t = COPY[lang].hero;
   const [activeTab, setActiveTab] = useState(0);
   const currentPreview = t.heroTabs[activeTab] || t.heroTabs[0];
@@ -343,31 +321,16 @@ function Hero({
             {t.ctaSecondary}
           </a>
           <div className="sm:ml-2 sm:flex-1 max-w-xs">
-            <CopyLine text="npx @nannndev/7server" label={t.quickInstall} />
+            <CopyLine text="curl -fsSL https://raw.githubusercontent.com/nannndev/7server/main/install.sh | bash" label={t.quickInstall} />
           </div>
         </div>
 
-        {/* Live Active Nodes, GitHub & npm social proof */}
+        {/* GitHub & Discord Community social proof */}
         <div className="reveal mt-6 flex flex-wrap items-center gap-3 text-xs font-mono sm:gap-4" style={{ color: 'var(--anatomy-muted)', ...v(3) }}>
-          <div className="inline-flex items-center gap-1.5 rounded-md px-2 py-1" title="Real-time verified active instances">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-            </span>
-            <span className="font-semibold text-[var(--anatomy-strong)]">{active !== null ? `${active}+` : '200+'}</span>
-            <span>{t.activeLabel}</span>
-          </div>
-          <span className="text-[var(--line-strong)]" aria-hidden>•</span>
           <a href={REPO} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-[var(--line)] hover:text-[var(--anatomy-strong)]">
             <Star className="h-3.5 w-3.5 fill-amber-400/20 text-amber-400" />
             <span className="font-semibold text-[var(--anatomy-strong)]">{stars !== null ? stars : 1}</span>
             <span>{t.starsLabel}</span>
-          </a>
-          <span className="text-[var(--line-strong)]" aria-hidden>•</span>
-          <a href="https://www.npmjs.com/package/@nannndev/7server" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-[var(--line)] hover:text-[var(--anatomy-strong)]">
-            <Download className="h-3.5 w-3.5 text-cyan-400" />
-            <span className="font-semibold text-[var(--anatomy-strong)]">{downloads !== null ? `${downloads.toLocaleString()}+` : '680+'}</span>
-            <span>{t.downloadsLabel}</span>
           </a>
           <span className="text-[var(--line-strong)]" aria-hidden>•</span>
           <a href={DISCORD} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-[var(--line)] hover:text-[#5865F2]">
@@ -1042,16 +1005,15 @@ function Security({ lang }: { lang: Lang }) {
 }
 
 const INSTALL = {
-  npm: { label: 'npm', note: 'Node.js 22.13 or newer. Data lives in ~/.7server.', steps: [['Install', 'npm install -g @nannndev/7server'], ['Run', '7server']] as [string, string][] },
   script: { label: 'VPS Script', note: 'One-line Ubuntu/Debian VPS installer with systemd service setup.', steps: [['Install & start', 'curl -fsSL https://raw.githubusercontent.com/nannndev/7server/main/install.sh | bash']] as [string, string][] },
-  brew: { label: 'Homebrew', note: 'macOS & Linuxbrew formula via nannndev/homebrew-tap.', steps: [['Tap & install', 'brew tap nannndev/tap && brew install sevenserver'], ['Run', '7server']] as [string, string][] },
   docker: { label: 'Docker', note: 'Best for a VPS. Data lives in the 7server-data volume; the port is bound to localhost, so put HTTPS in front.', steps: [['Get the compose file', `git clone ${REPO}.git && cd 7server`], ['Set a password', 'cp .env.docker.example .env'], ['Start', 'docker compose up -d']] as [string, string][] },
+  brew: { label: 'Homebrew', note: 'macOS & Linuxbrew formula via nannndev/homebrew-tap.', steps: [['Tap & install', 'brew tap nannndev/tap && brew install sevenserver'], ['Run', '7server']] as [string, string][] },
   source: { label: 'From source', note: 'For development: UI on :3000, API on :5001.', steps: [['Clone', `git clone ${REPO}.git && cd 7server`], ['Install', '(cd server && npm install) && (cd client && npm install)'], ['Run', 'npm run dev']] as [string, string][] }
 };
 
 function GetStarted({ lang }: { lang: Lang }) {
-  const [tab, setTab] = useState<keyof typeof INSTALL>('npm');
-  const { stars, downloads } = useProjectStats();
+  const [tab, setTab] = useState<keyof typeof INSTALL>('script');
+  const { stars } = useProjectStats();
   const cur = INSTALL[tab];
   return (
     <section id="start" className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
@@ -1104,14 +1066,6 @@ function GetStarted({ lang }: { lang: Lang }) {
           </a>
           <a href={DISCORD} target="_blank" rel="noopener noreferrer" className="metal inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition-colors hover:border-[#5865F2] hover:text-[#5865F2]" style={{ color: 'var(--anatomy-strong)' }}>
             <DiscordIcon className="h-4 w-4 text-[#5865F2]" /> Join Discord Community
-          </a>
-          <a href="https://www.npmjs.com/package/@nannndev/7server" target="_blank" rel="noopener noreferrer" className="metal inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold" style={{ color: 'var(--anatomy-strong)' }}>
-            <Download className="h-4 w-4 text-cyan-400" /> @nannndev/7server on npm
-            {downloads !== null && (
-              <span className="rounded-full bg-[var(--line)] px-2 py-0.5 text-xs font-mono text-[var(--anatomy-muted)]">
-                {downloads.toLocaleString()}+
-              </span>
-            )}
           </a>
         </div>
       </div>

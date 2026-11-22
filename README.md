@@ -11,8 +11,6 @@
 
 <p align="center">
   <a href="https://github.com/nannndev/7server/actions/workflows/ci.yml"><img src="https://github.com/nannndev/7server/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://www.npmjs.com/package/@nannndev/7server"><img src="https://img.shields.io/npm/v/@nannndev/7server?label=npm" alt="npm"></a>
-  <a href="https://www.npmjs.com/package/@nannndev/7server"><img src="https://img.shields.io/npm/dm/@nannndev/7server?label=downloads&color=06b6d4" alt="npm downloads"></a>
   <a href="https://github.com/nannndev/7server/pkgs/container/7server"><img src="https://img.shields.io/badge/docker-ghcr.io-blue" alt="Docker image"></a>
   <a href="https://discord.gg/AF2Hc56t3N"><img src="https://img.shields.io/badge/Discord-Join%20Community-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
 </p>
@@ -104,22 +102,6 @@ Installs Node.js 22+ if missing, downloads the latest GitHub Release tarball, an
 ```bash
 curl -fsSL https://raw.githubusercontent.com/nannndev/7server/main/install.sh | sudo bash
 ```
-
-### npm
-
-Needs Node.js 22.13 or newer.
-
-```bash
-npm install -g @nannndev/7server
-7server                      # http://127.0.0.1:5001, data in ~/.7server
-```
-
-```bash
-7server --port 8080 --host 0.0.0.0 --data /srv/7server --no-open
-7server reset-password admin # locked out? set a new password
-```
-
-When a new version is out, `7server` tells you on startup (checks GitHub Releases / npm at most once a day; turn it off with `--no-update-check`). More options in [packages/npm/README.md](packages/npm/README.md).
 
 ### Docker
 

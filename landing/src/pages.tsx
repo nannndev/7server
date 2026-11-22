@@ -285,7 +285,7 @@ export function ChangelogPage() {
     <PageShell
       eyebrow="Changelog & Releases"
       title="What's new in 7Server."
-      lead="Every release of @nannndev/7server on npm and ghcr.io/nannndev/7server. Upgrade anytime with npm install -g @nannndev/7server@latest or docker compose pull."
+      lead="Every release of 7Server on Docker (ghcr.io/nannndev/7server), Homebrew, and Linux VPS installer. Upgrade anytime with docker compose pull or 7server."
     >
       <div className="space-y-6">
         {RELEASES.map((rel, i) => (
@@ -321,9 +321,6 @@ export function ChangelogPage() {
       <div className="mt-8 flex flex-wrap gap-3">
         <a href={`${REPO}/releases`} target="_blank" rel="noopener noreferrer" className="btn-silver inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold">
           <GithubIcon className="h-4 w-4" /> View GitHub Releases
-        </a>
-        <a href="https://www.npmjs.com/package/@nannndev/7server?activeTab=versions" target="_blank" rel="noopener noreferrer" className="metal inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold" style={{ color: 'var(--anatomy-strong)' }}>
-          npm Version History
         </a>
       </div>
     </PageShell>
