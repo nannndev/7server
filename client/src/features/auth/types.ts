@@ -19,6 +19,7 @@ export interface AuthUser {
   role: Role;
   servers?: string[] | '*';
   permissions: Permission[];
+  totpEnabled?: boolean;
 }
 
 export interface UserSession {

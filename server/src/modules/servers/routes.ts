@@ -2,8 +2,27 @@ import { Router, Request, Response } from 'express';
 import { createServer, deleteServer, getAllServers, getServerById, updateServer, reorderServers } from './store.js';
 import { need } from '../../http/auth.js';
 import { isServerAllowed } from '../../http/handlers.js';
+import { createWsTicket } from '../terminal/ticket.js';
 
 export const serversRoutes = Router();
+
+// Create single-use ticket for WebSocket terminal upgrade
+serversRoutes.post('/terminal/ticket', need('terminal.open'), (req: Request, res: Response) => {
+  const serverId = req.body?.serverId ? String(req.body.serverId) : undefined;
+  if (serverId && !isServerAllowed(req.user?.servers, serverId)) {
+    return res.status(403).json({ success: false, error: 'Forbidden: Akses ke server ini dibatasi' });
+  }
+
+  const ticket = createWsTicket({
+    userId: req.user!.id,
+    username: req.user!.username,
+    role: req.user!.role,
+    serverId,
+    sessionId: req.user!.sessionId
+  });
+
+  res.json({ success: true, ticket });
+});
 
 serversRoutes.get('/servers', (req: Request, res: Response) => {
   let servers = getAllServers(false);

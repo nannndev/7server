@@ -56,9 +56,17 @@ export interface User {
   disabled?: boolean;
   createdAt: string;
   lastLoginAt?: string;
+  /** Encrypted Base32 TOTP secret (using AES-256-GCM from infra/crypto.ts) */
+  totpSecretEnc?: string;
+  /** Flag indicating whether TOTP 2FA is active for this account */
+  totpEnabled?: boolean;
+  /** SHA-256 hashes of unused one-time emergency recovery codes */
+  totpRecoveryHashes?: string[];
 }
 
-export type SafeUser = Omit<User, 'passwordHash'>;
+export type SafeUser = Omit<User, 'passwordHash' | 'totpSecretEnc' | 'totpRecoveryHashes'> & {
+  totpEnabled?: boolean;
+};
 
 export interface Session {
   id: string;

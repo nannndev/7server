@@ -32,6 +32,7 @@ const HELP = `${c.bold('7server')} ${pkg.version}  ${c.dim('self-hosted dashboar
 ${c.bold('Usage')}
   7server [options]                 start the dashboard
   7server reset-password [user]     set a new password (default user: admin)
+  7server reset-2fa [user]          disable 2FA for locked-out user (default: admin)
 
 ${c.bold('Options')}
   -p, --port <n>       port to listen on ${c.dim('(default 5001, or $PORT)')}
@@ -80,7 +81,7 @@ for (let i = 0; i < args.length; i++) {
   else if (!a.startsWith('-')) positional.push(a);
   else { err(`${c.red('✗')} Unknown option ${a}. See 7server --help`); process.exit(2); }
 }
-if (!['start', 'reset-password'].includes(command)) { err(`${c.red('✗')} Unknown command "${command}". See 7server --help`); process.exit(2); }
+if (!['start', 'reset-password', 'reset-2fa'].includes(command)) { err(`${c.red('✗')} Unknown command "${command}". See 7server --help`); process.exit(2); }
 if (!/^\d+$/.test(opts.port) || +opts.port < 1 || +opts.port > 65535) { err(`${c.red('✗')} Invalid port: ${opts.port}`); process.exit(2); }
 
 fs.mkdirSync(opts.data, { recursive: true, mode: 0o700 });
@@ -96,10 +97,14 @@ const env = {
   SEVENSERVER_TELEMETRY: opts.telemetry ? '1' : '0'
 };
 
-// ---------------------------------------------------------------- reset-password
+// ---------------------------------------------------------------- reset-password / reset-2fa
 if (command === 'reset-password') {
   out(`\n  ${c.bold('7server')} ${c.dim(pkg.version)} · reset password ${c.dim(`(data: ${opts.data})`)}\n`);
   const child = spawn(process.execPath, [path.join(here, '..', 'dist', 'reset-password.js'), ...positional], { stdio: 'inherit', env });
+  child.on('exit', (code) => process.exit(code ?? 0));
+} else if (command === 'reset-2fa') {
+  out(`\n  ${c.bold('7server')} ${c.dim(pkg.version)} · reset 2FA ${c.dim(`(data: ${opts.data})`)}\n`);
+  const child = spawn(process.execPath, [path.join(here, '..', 'dist', 'reset-2fa.js'), ...positional], { stdio: 'inherit', env });
   child.on('exit', (code) => process.exit(code ?? 0));
 } else {
   start();

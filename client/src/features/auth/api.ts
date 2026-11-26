@@ -8,12 +8,57 @@ export interface LoginResult {
   session: { id: string; expiresAt: string };
 }
 
-export async function login(password: string, username = 'admin'): Promise<LoginResult> {
-  const res = await fetch(`${API_BASE}/login`, jsonPost({ username, password }));
+export type LoginResponse =
+  | {
+      requiresMfa: true;
+      mfaTicket: string;
+      user: { id: string; username: string };
+    }
+  | LoginResult;
+
+export async function login(password: string, username = 'admin'): Promise<LoginResponse> {
+  const res = await fetch(`${API_BASE}/login`, {
+    ...jsonPost({ username, password }),
+    credentials: 'same-origin'
+  });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Login gagal');
-  setToken(data.token);
+  if (data.requiresMfa) {
+    return data;
+  }
+  if (data.token) {
+    setToken(data.token);
+  }
   return data;
+}
+
+export async function verifyMfaLogin(mfaTicket: string, code: string): Promise<LoginResult> {
+  const res = await fetch(`${API_BASE}/login/totp`, {
+    ...jsonPost({ mfaTicket, code }),
+    credentials: 'same-origin'
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Verifikasi 2FA gagal');
+  if (data.token) {
+    setToken(data.token);
+  }
+  return data;
+}
+
+export async function setup2fa(): Promise<{ secret: string; otpauthUri: string }> {
+  const res = await apiFetch(`${API_BASE}/auth/2fa/setup`, jsonPost({}));
+  return unwrap<{ secret: string; otpauthUri: string }>(res, 'Gagal menyiapkan 2FA');
+}
+
+export async function confirm2fa(code: string): Promise<{ recoveryCodes: string[] }> {
+  const res = await apiFetch(`${API_BASE}/auth/2fa/confirm`, jsonPost({ code }));
+  return unwrap<{ recoveryCodes: string[] }>(res, 'Gagal mengonfirmasi 2FA');
+}
+
+export async function disable2fa(password: string): Promise<void> {
+  const res = await apiFetch(`${API_BASE}/auth/2fa/disable`, jsonPost({ password }));
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal menonaktifkan 2FA');
 }
 
 export async function fetchMe(): Promise<{ user: AuthUser; sessionId: string }> {

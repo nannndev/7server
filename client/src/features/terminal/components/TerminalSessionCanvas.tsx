@@ -4,6 +4,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import type { ServerItem } from '@/features/servers';
 import { getToken } from '@/shared/api/client';
+import { requestTerminalTicket } from '../api';
 
 export interface TerminalSessionHandle {
   sendData: (data: string) => void;
@@ -99,13 +100,23 @@ export const TerminalSessionCanvas = forwardRef<TerminalSessionHandle, TerminalS
     }));
 
     // Connect WebSocket
-    const connectWebSocket = (term: Terminal, fitAddon: FitAddon) => {
+    const connectWebSocket = async (term: Terminal, fitAddon: FitAddon) => {
       onStatusChange('connecting');
       const dims = fitAddon.proposeDimensions() || { cols: 80, rows: 24 };
       onDimensionsChange?.(dims);
 
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws/terminal?serverId=${server.id}&cols=${dims.cols}&rows=${dims.rows}&token=${encodeURIComponent(getToken())}`;
+      let wsUrl = '';
+
+      try {
+        // Preferred: fetch a single-use 30s ticket so token is never exposed in URL/logs
+        const ticket = await requestTerminalTicket(server.id);
+        wsUrl = `${protocol}//${window.location.host}/ws/terminal?serverId=${server.id}&cols=${dims.cols}&rows=${dims.rows}&ticket=${encodeURIComponent(ticket)}`;
+      } catch (ticketErr) {
+        // Fallback to direct token if ticket endpoint is unavailable
+        console.warn('Falling back to direct WS token:', ticketErr);
+        wsUrl = `${protocol}//${window.location.host}/ws/terminal?serverId=${server.id}&cols=${dims.cols}&rows=${dims.rows}&token=${encodeURIComponent(getToken())}`;
+      }
 
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;

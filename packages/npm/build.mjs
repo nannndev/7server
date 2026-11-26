@@ -48,6 +48,7 @@ const shared = {
 };
 await esbuild.build({ ...shared, entryPoints: [path.join(ROOT, 'server', 'src', 'index.ts')], outfile: path.join(DIST, 'server.js') });
 await esbuild.build({ ...shared, entryPoints: [path.join(ROOT, 'server', 'src', 'resetPassword.ts')], outfile: path.join(DIST, 'reset-password.js') });
+await esbuild.build({ ...shared, entryPoints: [path.join(ROOT, 'server', 'src', 'reset2fa.ts')], outfile: path.join(DIST, 'reset-2fa.js') });
 
 // 3. dependency versions follow the server's package.json, so the package can't drift.
 const serverPkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'server', 'package.json'), 'utf8'));
