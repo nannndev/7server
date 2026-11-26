@@ -103,6 +103,14 @@ Installs Node.js 22+ if missing, downloads the latest GitHub Release tarball, an
 curl -fsSL https://raw.githubusercontent.com/nannndev/7server/main/install.sh | sudo bash
 ```
 
+### Windows PowerShell (one-liner)
+
+Installs Node.js 22+ if missing, downloads the latest release, sets up `7server` command in your PATH:
+
+```powershell
+irm https://raw.githubusercontent.com/nannndev/7server/main/install.ps1 | iex
+```
+
 ### Docker
 
 ```bash

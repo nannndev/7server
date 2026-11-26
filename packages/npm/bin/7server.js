@@ -31,6 +31,7 @@ const HELP = `${c.bold('7server')} ${pkg.version}  ${c.dim('self-hosted dashboar
 
 ${c.bold('Usage')}
   7server [options]                 start the dashboard
+  7server update                    update 7server to the latest release
   7server reset-password [user]     set a new password (default user: admin)
   7server reset-2fa [user]          disable 2FA for locked-out user (default: admin)
 
@@ -81,7 +82,7 @@ for (let i = 0; i < args.length; i++) {
   else if (!a.startsWith('-')) positional.push(a);
   else { err(`${c.red('✗')} Unknown option ${a}. See 7server --help`); process.exit(2); }
 }
-if (!['start', 'reset-password', 'reset-2fa'].includes(command)) { err(`${c.red('✗')} Unknown command "${command}". See 7server --help`); process.exit(2); }
+if (!['start', 'reset-password', 'reset-2fa', 'update'].includes(command)) { err(`${c.red('✗')} Unknown command "${command}". See 7server --help`); process.exit(2); }
 if (!/^\d+$/.test(opts.port) || +opts.port < 1 || +opts.port > 65535) { err(`${c.red('✗')} Invalid port: ${opts.port}`); process.exit(2); }
 
 fs.mkdirSync(opts.data, { recursive: true, mode: 0o700 });
@@ -97,8 +98,10 @@ const env = {
   SEVENSERVER_TELEMETRY: opts.telemetry ? '1' : '0'
 };
 
-// ---------------------------------------------------------------- reset-password / reset-2fa
-if (command === 'reset-password') {
+// ---------------------------------------------------------------- reset-password / reset-2fa / update
+if (command === 'update') {
+  handleUpdate();
+} else if (command === 'reset-password') {
   out(`\n  ${c.bold('7server')} ${c.dim(pkg.version)} · reset password ${c.dim(`(data: ${opts.data})`)}\n`);
   const child = spawn(process.execPath, [path.join(here, '..', 'dist', 'reset-password.js'), ...positional], { stdio: 'inherit', env });
   child.on('exit', (code) => process.exit(code ?? 0));
@@ -108,6 +111,45 @@ if (command === 'reset-password') {
   child.on('exit', (code) => process.exit(code ?? 0));
 } else {
   start();
+}
+
+function handleUpdate() {
+  out(`\n  ${c.bold('7server')} ${c.dim(pkg.version)} · updating to latest release...\n`);
+
+  if (process.platform === 'darwin') {
+    const isBrew = here.includes('Cellar') || here.includes('homebrew') || fs.existsSync('/opt/homebrew/bin/7server');
+    if (isBrew) {
+      out(`  ${c.cyan('➜')} Updating via Homebrew...`);
+      const child = spawn('brew', ['upgrade', 'sevenserver'], { stdio: 'inherit' });
+      child.on('exit', (code) => {
+        if (code === 0) out(`\n  ${c.green('✓')} 7Server successfully updated via Homebrew!`);
+        process.exit(code ?? 0);
+      });
+      return;
+    }
+  }
+
+  if (process.platform === 'win32') {
+    out(`  ${c.cyan('➜')} Updating via Windows PowerShell installer...`);
+    const child = spawn('powershell.exe', [
+      '-NoProfile',
+      '-ExecutionPolicy', 'Bypass',
+      '-Command', 'irm https://raw.githubusercontent.com/nannndev/7server/main/install.ps1 | iex'
+    ], { stdio: 'inherit' });
+    child.on('exit', (code) => {
+      if (code === 0) out(`\n  ${c.green('✓')} 7Server successfully updated!`);
+      process.exit(code ?? 0);
+    });
+    return;
+  }
+
+  // Linux or generic Unix
+  out(`  ${c.cyan('➜')} Updating via official installer script...`);
+  const child = spawn('bash', ['-c', 'curl -fsSL https://raw.githubusercontent.com/nannndev/7server/main/install.sh | sudo bash'], { stdio: 'inherit' });
+  child.on('exit', (code) => {
+    if (code === 0) out(`\n  ${c.green('✓')} 7Server successfully updated!`);
+    process.exit(code ?? 0);
+  });
 }
 
 // ---------------------------------------------------------------- start
