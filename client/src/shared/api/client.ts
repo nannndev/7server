@@ -15,7 +15,19 @@ export const setToken = (t: string) => {
 
 // Every API call goes through here so the token is attached and a 401 logs the user out.
 export async function apiFetch(url: string, init: RequestInit = {}): Promise<Response> {
-  const res = await fetch(url, { ...init, headers: { ...init.headers, Authorization: `Bearer ${getToken()}` } });
+  const token = getToken();
+  const headers: Record<string, string> = {
+    ...((init.headers as Record<string, string>) || {})
+  };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const res = await fetch(url, {
+    ...init,
+    credentials: 'same-origin', // Ensure session cookies are sent for same-origin calls
+    headers
+  });
   if (res.status === 401 && !url.endsWith('/login')) {
     setToken('');
     window.dispatchEvent(new Event('vps-hub-logout'));

@@ -73,8 +73,11 @@ export async function initUsersStore(seedPassword?: string) {
 }
 
 export function toSafeUser(user: User): SafeUser {
-  const { passwordHash, ...safe } = user;
-  return safe;
+  const { passwordHash, totpSecretEnc, totpRecoveryHashes, ...safe } = user;
+  return {
+    ...safe,
+    totpEnabled: Boolean(user.totpEnabled)
+  };
 }
 
 export function getUsers(): User[] {
@@ -128,6 +131,9 @@ export async function updateUser(
     servers?: string[] | '*';
     disabled?: boolean;
     password?: string;
+    totpSecretEnc?: string | null;
+    totpEnabled?: boolean;
+    totpRecoveryHashes?: string[];
   }
 ): Promise<SafeUser> {
   const users = getUsers();
@@ -138,6 +144,11 @@ export async function updateUser(
   if (updates.role !== undefined) user.role = updates.role;
   if (updates.servers !== undefined) user.servers = updates.servers;
   if (updates.disabled !== undefined) user.disabled = updates.disabled;
+  if (updates.totpSecretEnc !== undefined) {
+    user.totpSecretEnc = updates.totpSecretEnc === null ? undefined : updates.totpSecretEnc;
+  }
+  if (updates.totpEnabled !== undefined) user.totpEnabled = updates.totpEnabled;
+  if (updates.totpRecoveryHashes !== undefined) user.totpRecoveryHashes = updates.totpRecoveryHashes;
   if (updates.password) {
     user.passwordHash = await hashPassword(updates.password);
     // Invalidate existing sessions for this user on password change

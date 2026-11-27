@@ -21,6 +21,7 @@ import { BackgroundTasksWidget } from '@/shared/tasks/BackgroundTasksWidget';
 import UsersPage from '@/pages/UsersPage';
 import IntegrationsPage from '@/pages/IntegrationsPage';
 import ChangePasswordModal from '@/features/users/components/ChangePasswordModal';
+import TwoFactorModal from '@/features/users/components/TwoFactorModal';
 import { useAuth, useCan } from '@/features/auth/AuthContext';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { Button } from '@/shared/ui/button';
@@ -67,6 +68,7 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
     copilotActionRef.current?.(action);
   }, []);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [showTwoFactorModal, setShowTwoFactorModal] = useState(false);
   const { user } = useAuth();
   const { info: versionInfo, checking: versionChecking, check: checkVersion, showBanner: showVersionBanner, dismissBanner: dismissVersionBanner } = useAppVersion();
 
@@ -159,6 +161,7 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
           onOpenUsers={() => navigate({ page: 'users', tab: 'users' })}
           onOpenSessions={() => navigate({ page: 'users', tab: 'sessions' })}
           onOpenChangePassword={() => setShowChangePasswordModal(true)}
+          onOpenTwoFactor={() => setShowTwoFactorModal(true)}
           versionInfo={versionInfo}
           versionChecking={versionChecking}
           onCheckVersion={checkVersion}
@@ -280,6 +283,10 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
           open={showChangePasswordModal}
           onClose={() => setShowChangePasswordModal(false)}
         />
+      )}
+
+      {showTwoFactorModal && (
+        <TwoFactorModal open={showTwoFactorModal} onClose={() => setShowTwoFactorModal(false)} />
       )}
 
       <AiCopilotDrawer

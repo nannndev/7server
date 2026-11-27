@@ -30,7 +30,7 @@ export interface ListeningPortInfo {
   pid: string;
 }
 
-export type DeployEngine = 'docker' | 'native_node' | 'native_php' | 'native_python' | 'native_go' | 'static';
+export type DeployEngine = 'docker' | 'nixpacks' | 'native_node' | 'native_php' | 'native_python' | 'native_go' | 'static';
 export type ExposureType = 'public' | 'tunnel' | 'none';
 
 export interface DeploySpec {
@@ -53,9 +53,10 @@ export interface DeploySpec {
   postDeployCmd?: string;
   autoSsl?: boolean;
   commitSha?: string;
+  autoDeploy?: boolean;
 }
 
-export const ENGINES: DeployEngine[] = ['docker', 'native_node', 'native_php', 'native_python', 'native_go', 'static'];
+export const ENGINES: DeployEngine[] = ['docker', 'nixpacks', 'native_node', 'native_php', 'native_python', 'native_go', 'static'];
 export const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
 
 // Every field ends up in a root shell script, so anything not quoted with sq() must match a strict pattern.
@@ -107,6 +108,7 @@ export function parseDeploySpec(body: any): DeploySpec {
     ...(healthCheckPath ? { healthCheckPath } : {}),
     ...(str(body?.postDeployCmd) ? { postDeployCmd: str(body?.postDeployCmd) } : {}),
     ...(body?.autoSsl === true ? { autoSsl: true } : {}),
-    ...(commitSha ? { commitSha } : {})
+    ...(commitSha ? { commitSha } : {}),
+    ...(body?.autoDeploy !== undefined ? { autoDeploy: Boolean(body?.autoDeploy) } : {})
   };
 }

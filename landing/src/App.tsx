@@ -1005,9 +1005,10 @@ function Security({ lang }: { lang: Lang }) {
 }
 
 const INSTALL = {
-  script: { label: 'VPS Script', note: 'One-line Ubuntu/Debian VPS installer with systemd service setup.', steps: [['Install & start', 'curl -fsSL https://raw.githubusercontent.com/nannndev/7server/main/install.sh | bash']] as [string, string][] },
-  docker: { label: 'Docker', note: 'Best for a VPS. Data lives in the 7server-data volume; the port is bound to localhost, so put HTTPS in front.', steps: [['Get the compose file', `git clone ${REPO}.git && cd 7server`], ['Set a password', 'cp .env.docker.example .env'], ['Start', 'docker compose up -d']] as [string, string][] },
-  brew: { label: 'Homebrew', note: 'macOS & Linuxbrew formula via nannndev/homebrew-tap.', steps: [['Tap & install', 'brew tap nannndev/tap && brew install sevenserver'], ['Run', '7server']] as [string, string][] },
+  script: { label: 'Linux VPS', note: 'One-line Ubuntu/Debian VPS installer with automatic systemd service setup.', steps: [['Install & start', 'curl -fsSL https://raw.githubusercontent.com/nannndev/7server/main/install.sh | sudo bash']] as [string, string][] },
+  windows: { label: 'Windows', note: 'One-line PowerShell installer (no Docker needed, Node 22+).', steps: [['Install & start', 'irm https://raw.githubusercontent.com/nannndev/7server/main/install.ps1 | iex']] as [string, string][] },
+  brew: { label: 'macOS', note: 'macOS & Linuxbrew formula via nannndev/homebrew-tap.', steps: [['Tap & install', 'brew tap nannndev/tap && brew install sevenserver'], ['Run', '7server']] as [string, string][] },
+  docker: { label: 'Docker', note: 'Best for a containerized VPS or Homelab. Data lives in the 7server-data volume.', steps: [['Get the compose file', `git clone ${REPO}.git && cd 7server`], ['Set a password', 'cp .env.docker.example .env'], ['Start', 'docker compose up -d']] as [string, string][] },
   source: { label: 'From source', note: 'For development: UI on :3000, API on :5001.', steps: [['Clone', `git clone ${REPO}.git && cd 7server`], ['Install', '(cd server && npm install) && (cd client && npm install)'], ['Run', 'npm run dev']] as [string, string][] }
 };
 

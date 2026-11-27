@@ -31,8 +31,12 @@ server/src/__probe*.ts
 .DS_Store
 .vscode/
 .idea/
+.eay/
 .claude/
 graphify-out/
 
 # npm package build output
 *.tgz
+
+# eay-gateway session transcripts
+.eay/sessions/

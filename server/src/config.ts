@@ -34,5 +34,12 @@ export const config = {
   staticDir: process.env.STATIC_DIR ? path.resolve(process.env.STATIC_DIR) : path.resolve(SERVER_ROOT, '..', 'client', 'dist'),
   /** Treat Docker bridge peers (172.16/12) as internal for the AI gateway. Off by default: with
    * published ports Docker can make internet callers look like the bridge gateway. */
-  trustDockerBridge: process.env.AI_GATEWAY_TRUST_DOCKER_BRIDGE === '1'
+  trustDockerBridge: process.env.AI_GATEWAY_TRUST_DOCKER_BRIDGE === '1',
+  /** Custom CSP frame-ancestors directive (e.g. "https://homarr.local"). Empty = 'none' (cannot be iframed). */
+  frameAncestors: process.env.FRAME_ANCESTORS || '',
+  /** Additional allowed origins (comma-separated) for WebSocket upgrades and CSRF checks. */
+  allowedOrigins: (process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
 };

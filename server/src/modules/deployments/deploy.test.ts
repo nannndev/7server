@@ -257,6 +257,16 @@ console.log('nginx reload fallback ok');
   assert.equal(verifyWebhookSignature(secret, payload, sig), true);
   assert.equal(verifyWebhookSignature(secret, payload, 'sha256=deadbeef'), false);
   assert.equal(verifyWebhookSignature(secret, payload, undefined), false);
+  assert.equal(verifyWebhookSignature(secret, payload, undefined, secret), true);
+  assert.equal(verifyWebhookSignature(secret, payload, undefined, 'wrong-token'), false);
+  assert.equal(verifyWebhookSignature(secret, payload, secret), true);
+
+  // Nixpacks engine spec
+  const nixpacksSpec = parseDeploySpec({ ...base, engine: 'nixpacks', autoDeploy: true });
+  assert.equal(nixpacksSpec.engine, 'nixpacks');
+  assert.equal(nixpacksSpec.autoDeploy, true);
+  const nixpacksScript = buildDeployScript(nixpacksSpec);
+  assert.ok(nixpacksScript.includes('nixpacks'));
 
   const testServerId = '__test_deploy_lifecycle__';
   try {

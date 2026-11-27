@@ -17,8 +17,10 @@ import {
   fetchGitHubUserProfile,
   fetchGitHubRepos,
   fetchGitHubBranches,
-  inspectGitHubRepo
+  inspectGitHubRepo,
+  createGitHubRepoWebhook
 } from './githubService.js';
+import { getDeployConfig, saveDeployConfig } from '../deployments/store.js';
 
 // Temporary OAuth state store with 10-minute TTL
 interface OAuthStateRecord {
@@ -321,7 +323,8 @@ gitManagementRoutes.get('/git/github/repos', need('server.read'), async (req: Re
 // GET /api/git/github/repos/:owner/:repo/branches
 gitManagementRoutes.get('/api/git/github/repos/:owner/:repo/branches', need('server.read'), async (req: Request, res: Response) => {
   try {
-    const { owner, repo } = req.params;
+    const owner = String(req.params.owner || '');
+    const repo = String(req.params.repo || '');
     const integrationId = typeof req.query.integrationId === 'string' ? req.query.integrationId : undefined;
     const integration = getActiveIntegration('github', integrationId);
 
@@ -347,7 +350,8 @@ gitManagementRoutes.get('/api/git/github/repos/:owner/:repo/branches', need('ser
 // Alternative route without duplicate '/api' prefix when mounted under '/api'
 gitManagementRoutes.get('/git/github/repos/:owner/:repo/branches', need('server.read'), async (req: Request, res: Response) => {
   try {
-    const { owner, repo } = req.params;
+    const owner = String(req.params.owner || '');
+    const repo = String(req.params.repo || '');
     const integrationId = typeof req.query.integrationId === 'string' ? req.query.integrationId : undefined;
     const integration = getActiveIntegration('github', integrationId);
 
@@ -398,6 +402,71 @@ gitManagementRoutes.post('/git/github/inspect', need('server.read'), async (req:
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message || 'Gagal menginspeksi proyek di GitHub.' });
+  }
+});
+
+// POST /api/git/github/repos/:owner/:repo/webhook
+gitManagementRoutes.post('/git/github/repos/:owner/:repo/webhook', need('server.manage'), async (req: Request, res: Response) => {
+  try {
+    const owner = String(req.params.owner || '');
+    const repo = String(req.params.repo || '');
+    const { serverId, appName, webhookUrl: customWebhookUrl } = req.body || {};
+
+    if (!serverId || !appName) {
+      return res.status(400).json({ success: false, error: 'serverId and appName are required' });
+    }
+
+    const integration = getActiveIntegration('github');
+    if (!integration) {
+      return res.status(400).json({ success: false, error: 'Belum ada akun GitHub yang terhubung.' });
+    }
+
+    const token = getDecryptedAccessToken(integration);
+
+    // Look up or initialize deploy config to get/set webhookSecret
+    let cfg = getDeployConfig(serverId, appName);
+    let secret = cfg?.webhookSecret;
+    if (!cfg) {
+      // Create minimal initial deploy config or placeholder
+      cfg = saveDeployConfig(serverId, {
+        appName,
+        repo: `${owner}/${repo}`,
+        branch: 'main',
+        rootDir: '/',
+        installCmd: '',
+        buildCmd: '',
+        startCmd: '',
+        port: 3000,
+        domain: '',
+        engine: 'docker',
+        env: [],
+        autoDeploy: true
+      }, { autoDeploy: true });
+      secret = cfg.webhookSecret;
+    } else {
+      secret = cfg.webhookSecret;
+      saveDeployConfig(serverId, cfg.spec, { autoDeploy: true });
+    }
+
+    // Determine webhookUrl
+    let targetUrl = customWebhookUrl;
+    if (!targetUrl) {
+      const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+      const host = req.headers['x-forwarded-host'] || req.get('host') || 'localhost';
+      targetUrl = `${proto}://${host}/api/webhooks/deploy/${encodeURIComponent(serverId)}/${encodeURIComponent(appName)}`;
+    }
+
+    const hookRes = await createGitHubRepoWebhook(token, owner, repo, targetUrl, secret);
+
+    res.json({
+      success: true,
+      webhookUrl: targetUrl,
+      created: !hookRes.alreadyExists,
+      alreadyExists: Boolean(hookRes.alreadyExists),
+      hookId: hookRes.id
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message || 'Gagal membuat webhook GitHub.' });
   }
 });
 

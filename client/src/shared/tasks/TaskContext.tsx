@@ -9,6 +9,7 @@ interface TaskContextType {
   startTask: (params: StartTaskParams) => string;
   appendTaskLog: (id: string, chunk: string) => void;
   finishTask: (id: string, result?: { ok?: boolean; error?: string }) => void;
+  cancelTask: (id: string) => void;
   clearFinishedTasks: () => void;
   isDrawerOpen: boolean;
   setIsDrawerOpen: (open: boolean) => void;
@@ -36,6 +37,7 @@ export function TaskManagerProvider({ children }: { children: React.ReactNode })
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const activeCountRef = useRef(0);
+  const controllersRef = useRef<Map<string, AbortController>>(new Map());
 
   // Update elapsed seconds ticker for active tasks
   useEffect(() => {
@@ -128,6 +130,17 @@ export function TaskManagerProvider({ children }: { children: React.ReactNode })
     );
   }, []);
 
+  const cancelTask = useCallback((id: string) => {
+    const ac = controllersRef.current.get(id);
+    if (ac) {
+      ac.abort();
+      controllersRef.current.delete(id);
+    } else {
+      appendTaskLog(id, '\nCancelled by user');
+      finishTask(id, { ok: false, error: 'Cancelled by user' });
+    }
+  }, [appendTaskLog, finishTask]);
+
   const clearFinishedTasks = useCallback(() => {
     setTasks((prev) => prev.filter((t) => t.status === 'running'));
     if (selectedTaskId) {
@@ -164,6 +177,9 @@ export function TaskManagerProvider({ children }: { children: React.ReactNode })
         initialLog: `Starting: ${params.title}...`
       });
 
+      const ac = new AbortController();
+      controllersRef.current.set(taskId, ac);
+
       try {
         const response = await apiFetch(params.url, {
           method: 'POST',
@@ -171,7 +187,8 @@ export function TaskManagerProvider({ children }: { children: React.ReactNode })
             'Content-Type': 'application/json',
             Accept: 'text/event-stream'
           },
-          body: params.body ? JSON.stringify(params.body) : undefined
+          body: params.body ? JSON.stringify(params.body) : undefined,
+          signal: ac.signal
         });
 
         if (!response.ok) {
@@ -269,10 +286,22 @@ export function TaskManagerProvider({ children }: { children: React.ReactNode })
           params.onError?.(errWithDetails);
         }
       } catch (err: any) {
-        appendTaskLog(taskId, `\nFatal Exception: ${err.message || 'Execution error'}`);
-        finishTask(taskId, { ok: false, error: err.message });
-        toast.error(`${params.title} failed: ${err.message}`);
-        params.onError?.(err);
+        if (ac.signal.aborted || err?.name === 'AbortError') {
+          appendTaskLog(taskId, '\nCancelled by user');
+          finishTask(taskId, { ok: false, error: 'Cancelled by user' });
+          toast.info(`${params.title} cancelled`);
+          const cancelErr: any = new Error('Cancelled by user');
+          cancelErr.name = 'AbortError';
+          cancelErr.cancelled = true;
+          params.onError?.(cancelErr);
+        } else {
+          appendTaskLog(taskId, `\nFatal Exception: ${err.message || 'Execution error'}`);
+          finishTask(taskId, { ok: false, error: err.message });
+          toast.error(`${params.title} failed: ${err.message}`);
+          params.onError?.(err);
+        }
+      } finally {
+        controllersRef.current.delete(taskId);
       }
     },
     [startTask, appendTaskLog, finishTask]
@@ -288,6 +317,7 @@ export function TaskManagerProvider({ children }: { children: React.ReactNode })
         startTask,
         appendTaskLog,
         finishTask,
+        cancelTask,
         clearFinishedTasks,
         isDrawerOpen,
         setIsDrawerOpen,

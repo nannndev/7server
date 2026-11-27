@@ -2,7 +2,7 @@ import { sq } from '../../databases/shell.js';
 import { DeploySpec } from './types.js';
 
 export function nginxSite(s: DeploySpec, site: string, workDir: string): string {
-  const proxied = !!s.startCmd || s.engine === 'docker';
+  const proxied = !!s.startCmd || s.engine === 'docker' || s.engine === 'nixpacks';
   if (!s.domain && proxied) return 'echo "No domain set: skipping Nginx"';
   // Static site without a domain: Nginx serves the build output on the chosen port.
   // Static site with a domain/tunnel: Nginx serves on both port 80 and the chosen internal port,

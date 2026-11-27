@@ -1,6 +1,6 @@
 // Step 3 of the deploy wizard: live stages + log of the background deploy task.
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Check, ExternalLink, RefreshCw, Cpu, Terminal, Copy, CheckCircle2, Activity, Sparkles, Clock, Play, AlertTriangle } from 'lucide-react';
+import { Check, ExternalLink, RefreshCw, Cpu, Terminal, Copy, CheckCircle2, Activity, Sparkles, Clock, Play, AlertTriangle, Square } from 'lucide-react';
 import { Card } from '@/shared/ui/card';
 import { Button } from '@/shared/ui/button';
 import { Badge } from '@/shared/ui/badge';
@@ -8,6 +8,7 @@ import { BrandIcon } from '@/shared/ui/brand-icon';
 import { toast } from '@/shared/ui/toast';
 import { execOnServer } from '@/features/copilot/api';
 import { useT } from '@/shared/i18n';
+import { useTaskManager } from '@/shared/tasks/TaskContext';
 import type { ServerItem } from '@/features/servers/types';
 import type { BackgroundTask } from '@/shared/tasks/types';
 
@@ -78,6 +79,7 @@ export function DeployProgress({
   onContinueStack?: () => void;
 }) {
   const t = useT();
+  const { cancelTask } = useTaskManager();
   const [activeServiceIdx, setActiveServiceIdx] = useState(0);
 
   // Auto-switch to running service when previous completes
@@ -347,6 +349,21 @@ Please check the process and container status on the server, analyze the root ca
             </div>
           </div>
         </div>
+
+        {!deployFinished && !deployFailed && currentTask?.status === 'running' && (
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => cancelTask(currentTask.id)}
+              className="h-9 px-3.5 text-xs gap-1.5 border-red-500/40 text-red-500 hover:bg-red-500/10 font-medium"
+            >
+              <Square className="w-3 h-3 fill-current" />
+              <span>{t('common.cancel')}</span>
+            </Button>
+          </div>
+        )}
 
         {deployFailed && (
           <div className="flex items-center gap-2 flex-wrap">

@@ -138,18 +138,51 @@ export async function executeCommandStream(
   command: string,
   onChunk: (chunk: string, isStderr: boolean) => void,
   timeoutMs = 180000,
-  opts: { stdin?: string } = {}
+  opts: { stdin?: string; signal?: AbortSignal } = {}
 ): Promise<CommandResult> {
+  if (opts.signal?.aborted) {
+    const err = new Error('Task cancelled by user');
+    err.name = 'AbortError';
+    throw err;
+  }
+
   const conn = await createSSHClient(serverConfig);
 
   return new Promise((resolve, reject) => {
     let stdout = '';
     let stderr = '';
     let isDone = false;
+    let activeStream: any = null;
+
+    const cleanup = () => {
+      clearTimeout(timeout);
+      if (opts.signal) opts.signal.removeEventListener('abort', onAbort);
+    };
+
+    const onAbort = () => {
+      if (isDone) return;
+      isDone = true;
+      cleanup();
+      try { activeStream?.signal?.('TERM'); } catch {}
+      try { activeStream?.close?.(); } catch {}
+      try { conn.end(); } catch {}
+      const err = new Error('Task cancelled by user');
+      err.name = 'AbortError';
+      reject(err);
+    };
+
+    if (opts.signal) {
+      if (opts.signal.aborted) {
+        onAbort();
+        return;
+      }
+      opts.signal.addEventListener('abort', onAbort, { once: true });
+    }
 
     const timeout = setTimeout(() => {
       if (!isDone) {
         isDone = true;
+        cleanup();
         try { conn.end(); } catch (e) {}
         reject(new Error(`Command timed out after ${timeoutMs / 1000}s`));
       }
@@ -157,15 +190,27 @@ export async function executeCommandStream(
 
     conn.exec(command, (err, stream) => {
       if (err) {
-        clearTimeout(timeout);
-        conn.end();
-        return reject(err);
+        if (!isDone) {
+          isDone = true;
+          cleanup();
+          conn.end();
+          return reject(err);
+        }
+        return;
       }
+
+      if (isDone) {
+        try { stream.close(); } catch {}
+        try { conn.end(); } catch {}
+        return;
+      }
+
+      activeStream = stream;
 
       stream.on('close', (code: number, signal: string) => {
         if (!isDone) {
           isDone = true;
-          clearTimeout(timeout);
+          cleanup();
           conn.end();
           resolve({ stdout, stderr, code: code !== undefined ? code : 0, signal });
         }

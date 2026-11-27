@@ -24,7 +24,7 @@ const LOGO = '/icons/icon-opt2-server-blade.png';
 
 export default function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) {
   const { t, lang, setLang } = useI18n();
-  const { login, refreshUser } = useAuth();
+  const { login, verifyMfa, refreshUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
   // First run: show "create admin" setup instead of sign-in
@@ -44,6 +44,9 @@ export default function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) 
   const [busy, setBusy] = useState(false);
   const [unlocked, setUnlocked] = useState(false);
   const [shake, setShake] = useState(false);
+  // Set after password succeeds on a 2FA account; the form then asks for the code
+  const [mfaTicket, setMfaTicket] = useState<string | null>(null);
+  const [code, setCode] = useState('');
 
   // Synchronize typing with the isometric server rack LEDs
   const [typing, setTyping] = useState(false);
@@ -65,14 +68,22 @@ export default function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) 
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!password || busy) return;
+    if (busy || !(mfaTicket ? code.trim() : password)) return;
 
     setBusy(true);
     setError(null);
     setShake(false);
 
     try {
-      await login(password, username);
+      if (mfaTicket) {
+        await verifyMfa(mfaTicket, code.trim());
+      } else {
+        const ticket = await login(password, username);
+        if (ticket) {
+          setMfaTicket(ticket);
+          return;
+        }
+      }
       setUnlocked(true);
       setTimeout(onLoggedIn, 600);
     } catch (err: any) {
@@ -192,6 +203,42 @@ export default function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) 
                 <SetupForm needsCode={setup.needsCode} onDone={async () => { await refreshUser(); onLoggedIn(); }} />
               ) : (
                 <form onSubmit={submit} className="space-y-3.5">
+                  {mfaTicket ? (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-xs font-mono">
+                        <label htmlFor="mfa-code" className="text-[var(--muted-foreground)] flex items-center gap-1.5">
+                          <ShieldCheck className="w-3.5 h-3.5 text-[var(--foreground)]" />
+                          <span>{t('auth.mfaCode')}</span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => { setMfaTicket(null); setCode(''); setError(null); }}
+                          className="text-[10px] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition"
+                        >
+                          {t('auth.mfaBack')}
+                        </button>
+                      </div>
+                      <div className={`well rounded-xl px-3 py-2 flex items-center gap-2 transition focus-within:ring-1 ${
+                        error ? 'border-red-500/50 focus-within:ring-red-500' : 'focus-within:ring-[var(--accent)]'
+                      }`}>
+                        <span className="text-xs font-mono text-[var(--muted-foreground)] select-none">&gt;</span>
+                        <input
+                          id="mfa-code"
+                          type="text"
+                          inputMode="text"
+                          autoComplete="one-time-code"
+                          autoFocus
+                          required
+                          value={code}
+                          onChange={(e) => { setCode(e.target.value); handleTyping(); }}
+                          placeholder="123456"
+                          className="bg-transparent text-xs text-[var(--foreground)] w-full outline-none font-mono tracking-widest"
+                        />
+                      </div>
+                      <p className="text-[11px] text-[var(--muted-foreground)]">{t('auth.mfaHint')}</p>
+                    </div>
+                  ) : (
+                  <>
                   {/* Username Field */}
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between text-xs font-mono">
@@ -255,6 +302,8 @@ export default function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) 
                       </button>
                     </div>
                   </div>
+                  </>
+                  )}
 
                   {/* Error Message: Simple, localized, zero reload */}
                   {error && (
@@ -266,7 +315,7 @@ export default function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) 
                       <div className="space-y-0.5 min-w-0">
                         <p className="font-semibold leading-snug">{error}</p>
                         <p className="text-[11px] opacity-80 leading-normal">
-                          {t('auth.errorHelper')}
+                          {t(mfaTicket ? 'auth.mfaHint' : 'auth.errorHelper')}
                         </p>
                       </div>
                     </div>
@@ -275,7 +324,7 @@ export default function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) 
                   {/* Submit Button */}
                   <button
                     type="submit"
-                    disabled={busy || !password}
+                    disabled={busy || !(mfaTicket ? code.trim() : password)}
                     className="btn-silver w-full mt-2 py-2.5 rounded-xl font-semibold text-xs flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer transition active:scale-[0.99]"
                   >
                     {busy ? (

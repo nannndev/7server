@@ -4,16 +4,21 @@ import {
   getSafeUsers, 
   createUser, 
   updateUser, 
-  deleteUser 
+  deleteUser,
+  getUserById
 } from './store.js';
 import { 
   changePasswordService, 
   resetPasswordByAdmin, 
   listSessionsService, 
   revokeSessionService,
-  logoutService
+  logoutService,
+  setupTotpService,
+  confirmTotpService,
+  disableTotpService
 } from './service.js';
 import { readAudit, exportAuditCsv } from '../../infra/audit.js';
+import { clearSessionCookie } from '../../http/cookies.js';
 
 export const usersRoutes = Router();
 
@@ -29,7 +34,8 @@ usersRoutes.get('/auth/me', (req: Request, res: Response) => {
         username: req.user.username,
         role: req.user.role,
         servers: req.user.servers,
-        permissions: req.user.permissions
+        permissions: req.user.permissions,
+        totpEnabled: Boolean(getUserById(req.user.id)?.totpEnabled)
       },
       sessionId: req.user.sessionId
     }
@@ -47,10 +53,45 @@ usersRoutes.post('/auth/change-password', async (req: Request, res: Response) =>
   }
 });
 
+// ---------------- 2FA (TOTP) Profile Endpoints ----------------
+
+usersRoutes.post('/auth/2fa/setup', async (req: Request, res: Response) => {
+  if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  try {
+    const data = await setupTotpService(req.user.id);
+    res.json({ success: true, ...data });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+usersRoutes.post('/auth/2fa/confirm', async (req: Request, res: Response) => {
+  if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  try {
+    const { code } = req.body || {};
+    const data = await confirmTotpService(req.user.id, String(code || ''));
+    res.json({ success: true, recoveryCodes: data.recoveryCodes });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+usersRoutes.post('/auth/2fa/disable', async (req: Request, res: Response) => {
+  if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  try {
+    const { password } = req.body || {};
+    await disableTotpService(req.user.id, String(password || ''));
+    res.json({ success: true, message: '2FA berhasil dinonaktifkan' });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 usersRoutes.post('/auth/logout', (req: Request, res: Response) => {
   if (req.user?.sessionId) {
     logoutService(req.user.sessionId, req.user.username, req.ip || '');
   }
+  clearSessionCookie(req, res);
   res.json({ success: true, message: 'Logout berhasil' });
 });
 

@@ -35,7 +35,7 @@ export function buildDeployScript(s: DeploySpec, token?: string): string {
   // Header instead of a token-in-URL: nothing ends up in .git/config. shortcut: the header is briefly visible in ps on the VPS; use a git credential helper if that matters.
   const auth = token ? `-c http.extraHeader=${sq(`Authorization: Basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`)} ` : '';
   const site = `7server-${s.appName}`;
-  const isDocker = s.engine === 'docker';
+  const isDocker = s.engine === 'docker' || s.engine === 'nixpacks';
   const envKeys = new Set(s.env.map((e) => e.key.toUpperCase()));
   const defaultRuntimeEnv: Array<{ key: string; value: string }> = [];
   if (!isDocker) {

@@ -23,6 +23,7 @@ export interface TrackedDeployOpts {
   sudoPassword?: string;
   onChunk?: (chunk: string, isStderr: boolean) => void;
   persistSpec?: boolean;
+  signal?: AbortSignal;
 }
 
 export async function executeTrackedDeploy(
@@ -59,7 +60,8 @@ export async function executeTrackedDeploy(
         if (accLog.length > 20_000) accLog = accLog.slice(-15_000);
         opts.onChunk?.(chunk, isErr);
       },
-      30 * 60 * 1000
+      30 * 60 * 1000,
+      opts.signal
     );
     const fullLog = result.output || accLog;
     const commit = extractCommitFromOutput(fullLog) || spec.commitSha;
@@ -102,7 +104,12 @@ export async function runStreamTrackedDeploy(
     'Connection': 'keep-alive',
     'X-Accel-Buffering': 'no'
   });
+  const ac = new AbortController();
+  res.on('close', () => {
+    if (!res.writableEnded) ac.abort();
+  });
   const send = (type: string, payload: any) => {
+    if (res.writableEnded || ac.signal.aborted) return;
     res.write(`data: ${JSON.stringify({ type, ...payload })}\n\n`);
     if (typeof (res as any).flush === 'function') (res as any).flush();
   };
@@ -112,21 +119,47 @@ export async function runStreamTrackedDeploy(
       await executeTrackedDeploy(server, spec, {
         ...opts,
         sudoPassword,
+        signal: ac.signal,
         onChunk: (chunk) => send('chunk', { chunk })
       })
     );
   } catch (err: any) {
-    send('error', { error: err?.message || 'Execution failed' });
+    if (!ac.signal.aborted) {
+      send('error', { error: err?.message || 'Execution failed' });
+    }
   }
-  res.end();
+  if (!res.writableEnded) res.end();
 }
 
-export function verifyWebhookSignature(secret: string, rawBody: Buffer | string, signatureHeader?: string): boolean {
-  if (!secret || !signatureHeader || !signatureHeader.startsWith('sha256=')) return false;
-  const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
-  const a = Buffer.from(signatureHeader);
-  const b = Buffer.from(expected);
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
+export function verifyWebhookSignature(
+  secret: string,
+  rawBody: Buffer | string,
+  signatureHeader?: string,
+  tokenHeaderOrQuery?: string
+): boolean {
+  if (!secret) return false;
+
+  // 1. GitHub HMAC-SHA256: x-hub-signature-256: sha256=...
+  if (signatureHeader && signatureHeader.startsWith('sha256=')) {
+    const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
+    const a = Buffer.from(signatureHeader);
+    const b = Buffer.from(expected);
+    if (a.length === b.length && crypto.timingSafeEqual(a, b)) {
+      return true;
+    }
+  }
+
+  // 2. GitLab token (x-gitlab-token) or query / payload token (?token=...)
+  const tokenCandidate = tokenHeaderOrQuery || (!signatureHeader?.startsWith('sha256=') ? signatureHeader : undefined);
+  if (tokenCandidate) {
+    const a = Buffer.from(tokenCandidate);
+    const b = Buffer.from(secret);
+    if (a.length === b.length && crypto.timingSafeEqual(a, b)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 export function handleDeployWebhook(
@@ -134,12 +167,13 @@ export function handleDeployWebhook(
   appName: string,
   rawBody: Buffer | string,
   body: any,
-  signatureHeader?: string
+  signatureHeader?: string,
+  gitlabTokenOrQueryToken?: string
 ): { status: number; payload: any } {
   const cfg = getDeployConfig(serverId, appName);
   if (!cfg) return { status: 404, payload: { error: 'Deploy configuration not found' } };
 
-  if (!verifyWebhookSignature(cfg.webhookSecret, rawBody, signatureHeader)) {
+  if (!verifyWebhookSignature(cfg.webhookSecret, rawBody, signatureHeader, gitlabTokenOrQueryToken)) {
     return { status: 401, payload: { error: 'Invalid webhook signature' } };
   }
 

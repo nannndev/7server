@@ -4,7 +4,9 @@ import path from 'path';
 import express from 'express';
 import cors from 'cors';
 import { config } from './config.js';
-import { loginHandler, requireAuth } from './http/auth.js';
+import { securityHeadersMiddleware } from './http/securityHeaders.js';
+import { csrfOriginCheck } from './http/csrf.js';
+import { loginHandler, loginTotpHandler, requireAuth } from './http/auth.js';
 import { needsSetup, setupNeedsCode, completeSetup } from './modules/users/setup.js';
 import { auditMiddleware } from './http/audit.js';
 import { errorHandler } from './http/errors.js';
@@ -39,6 +41,12 @@ export function createApp() {
   // (taken from X-Forwarded-For only when the hop that sent it is a listed proxy).
   if (config.trustProxy) app.set('trust proxy', config.trustProxy.split(',').map((s) => s.trim()).filter(Boolean));
 
+  // Security headers (CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, HSTS)
+  app.use(securityHeadersMiddleware);
+
+  // CSRF protection for cookie-based state modifying requests
+  app.use(csrfOriginCheck);
+
   // Same-origin via Vite proxy; set CORS_ORIGIN only if the UI is served elsewhere.
   if (config.corsOrigin) app.use(cors({ origin: config.corsOrigin }));
   app.use(express.json({ limit: '5mb', verify: (req: any, _res, buf) => { req.rawBody = buf; } }));
@@ -49,6 +57,7 @@ export function createApp() {
   app.use('/api', deployWebhookRoutes);
 
   app.post('/api/login', loginHandler);
+  app.post('/api/login/totp', loginTotpHandler);
   // First run: no user exists yet -> the UI shows "create admin" (see modules/users/setup.ts).
   app.get('/api/setup', (req, res) => res.json({ needsSetup: needsSetup(), needsCode: needsSetup() && setupNeedsCode(req.ip || req.socket.remoteAddress || '') }));
   app.post('/api/setup', async (req, res) => {

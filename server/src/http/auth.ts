@@ -10,12 +10,23 @@ import {
   touchSession,
   getUserByUsername
 } from '../modules/users/store.js';
-import { loginService } from '../modules/users/service.js';
+import { loginService, verifyMfaLoginService } from '../modules/users/service.js';
 import { 
   AuthContextUser, 
   Permission, 
   ROLE_PERMISSIONS 
 } from '../modules/users/types.js';
+import { 
+  checkRateLimit, 
+  recordFailure, 
+  clearRateLimit 
+} from './rateLimiter.js';
+import { 
+  SESSION_COOKIE_NAME, 
+  setSessionCookie, 
+  clearSessionCookie, 
+  parseCookies 
+} from './cookies.js';
 
 declare global {
   namespace Express {
@@ -50,27 +61,35 @@ export function safeEqual(a: string, b: string): boolean {
   return crypto.timingSafeEqual(ha, hb);
 }
 
-const loginAttempts = new Map<string, { count: number; until: number }>();
+let warnedMissingTrustProxy = false;
 
 export async function loginHandler(req: Request, res: Response) {
-  const ip = req.ip || 'unknown';
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
   const username = String(req.body?.username || 'admin').trim().toLowerCase();
-  const rateLimitKey = `${ip}:${username}`;
 
-  let att = loginAttempts.get(rateLimitKey) || loginAttempts.get(ip);
-  if (att && att.until > Date.now()) {
-    const remainingSec = Math.ceil((att.until - Date.now()) / 1000);
+  // Warn operators running behind reverse proxies if TRUST_PROXY is omitted
+  if (!config.trustProxy && (req.headers['x-forwarded-for'] || req.headers['x-real-ip']) && !warnedMissingTrustProxy) {
+    warnedMissingTrustProxy = true;
+    console.warn(
+      '[security] Received X-Forwarded-For header but TRUST_PROXY is not configured! ' +
+      'Set TRUST_PROXY=loopback (or reverse proxy IP) in environment to avoid all clients sharing 127.0.0.1 rate limits.'
+    );
+  }
+
+  const userKey = `user:${ip}:${username}`;
+  const ipKey = `ip:${ip}`;
+
+  // Check rate limit: user+ip limit or broad IP limit
+  const lockedUserSec = checkRateLimit(userKey);
+  const lockedIpSec = checkRateLimit(ipKey);
+  const lockSec = Math.max(lockedUserSec, lockedIpSec);
+
+  if (lockSec > 0) {
     return res.status(429).json({
       success: false,
-      error: `Terlalu banyak percobaan login, silakan tunggu ${remainingSec} detik`
+      code: 'RATE_LIMITED',
+      error: `Terlalu banyak percobaan login, silakan tunggu ${lockSec} detik`
     });
-  }
-  // An expired lock means the penalty was served: start the count fresh,
-  // otherwise one more typo re-locks for another 60s forever.
-  if (att && att.until > 0 && att.until <= Date.now()) {
-    loginAttempts.delete(rateLimitKey);
-    loginAttempts.delete(ip);
-    att = undefined;
   }
 
   try {
@@ -81,8 +100,20 @@ export async function loginHandler(req: Request, res: Response) {
       userAgent: req.headers['user-agent'] || 'unknown'
     });
 
-    loginAttempts.delete(rateLimitKey);
-    loginAttempts.delete(ip);
+    if (result.requiresMfa) {
+      return res.json({
+        success: true,
+        requiresMfa: true,
+        mfaTicket: result.mfaTicket,
+        user: result.user
+      });
+    }
+
+    clearRateLimit(userKey);
+    clearRateLimit(ipKey);
+
+    // Set secure HttpOnly cookie for browser sessions
+    setSessionCookie(req, res, result.token);
 
     res.json({
       success: true,
@@ -92,19 +123,76 @@ export async function loginHandler(req: Request, res: Response) {
       session: result.session
     });
   } catch (err: any) {
-    const count = (att?.count || 0) + 1;
-    const lockDuration = count >= 5 ? 60000 : 0;
-    loginAttempts.set(rateLimitKey, { count, until: lockDuration ? Date.now() + lockDuration : 0 });
-    loginAttempts.set(ip, { count, until: lockDuration ? Date.now() + lockDuration : 0 });
+    recordFailure(userKey);
+    recordFailure(ipKey);
 
-    const status = err.message.includes('dinonaktifkan') ? 403 : 401;
-    res.status(status).json({ success: false, error: err.message || 'Login gagal' });
+    const isAccountDisabled = err.code === 'ACCOUNT_DISABLED' || err.message?.includes('dinonaktifkan');
+    const status = isAccountDisabled ? 403 : 401;
+    res.status(status).json({
+      success: false,
+      code: isAccountDisabled ? 'ACCOUNT_DISABLED' : 'INVALID_CREDENTIALS',
+      error: err.message || 'Login gagal'
+    });
+  }
+}
+
+export async function loginTotpHandler(req: Request, res: Response) {
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  const mfaTicket = String(req.body?.mfaTicket || '').trim();
+  const code = String(req.body?.code || '').trim();
+
+  const ipKey = `ip:${ip}`;
+  const mfaKey = `mfa:${ip}`;
+
+  const lockedSec = checkRateLimit(mfaKey);
+  if (lockedSec > 0) {
+    return res.status(429).json({
+      success: false,
+      code: 'RATE_LIMITED',
+      error: `Terlalu banyak percobaan 2FA, silakan tunggu ${lockedSec} detik`
+    });
+  }
+
+  try {
+    const result = await verifyMfaLoginService({
+      mfaTicket,
+      code,
+      ip,
+      userAgent: req.headers['user-agent'] || 'unknown'
+    });
+
+    clearRateLimit(mfaKey);
+    clearRateLimit(ipKey);
+
+    setSessionCookie(req, res, result.token);
+
+    res.json({
+      success: true,
+      token: result.token,
+      user: result.user,
+      permissions: result.permissions,
+      session: result.session
+    });
+  } catch (err: any) {
+    recordFailure(mfaKey);
+    res.status(401).json({
+      success: false,
+      code: 'INVALID_2FA',
+      error: err.message || 'Verifikasi 2FA gagal'
+    });
   }
 }
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
+  // Hybrid authentication: Check Authorization header first, then fallback to HttpOnly session cookie
   const header = req.headers.authorization || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : '';
+  let token = header.startsWith('Bearer ') ? header.slice(7) : '';
+
+  if (!token && req.headers.cookie) {
+    const cookies = parseCookies(req.headers.cookie);
+    token = cookies[SESSION_COOKIE_NAME] || '';
+  }
+
   if (!token) {
     return res.status(401).json({ success: false, error: 'Unauthorized: Token diperlukan' });
   }
