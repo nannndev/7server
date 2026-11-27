@@ -147,11 +147,9 @@ if [ -n "$COMPOSE_FILE" ]; then
   [ -f .env ] && COMPOSE_ENV_FLAG="--env-file .env"
   COMPOSE_OVERRIDE_FLAG=""
   [ -f .7server-compose.override.yml ] && COMPOSE_OVERRIDE_FLAG="-f .7server-compose.override.yml"
-  # Replace deprecated / blocked quay.io MinIO images with public working images
-  sed -i 's|quay.io/minio/minio:latest|cgr.dev/chainguard/minio:latest|g' "$COMPOSE_FILE" 2>/dev/null || true
-  sed -i 's|quay.io/minio/minio|cgr.dev/chainguard/minio:latest|g' "$COMPOSE_FILE" 2>/dev/null || true
-  sed -i 's|quay.io/minio/mc:latest|cgr.dev/chainguard/minio-client:latest|g' "$COMPOSE_FILE" 2>/dev/null || true
-  sed -i 's|quay.io/minio/mc|cgr.dev/chainguard/minio-client:latest|g' "$COMPOSE_FILE" 2>/dev/null || true
+  # Replace deprecated / removed MinIO images (quay.io and Docker Hub) with public working images
+  sed -i -E 's#^([[:space:]]*image:[[:space:]]*["'"'"']?)(quay\\.io/|docker\\.io/)?minio/minio(:[^"'"'"'[:space:]]*)?(["'"'"']?)#\\1cgr.dev/chainguard/minio:latest\\4#g' "$COMPOSE_FILE" 2>/dev/null || true
+  sed -i -E 's#^([[:space:]]*image:[[:space:]]*["'"'"']?)(quay\\.io/|docker\\.io/)?minio/mc(:[^"'"'"'[:space:]]*)?(["'"'"']?)#\\1cgr.dev/chainguard/minio-client:latest\\4#g' "$COMPOSE_FILE" 2>/dev/null || true
 
   # Ensure data directories exist with write access for unprivileged container users (opensearch UID 1000, postgres UID 999, etc.)
   mkdir -p data/credentials data/opensearch data/postgres data/redis data/minio data/rabbitmq 2>/dev/null || true
@@ -306,35 +304,77 @@ if [ -n "$COMPOSE_FILE" ]; then
     ' "$COMPOSE_FILE" "${s.port}" "${bindPrefix}" "$USED_PORTS" ${sq(s.appName)} 2>/dev/null || true
   fi
   export HOST=0.0.0.0
-  if (grep -qE '^[[:space:]]*profiles:' "$COMPOSE_FILE" 2>/dev/null || true); then
-    export COMPOSE_PROFILES="*"
+  # Only activate compose profiles automatically if the compose file defines NO default (unprofiled) services.
+  # Otherwise optional/dev profiles (e.g. devtools, minio, seaweedfs, test) would be pulled and started unintentionally.
+  if [ -z "\${COMPOSE_PROFILES:-}" ] && (grep -qE '^[[:space:]]*profiles:' "$COMPOSE_FILE" 2>/dev/null || true); then
+    DEFAULT_SVCS=$(docker compose -p ${name} -f "$COMPOSE_FILE" \${COMPOSE_OVERRIDE_FLAG} \${COMPOSE_ENV_FLAG} config --services 2>/dev/null || true)
+    if [ -z "$DEFAULT_SVCS" ]; then
+      if grep -qE '^[[:space:]]*-[[:space:]]*["'"'"']?(prod|production)["'"'"']?[[:space:]]*$|profiles:[[:space:]]*\\[[^]]*(prod|production)' "$COMPOSE_FILE" 2>/dev/null; then
+        export COMPOSE_PROFILES="prod,production"
+      else
+        export COMPOSE_PROFILES="*"
+      fi
+    fi
   fi
   if ! docker compose -p ${name} -f "$COMPOSE_FILE" \${COMPOSE_OVERRIDE_FLAG} \${COMPOSE_ENV_FLAG} up -d --build; then
     echo "Docker compose up encountered an error. Collecting container logs..."
     docker compose -p ${name} -f "$COMPOSE_FILE" \${COMPOSE_OVERRIDE_FLAG} \${COMPOSE_ENV_FLAG} ps -a 2>/dev/null || true
     docker compose -p ${name} -f "$COMPOSE_FILE" \${COMPOSE_OVERRIDE_FLAG} \${COMPOSE_ENV_FLAG} logs --tail 35 --no-color 2>&1 || true
     for cn in $( (grep -E '^[[:space:]]*container_name:' "$COMPOSE_FILE" 2>/dev/null || true) | awk '{gsub(/[\\x22\\x27]/, ""); print $NF}'); do
-      echo "=== Container logs for $cn ==="
-      docker logs --tail 30 "$cn" 2>&1 || true
+      if docker container inspect "$cn" >/dev/null 2>&1; then
+        echo "=== Container logs for $cn ==="
+        docker logs --tail 30 "$cn" 2>&1 || true
+      fi
     done
     exit 1
   fi
 else
   TARGET_FLAG=""
-  if [ -f "Dockerfile" ]; then
-    for st in app production runner runtime web server main prod; do
-      if grep -iqE "^FROM\\s+.*\\s+AS\\s+\${st}\\s*$" "Dockerfile"; then
-        TARGET_FLAG="--target \${st}"
-        break
-      fi
-    done
+  # Support Nixpacks build engine or fallback
+  USE_NIXPACKS=0
+  if [ "${s.engine}" = "nixpacks" ] || { [ ! -f "Dockerfile" ] && [ ! -f "docker-compose.yml" ] && [ ! -f "compose.yml" ]; }; then
+    if command -v nixpacks >/dev/null 2>&1; then
+      USE_NIXPACKS=1
+    elif command -v npx >/dev/null 2>&1; then
+      USE_NIXPACKS=2
+    fi
   fi
-  if ! docker build \${TARGET_FLAG} --build-arg PORT=${s.port} -t ${name} .; then
-    if [ "$PWD" != ${sq(appDir)} ] && [ -f "$PWD/Dockerfile" ]; then
-      echo "Retrying Docker build using monorepo root context (${appDir})..."
-      docker build \${TARGET_FLAG} --build-arg PORT=${s.port} -t ${name} -f "$PWD/Dockerfile" ${sq(appDir)}
-    else
-      exit 1
+
+  if [ "$USE_NIXPACKS" = "1" ]; then
+    echo "Building container image with Nixpacks..."
+    nixpacks build . --name ${name}
+  elif [ "$USE_NIXPACKS" = "2" ]; then
+    echo "Building container image with Nixpacks (via npx)..."
+    npx -y nixpacks build . --name ${name}
+  else
+    if [ ! -f "Dockerfile" ]; then
+      echo "No Dockerfile found. Generating standard Dockerfile..."
+      cat << 'EOF_DOCKERFILE' > Dockerfile
+FROM node:20-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm install --production 2>/dev/null || npm install 2>/dev/null || true
+COPY . .
+ENV PORT=${s.port}
+EXPOSE ${s.port}
+CMD ["npm", "start"]
+EOF_DOCKERFILE
+    fi
+    if [ -f "Dockerfile" ]; then
+      for st in app production runner runtime web server main prod; do
+        if grep -iqE "^FROM\\s+.*\\s+AS\\s+\${st}\\s*$" "Dockerfile"; then
+          TARGET_FLAG="--target \${st}"
+          break
+        fi
+      done
+    fi
+    if ! docker build \${TARGET_FLAG} --build-arg PORT=${s.port} -t ${name} .; then
+      if [ "$PWD" != ${sq(appDir)} ] && [ -f "$PWD/Dockerfile" ]; then
+        echo "Retrying Docker build using monorepo root context (${appDir})..."
+        docker build \${TARGET_FLAG} --build-arg PORT=${s.port} -t ${name} -f "$PWD/Dockerfile" ${sq(appDir)}
+      else
+        exit 1
+      fi
     fi
   fi
 

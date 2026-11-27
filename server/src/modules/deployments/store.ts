@@ -88,7 +88,7 @@ export function saveDeployConfig(
       patch.regenerateWebhook || !existing?.webhookSecret
         ? crypto.randomBytes(24).toString('hex')
         : existing.webhookSecret,
-    autoDeploy: patch.autoDeploy !== undefined ? patch.autoDeploy : existing?.autoDeploy ?? false,
+    autoDeploy: patch.autoDeploy !== undefined ? patch.autoDeploy : spec.autoDeploy !== undefined ? spec.autoDeploy : existing?.autoDeploy ?? false,
     lastDeployAt: patch.lastDeployAt ?? existing?.lastDeployAt,
     lastCommit: patch.lastCommit ?? existing?.lastCommit,
     lastStatus: patch.lastStatus ?? existing?.lastStatus,

@@ -4,7 +4,8 @@ import {
   getSafeUsers, 
   createUser, 
   updateUser, 
-  deleteUser 
+  deleteUser,
+  getUserById
 } from './store.js';
 import { 
   changePasswordService, 
@@ -33,7 +34,8 @@ usersRoutes.get('/auth/me', (req: Request, res: Response) => {
         username: req.user.username,
         role: req.user.role,
         servers: req.user.servers,
-        permissions: req.user.permissions
+        permissions: req.user.permissions,
+        totpEnabled: Boolean(getUserById(req.user.id)?.totpEnabled)
       },
       sessionId: req.user.sessionId
     }

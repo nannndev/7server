@@ -710,6 +710,58 @@ export async function inspectGitHubRepo(
 }
 
 
+export async function createGitHubRepoWebhook(
+  accessToken: string,
+  owner: string,
+  repo: string,
+  webhookUrl: string,
+  secret: string
+): Promise<{ id?: number; url?: string; alreadyExists?: boolean }> {
+  const url = `${GITHUB_API_BASE}/repos/${owner}/${repo}/hooks`;
+  const body = {
+    name: 'web',
+    active: true,
+    events: ['push'],
+    config: {
+      url: webhookUrl,
+      content_type: 'json',
+      secret,
+      insecure_ssl: '0'
+    }
+  };
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      ...ghHeaders(accessToken),
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (res.status === 201) {
+    const data = (await res.json()) as any;
+    return { id: data.id, url: data.url };
+  }
+
+  const errData = await res.json().catch(() => ({}));
+  const isAlreadyExists =
+    res.status === 422 ||
+    (Array.isArray(errData?.errors) &&
+      errData.errors.some((e: any) =>
+        typeof e?.message === 'string' && /hook already exists/i.test(e.message)
+      )) ||
+    (typeof errData?.message === 'string' && /hook already exists/i.test(errData.message));
+
+  if (isAlreadyExists) {
+    return { alreadyExists: true };
+  }
+
+  throw new Error(
+    `Failed to create GitHub repo webhook: ${res.status} ${errData?.message || res.statusText}`
+  );
+}
+
 /** "^22.11.0 || >=24" -> 22, ">=18" -> 18, "v20.10" -> 20, "lts/*" -> undefined. Lowest major any range allows. */
 export function minNodeMajor(spec: string | null | undefined): number | undefined {
   const majors = [...String(spec || '').matchAll(/(?:^|[\s|^~>=v])(\d{1,2})(?=[.\sx*]|$)/g)].map((m) => Number(m[1])).filter((n) => n >= 4);

@@ -58,4 +58,19 @@ export async function saveAppEnv(serverId: string, appName: string, content: str
   return unwrap(res, 'Failed to save .env');
 }
 
+export async function setupGitHubAutoDeployWebhook(
+  serverId: string,
+  appName: string,
+  owner: string,
+  repo: string,
+  webhookUrl?: string
+): Promise<{ success: boolean; message?: string; alreadyExists?: boolean; webhookUrl?: string }> {
+  const res = await apiFetch(`${API_BASE}/git/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/webhook`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ serverId, appName, webhookUrl })
+  });
+  return unwrap(res, 'Gagal mengonfigurasi webhook GitHub');
+}
+
 export { jsonPost };

@@ -293,7 +293,8 @@ export async function executeSoftwareScript(
   script: string,
   sudoPasswordOverride?: string,
   onChunk?: (chunk: string, isStderr: boolean) => void,
-  timeoutMs = 300000
+  timeoutMs = 300000,
+  signal?: AbortSignal
 ): Promise<{ ok: boolean; exitCode: number; output: string; durationMs: number; sudoRequired?: boolean }> {
   if (!script || !script.trim()) {
     throw new Error('Script cannot be empty');
@@ -309,20 +310,33 @@ export async function executeSoftwareScript(
   const wrapper = wrapScript(script, remoteFile);
 
   const wrappedCmd = `export __7SERVER_HAS_SUDO_PASS=${hasSudoPass ? '1' : ''}\n${wrapper}`;
-  const r = onChunk
-    ? await executeCommandStream(
-        target,
-        wrappedCmd,
-        onChunk,
-        timeoutMs,
-        hasSudoPass ? { stdin: `${sudoPass}\n` } : {}
-      )
-    : await executeCommand(
-        target,
-        wrappedCmd,
-        timeoutMs,
-        hasSudoPass ? { stdin: `${sudoPass}\n` } : {}
-      );
+  let r;
+  try {
+    r = onChunk
+      ? await executeCommandStream(
+          target,
+          wrappedCmd,
+          onChunk,
+          timeoutMs,
+          { ...(hasSudoPass ? { stdin: `${sudoPass}\n` } : {}), signal }
+        )
+      : await executeCommand(
+          target,
+          wrappedCmd,
+          timeoutMs,
+          hasSudoPass ? { stdin: `${sudoPass}\n` } : {}
+        );
+  } catch (err: any) {
+    if (signal?.aborted || err?.name === 'AbortError') {
+      // Best-effort remote kill so child processes (docker compose / build) don't keep running on the VPS.
+      const killScript = `for pid in $(pgrep -f ${remoteFile} 2>/dev/null || true); do pkill -TERM -P "$pid" 2>/dev/null || true; kill -TERM "$pid" 2>/dev/null || true; done; rm -f ${remoteFile}`;
+      const killCmd = hasSudoPass
+        ? `sudo -S -p '' bash -c '${killScript}' 2>/dev/null || bash -c '${killScript}'`
+        : `(sudo -n bash -c '${killScript}' 2>/dev/null || bash -c '${killScript}')`;
+      executeCommand(target, killCmd, 10000, hasSudoPass ? { stdin: `${sudoPass}\n` } : {}).catch(() => {});
+    }
+    throw err;
+  }
 
   const combined = `${r.stdout || ''}${r.stderr ? `\n${r.stderr}` : ''}`;
   const isSudoRequired = combined.includes('__7SERVER_SUDO_REQUIRED__');

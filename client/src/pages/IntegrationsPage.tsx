@@ -52,7 +52,7 @@ export default function IntegrationsPage() {
         fetchCloudflareIntegration().catch(() => ({ connected: false, zones: [] }))
       ]);
       setIntegrations(ints);
-      setCf(cfData);
+      setCf(cfData ?? { connected: false, zones: [] });
     } catch (err: any) {
       toast.error(err.message || t('integrations.loadFailed'));
     } finally {

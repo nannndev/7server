@@ -11,7 +11,8 @@ import {
   Check,
   Trash2,
   Maximize2,
-  Minimize2
+  Minimize2,
+  Square
 } from 'lucide-react';
 import { useTaskManager } from './TaskContext';
 import { Button } from '@/shared/ui/button';
@@ -25,7 +26,8 @@ export function BackgroundTasksWidget() {
     setIsDrawerOpen,
     selectedTaskId,
     setSelectedTaskId,
-    clearFinishedTasks
+    clearFinishedTasks,
+    cancelTask
   } = useTaskManager();
 
   const [copied, setCopied] = useState(false);
@@ -229,6 +231,18 @@ export function BackgroundTasksWidget() {
                   </div>
 
                   <div className="flex items-center gap-2">
+                    {selectedTask.status === 'running' && (
+                      <button
+                        type="button"
+                        onClick={() => cancelTask(selectedTask.id)}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-red-500 hover:bg-red-500/10 border border-red-500/30 transition cursor-pointer"
+                        title="Cancel running task"
+                      >
+                        <Square className="w-2.5 h-2.5 fill-current" />
+                        <span>Cancel</span>
+                      </button>
+                    )}
+
                     <label className="flex items-center gap-1.5 cursor-pointer text-[10px] text-[var(--muted-foreground)] select-none">
                       <input
                         type="checkbox"

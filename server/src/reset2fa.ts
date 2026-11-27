@@ -13,8 +13,7 @@ const users = getUsers();
 if (!users.length) fail('No accounts exist yet.');
 
 const name = (process.argv[2] || 'admin').trim().toLowerCase();
-const user = getUserByUsername(name);
-if (!user) fail(`No user "${name}". Existing: ${users.map((u) => u.username).join(', ')}`);
+const user = getUserByUsername(name) ?? fail(`No user "${name}". Existing: ${users.map((u) => u.username).join(', ')}`);
 
 if (!user.totpEnabled) {
   console.log(`  ℹ 2FA is already disabled for user "${user.username}".`);

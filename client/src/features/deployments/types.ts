@@ -1,3 +1,5 @@
+export type DeployEngine = 'docker' | 'nixpacks' | 'native_node' | 'native_php' | 'native_python' | 'native_go' | 'static';
+
 export interface WebAppInfo {
   name: string;
   path: string;

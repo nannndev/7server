@@ -41,16 +41,23 @@ export async function runScript(t: ServerCredentials, req: Request, res: Respons
     'Connection': 'keep-alive',
     'X-Accel-Buffering': 'no'
   });
+  const ac = new AbortController();
+  res.on('close', () => {
+    if (!res.writableEnded) ac.abort();
+  });
   const send = (type: string, payload: any) => {
+    if (res.writableEnded || ac.signal.aborted) return;
     res.write(`data: ${JSON.stringify({ type, ...payload })}\n\n`);
     if (typeof (res as any).flush === 'function') (res as any).flush();
   };
   try {
-    send('done', await executeSoftwareScript(t, script, sudoPassword, (chunk) => send('chunk', { chunk }), timeoutMs));
+    send('done', await executeSoftwareScript(t, script, sudoPassword, (chunk) => send('chunk', { chunk }), timeoutMs, ac.signal));
   } catch (err: any) {
-    send('error', { error: err.message || 'Execution failed' });
+    if (!ac.signal.aborted) {
+      send('error', { error: err.message || 'Execution failed' });
+    }
   }
-  res.end();
+  if (!res.writableEnded) res.end();
 }
 
 // Log template setup execution into Audit log

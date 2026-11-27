@@ -50,7 +50,7 @@ export interface NormalizedRepo {
   };
 }
 
-export type DetectedEngine = 'docker' | 'native_node' | 'native_php' | 'native_python' | 'native_go' | 'static';
+export type DetectedEngine = 'docker' | 'nixpacks' | 'native_node' | 'native_php' | 'native_python' | 'native_go' | 'static';
 
 export interface SuggestedConfig {
   root_dir: string;

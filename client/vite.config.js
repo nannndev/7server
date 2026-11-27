@@ -12,7 +12,8 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'http://localhost:5001',
-        changeOrigin: true
+        // Keep original Host header so it matches browser Origin for backend CSRF checks.
+        changeOrigin: false
       },
       '/ws': {
         target: 'ws://localhost:5001',

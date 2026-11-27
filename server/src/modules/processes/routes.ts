@@ -27,7 +27,14 @@ deployWebhookRoutes.post('/webhooks/deploy/:serverId/:appName', (req: Request, r
   const appName = String(req.params.appName || '');
   const rawBody = (req as any).rawBody || JSON.stringify(req.body || {});
   const sig = typeof req.headers['x-hub-signature-256'] === 'string' ? req.headers['x-hub-signature-256'] : undefined;
-  const result = handleDeployWebhook(serverId, appName, rawBody, req.body, sig);
+  const token = (typeof req.headers['x-gitlab-token'] === 'string'
+    ? req.headers['x-gitlab-token']
+    : typeof req.query.token === 'string'
+    ? req.query.token
+    : typeof req.body?.token === 'string'
+    ? req.body.token
+    : undefined);
+  const result = handleDeployWebhook(serverId, appName, rawBody, req.body, sig, token);
   res.status(result.status).json(result.payload);
 });
 

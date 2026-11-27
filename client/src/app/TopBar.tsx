@@ -3,7 +3,7 @@ import React, { useRef, useState } from 'react';
 import {
   Plus, Terminal, RefreshCw, Download, Upload, LogOut, Settings2,
   Menu, ChevronRight, Eye, EyeOff, Sparkles, User, Users,
-  KeyRound, Shield, ShieldAlert, ChevronDown, BookOpen
+  KeyRound, Shield, ShieldAlert, ShieldCheck, ChevronDown, BookOpen
 } from 'lucide-react';
 import { usePrivacy } from '@/shared/hooks/usePrivacy';
 import { useAuth, useCan } from '@/features/auth/AuthContext';
@@ -39,6 +39,7 @@ interface TopBarProps {
   onOpenUsers?: () => void;
   onOpenSessions?: () => void;
   onOpenChangePassword?: () => void;
+  onOpenTwoFactor?: () => void;
   versionInfo?: VersionInfo | null;
   versionChecking?: boolean;
   onCheckVersion?: (force?: boolean) => void;
@@ -68,6 +69,7 @@ export default function TopBar({
   onOpenUsers,
   onOpenSessions,
   onOpenChangePassword,
+  onOpenTwoFactor,
   versionInfo,
   versionChecking,
   onCheckVersion,
@@ -466,6 +468,20 @@ export default function TopBar({
                     >
                       <KeyRound className="w-3.5 h-3.5 text-amber-500" />
                       <span>{t('top.changePassword')}</span>
+                    </button>
+                  )}
+
+                  {onOpenTwoFactor && (
+                    <button
+                      onClick={() => {
+                        setShowUserMenu(false);
+                        onOpenTwoFactor();
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left hover:bg-[var(--muted)] transition"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                      <span>{t('top.twoFactor')}</span>
+                      {user.totpEnabled && <span className="ml-auto text-[10px] text-emerald-500">ON</span>}
                     </button>
                   )}
 

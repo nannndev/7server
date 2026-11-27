@@ -18,23 +18,23 @@ const wrap = (fn: (req: Request, res: Response) => Promise<void>) =>
   (req: Request, res: Response, next: NextFunction) => fn(req, res).catch(next);
 
 cloudflareRoutes.get('/integrations/cloudflare', (_req, res) => {
-  res.json(getSafeCloudflareIntegration());
+  res.json({ success: true, data: getSafeCloudflareIntegration() });
 });
 
 cloudflareRoutes.post('/integrations/cloudflare/token', need('service.control'), wrap(async (req, res) => {
   const token = typeof req.body?.token === 'string' ? req.body.token : '';
   const saved = await verifyAndSaveCloudflareToken(token);
-  res.json(saved);
+  res.json({ success: true, data: saved });
 }));
 
 cloudflareRoutes.post('/integrations/cloudflare/sync', need('service.control'), wrap(async (_req, res) => {
   const updated = await syncCloudflareZones();
-  res.json(updated);
+  res.json({ success: true, data: updated });
 }));
 
 cloudflareRoutes.delete('/integrations/cloudflare', need('service.control'), (_req, res) => {
   deleteCloudflareIntegration();
-  res.json({ ok: true });
+  res.json({ success: true, data: { ok: true } });
 });
 
 cloudflareRoutes.post('/integrations/cloudflare/action', (req, res, next) => {
@@ -49,7 +49,7 @@ cloudflareRoutes.post('/integrations/cloudflare/action', (req, res, next) => {
 
   const run = () => {
     executeCloudflareAction(payload)
-      .then((result) => res.json({ ok: true, action: payload.action, result }))
+      .then((result) => res.json({ success: true, data: { ok: true, action: payload.action, result } }))
       .catch(next);
   };
 

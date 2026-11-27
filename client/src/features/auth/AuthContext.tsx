@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { getToken, setToken } from '@/shared/api/client';
-import { fetchMe, login as apiLogin, logoutApi } from './api';
+import { fetchMe, login as apiLogin, logoutApi, verifyMfaLogin } from './api';
 import type { AuthUser, Permission } from './types';
 
 interface AuthContextType {
@@ -8,7 +8,9 @@ interface AuthContextType {
   loading: boolean;
   can: (permission: Permission) => boolean;
   canAccessServer: (serverId: string) => boolean;
-  login: (password: string, username?: string) => Promise<void>;
+  /** Resolves to an MFA ticket when the account needs a 2FA code, otherwise null. */
+  login: (password: string, username?: string) => Promise<string | null>;
+  verifyMfa: (mfaTicket: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -43,6 +45,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (password: string, username = 'admin') => {
     const res = await apiLogin(password, username);
+    if ('requiresMfa' in res) return res.mfaTicket;
+    setUser(res.user);
+    return null;
+  };
+
+  const verifyMfa = async (mfaTicket: string, code: string) => {
+    const res = await verifyMfaLogin(mfaTicket, code);
     setUser(res.user);
   };
 
@@ -74,6 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         can,
         canAccessServer,
         login,
+        verifyMfa,
         logout,
         refreshUser
       }}
