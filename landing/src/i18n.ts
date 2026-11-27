@@ -131,8 +131,8 @@ export const COPY = {
           title: 'Deploy Git apps, point domains or tunnels, and control Docker',
           summary: 'Connect a GitHub Personal Access Token to auto-discover repositories, branches, and monorepo root folders, point domains or zero-trust tunnels in 1 click, or manage containers, Nginx SSL, databases, and SFTP files.',
           details: [
-            'Full-width Git Deployment Studio with framework preset detection, custom healthcheck paths, post-deploy hooks, and Auto-SSL',
-            '1-Click Redeploy, Deploy History & instant Commit Rollback, GitHub Push Auto-Deploy Webhooks, Live App Logs, and quick .env Editor',
+            'Full-width Git Deployment Studio with framework & Nixpacks auto-build, custom healthcheck paths, live cancel, and Auto-SSL',
+            '1-Click Redeploy, Deploy History & instant Commit Rollback, 1-click GitHub Auto-Deploy Webhooks, Live App Logs, and quick .env Editor',
             'Smart pointing: 1-click Nginx virtual hosts with DNS pre-flight checks on public VPS, or Cloudflare Tunnels behind NAT',
             'Start, stop, restart, and inspect logs for Docker containers, systemd services, and PM2 workers',
           ],
@@ -529,7 +529,8 @@ export const COPY = {
           title: 'Deploy aplikasi Git, hubungkan domain atau tunnel, dan kelola Docker',
           summary: 'Hubungkan GitHub Personal Access Token untuk auto-discovery repositori, branch, dan subfolder monorepo, hubungkan domain publik atau tunnel zero-trust dalam 1 klik, atau kelola container, SSL Nginx, database, dan file SFTP.',
           details: [
-            'Studio Deploy Git layar penuh dengan deteksi otomatis framework (Next.js, Node, Laravel, Docker, Go, Python)',
+            'Studio Deploy Git layar penuh dengan deteksi framework & Nixpacks auto-build, live cancel, custom healthcheck, dan Auto-SSL',
+            '1-Click Redeploy, Riwayat Deploy & Commit Rollback instan, 1-click GitHub Auto-Deploy Webhook, Live App Logs, dan editor .env cepat',
             'Smart domain pointing: pembuatan VirtualHost Nginx dengan pengecekan DNS pre-flight pada IP publik, atau Cloudflare Tunnel otomatis pada jaringan privat/NAT',
             'Start, stop, restart, dan pantau log untuk Docker container, layanan systemd, dan worker PM2',
             'Terminal browser xterm.js multi-tab lengkap dengan tombol pintasan perintah cepat',

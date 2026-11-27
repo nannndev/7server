@@ -224,9 +224,21 @@ interface ReleaseEntry {
 
 const RELEASES: ReleaseEntry[] = [
   {
+    version: 'v0.5.0',
+    date: '2026-11-27',
+    tag: 'Latest Release',
+    title: 'Security Hardening (TOTP 2FA, CSRF & Cookie Auth), Live Deploy Cancel, Nixpacks & Windows Installer',
+    highlights: [
+      'Security Hardening & TOTP 2FA: HttpOnly cookie authentication, Origin/Host CSRF protection, progressive login rate limiting, strict CSP & security headers, single-use WebSocket terminal tickets, and TOTP 2FA setup/verification modal with CLI recovery (7server reset-2fa).',
+      'End-to-End Deploy & Task Cancellation: Cancel long-running deployments or background SSH tasks directly from the Deploy Progress bar or Operations drawer — aborts SSE streams, closes SSH sessions, and terminates remote process trees on the VPS.',
+      'Git Deployment & Docker Compose Upgrades: Nixpacks build engine fallback, 1-click GitHub Auto-Deploy Webhook registration, smarter Docker Compose profile handling (keeps optional devtools profiles off by default), Docker Hub MinIO image auto-replacement, and safer failure log inspection.',
+      'Windows Installer & Universal Update CLI: One-line Windows PowerShell installer (install.ps1, no Docker required) and unified 7server update CLI command.'
+    ]
+  },
+  {
     version: 'v0.4.0',
     date: '2026-11-16',
-    tag: 'Latest Release',
+    tag: 'Previous Release',
     title: 'Deployment Lifecycle, Cloudflare API Copilot Access, AI Gateway Controls & Multi-Channel Alerts',
     highlights: [
       'Full Deployment Lifecycle: Saved deploy configs with encrypted env vars, 1-click Redeploy, Deploy History & instant Commit Rollback, GitHub Push Auto-Deploy Webhooks (HMAC-SHA256), custom healthcheck paths, post-deploy migration hooks, Auto-SSL (Certbot), live app logs, and quick .env editor.',
@@ -285,7 +297,7 @@ export function ChangelogPage() {
     <PageShell
       eyebrow="Changelog & Releases"
       title="What's new in 7Server."
-      lead="Every release of 7Server on Docker (ghcr.io/nannndev/7server), Homebrew, and Linux VPS installer. Upgrade anytime with docker compose pull or 7server."
+      lead="Every release of 7Server on Docker (ghcr.io/nannndev/7server), Homebrew, Linux VPS installer, and Windows PowerShell. Upgrade anytime with 7server update or docker compose pull."
     >
       <div className="space-y-6">
         {RELEASES.map((rel, i) => (

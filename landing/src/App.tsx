@@ -971,13 +971,13 @@ function Security({ lang }: { lang: Lang }) {
   const items: { icon: typeof Lock; title: string; body: string }[] = lang === 'id'
     ? [
       { icon: Lock, title: 'Terenkripsi Penuh (At-Rest)', body: 'Seluruh data tersimpan dalam satu file SQLite lokal. Kredensial SSH, token Git/AI, dan webhook dienkripsi dengan AES-256-GCM menggunakan file kunci terpisah di mesin Anda.' },
-      { icon: ShieldCheck, title: 'Pengguna, Peran (RBAC) & Audit', body: 'Setiap anggota tim memiliki akun sendiri: Admin, Operator, atau Viewer, yang dapat dibatasi per VPS. Sesi login dapat dicabut kapan saja dan setiap aksi tercatat di Audit Log.' },
+      { icon: ShieldCheck, title: '2FA (TOTP), RBAC & Audit Log', body: 'Setiap akun mendukung 2FA TOTP, peran Admin/Operator/Viewer per VPS, sesi cookie HttpOnly, proteksi CSRF, rate-limit login progresif, pencabutan sesi instan, dan Audit Log lengkap.' },
       { icon: EyeOff, title: 'Mode Privasi Demo & Screencast', body: 'Sembunyikan seluruh IP server, domain, path file, dan port secara instan dengan satu tombol privasi di TopBar. Aman digunakan saat rekaman video, webinar, atau livestreaming.' },
       { icon: Sparkles, title: 'Gateway Terisolasi Jaringan Privat', body: 'AI Gateway hanya merespons localhost, jaringan privat, dan IP VPS yang telah Anda daftarkan di 7Server. Akses luar lainnya otomatis ditolak (403).' },
     ]
     : [
       { icon: Lock, title: 'Encrypted at rest', body: 'Everything lives in one SQLite file. SSH credentials, AI tokens and webhooks inside it are encrypted with AES-256-GCM, with the key kept in a separate file on your machine.' },
-      { icon: ShieldCheck, title: 'Users and roles', body: 'Each person gets an account: Admin, Operator or Viewer, optionally limited to some servers. Sessions can be revoked, and every change is written to an audit log with who did it.' },
+      { icon: ShieldCheck, title: '2FA (TOTP), RBAC & Hardening', body: 'Per-user Admin, Operator, or Viewer roles scoped by server, with TOTP 2FA, HttpOnly cookie sessions, CSRF & rate-limit protection, instant session revocation, and full audit trails.' },
       { icon: EyeOff, title: 'Privacy Mode for Screencasts', body: 'Instantly blur all server IPs, domain names, application paths, local ports, and tokens with one click in the top bar. Built for live demos, streaming, and video recording.' },
       { icon: Sparkles, title: 'Gateway stays inside', body: 'The AI gateway only answers this machine, private networks and the servers you registered. Everyone else gets 403.' },
     ];
