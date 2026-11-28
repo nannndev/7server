@@ -9,6 +9,11 @@ OUT=${1:-docs/screenshots}
 S=${SERVER_ID:?set SERVER_ID to the demo web server id}
 A=${API_SERVER_ID:-$S}  # the server whose docker CLI talks to the dind containers
 mkdir -p "$OUT"
+# The copilot robot wanders while idle; pin it to the bottom-right corner so it never covers page content.
+shot() {
+  agent-browser eval "document.querySelectorAll('div.fixed.z-40.select-none').forEach(e=>{e.style.left='';e.style.top='';e.style.right='24px';e.style.bottom='22px'}); 1" >/dev/null 2>&1 || true
+  agent-browser screenshot "$1" >/dev/null
+}
 
 # name|hash route
 PAGES=(
@@ -51,14 +56,14 @@ for theme in dark light; do
     agent-browser reload >/dev/null   # theme is read on load
     agent-browser wait 3500 >/dev/null  # SSH-backed tabs fetch live data
     [ "$name" = server-overview ] && { agent-browser find role button click --name Refresh >/dev/null 2>&1 || true; agent-browser wait 5000 >/dev/null; }
-    agent-browser screenshot "$OUT/$name-$theme.png" >/dev/null
+    shot "$OUT/$name-$theme.png"
     echo "$name-$theme"
   done
   agent-browser open "$BASE/#/servers/$S" >/dev/null; agent-browser wait 6000 >/dev/null
   # Copilot drawer over the server overview; the deploy wizard's first step (later steps need a real GitHub token).
   agent-browser find role button click --name "AI Copilot" >/dev/null 2>&1 || true
-  agent-browser wait 2000 >/dev/null; agent-browser screenshot "$OUT/copilot-$theme.png" >/dev/null
-  agent-browser open "$BASE/#/servers/$S/webapps" >/dev/null; agent-browser wait 3500 >/dev/null
+  agent-browser wait 2000 >/dev/null; shot "$OUT/copilot-$theme.png"
+  agent-browser open "$BASE/#/servers/$S/webapps" >/dev/null; agent-browser reload >/dev/null; agent-browser wait 3500 >/dev/null
   agent-browser find role button click --name "Deploy New App" >/dev/null 2>&1 || true
-  agent-browser wait 3000 >/dev/null; agent-browser screenshot "$OUT/deploy-$theme.png" >/dev/null
+  agent-browser wait 3000 >/dev/null; shot "$OUT/deploy-$theme.png"
 done
