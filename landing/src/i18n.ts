@@ -40,17 +40,17 @@ export const COPY = {
       start: 'Get started',
     },
     hero: {
-      badge: 'self-hosted · open source · agentless · vibe-code on server',
-      title: 'Run every server from one dashboard. Vibe-code directly on them.',
-      lead: '7Server connects to your servers over the SSH access you already have. Watch CPU, RAM and disk in 3D, deploy Git apps, open a browser terminal, manage Docker, Cloudflare Tunnels, Nginx, automated Let\'s Encrypt SSL with DNS pre-flight checks, cron, backups and databases, and develop or vibe-code directly on your VPS with a built-in Universal AI Gateway (27 providers + multi-account rotation) and an AI SRE Copilot that inspects first and asks before changing anything.',
+      badge: 'self-hosted · open source · agentless SSH',
+      title: 'Manage your Linux servers from one dashboard.',
+      lead: '7Server connects to your VPS over standard SSH — nothing to install on target servers. Monitor metrics, deploy Git apps, manage Docker, Nginx, databases, and a browser terminal, with an optional AI assistant that checks first and asks before changing anything.',
       ctaPrimary: 'Get started',
-      ctaSecondary: 'See how it works',
-      quickInstall: 'Quick start with npm (Node.js 22.13+)',
+      ctaSecondary: 'How it works',
+      quickInstall: 'Linux VPS one-line installer',
       starsLabel: 'GitHub Stars',
       downloadsLabel: 'npm installs',
       communityLabel: 'Discord Community',
       activeLabel: 'active servers',
-      previewCaption: 'Live preview from the self-hosted dashboard — click any tab to switch views or click the image to zoom.',
+      previewCaption: 'Screenshots from the self-hosted dashboard — switch categories or click any image to zoom.',
       heroTabs: [
         { id: 'matrix', label: '3D Fleet Matrix', image: '/screenshots/fleet-matrix.png', route: 'Fleet › Matrix 3D' },
         { id: 'overview', label: 'Node Telemetry', image: '/screenshots/server-overview.png', route: 'Fleet › prod-web-01 › Overview' },
@@ -62,8 +62,8 @@ export const COPY = {
     },
     how: {
       eyebrow: 'How it works',
-      title: 'Zero agents on your servers. Pure SSH under the hood.',
-      lead: 'Traditional monitoring tools make you install a root daemon or open extra ports on every VPS. 7Server runs on one machine you control and talks to your fleet over standard OpenSSH (port 22). Remove a server from the dashboard and zero files or processes are left behind.',
+      title: 'No agents on your servers. Just SSH.',
+      lead: 'Run 7Server on one machine you control. It connects to your servers over standard OpenSSH (port 22). Remove a server and nothing is left behind.',
       modeWorkflow: 'Interactive Workflow',
       modeBench: 'Fig 1 · Isometric SSH Probe',
       archNodes: [
@@ -174,7 +174,7 @@ export const COPY = {
       categories: [
         {
           id: 'fleet',
-          label: 'Fleet & 3D Views',
+          label: 'Fleet & 3D',
           screens: [
             {
               id: 'fleet-matrix',
@@ -207,7 +207,7 @@ export const COPY = {
         },
         {
           id: 'node',
-          label: 'Node & Topology',
+          label: 'Node',
           screens: [
             {
               id: 'server-overview',
@@ -240,7 +240,7 @@ export const COPY = {
         },
         {
           id: 'workloads',
-          label: 'Docker, Apps & Nginx',
+          label: 'Apps & Docker',
           screens: [
             {
               id: 'apps',
@@ -327,7 +327,7 @@ export const COPY = {
         },
         {
           id: 'terminal',
-          label: 'Browser Terminal',
+          label: 'Terminal',
           screens: [
             {
               id: 'web-terminal',
@@ -342,7 +342,7 @@ export const COPY = {
         },
         {
           id: 'ai',
-          label: 'AI Copilot & Gateway',
+          label: 'AI & Gateway',
           screens: [
             {
               id: 'copilot',
@@ -375,7 +375,7 @@ export const COPY = {
         },
         {
           id: 'security',
-          label: 'RBAC, Audit & Alerts',
+          label: 'Access & Alerts',
           screens: [
             {
               id: 'roles',
@@ -438,17 +438,17 @@ export const COPY = {
       start: 'Mulai Cepat',
     },
     hero: {
-      badge: 'self-hosted · open source · tanpa agen · vibe-code langsung di server',
-      title: 'Kelola semua server dari satu dashboard. Vibe-coding langsung di server.',
-      lead: '7Server terhubung ke server Anda melalui akses SSH yang sudah Anda miliki. Pantau CPU, RAM, dan disk dalam tampilan 3D, deploy aplikasi Git, buka terminal di browser, kelola Docker, Cloudflare Tunnels, Nginx, otomatisasi SSL Let\'s Encrypt dengan validasi DNS pre-flight, cron, backup, database, serta ngoding dan vibe-coding langsung di atas VPS Anda lewat Universal AI Gateway bawaan (27 provider + rotasi multi-account) dan AI SRE Copilot yang memeriksa kondisi server sebelum meminta izin perubahan.',
+      badge: 'self-hosted · open source · SSH tanpa agen',
+      title: 'Kelola semua server Linux dari satu dashboard.',
+      lead: '7Server terhubung ke VPS Anda lewat SSH standar — tanpa instal agen di server target. Pantau metrik, deploy aplikasi Git, kelola Docker, Nginx, database, dan terminal browser, lengkap dengan asisten AI opsional yang memeriksa dulu dan minta izin sebelum mengubah apa pun.',
       ctaPrimary: 'Mulai Sekarang',
-      ctaSecondary: 'Lihat Cara Kerjanya',
-      quickInstall: 'Instalasi cepat via npm (Node.js 22.13+)',
+      ctaSecondary: 'Cara Kerja',
+      quickInstall: 'Installer 1-baris untuk Linux VPS',
       starsLabel: 'Bintang GitHub',
       downloadsLabel: 'instalasi npm',
       communityLabel: 'Komunitas Discord',
       activeLabel: 'server aktif',
-      previewCaption: 'Tampilan asli dari dashboard 7Server — klik tab di atas untuk mengganti layar atau klik gambar untuk memperbesar.',
+      previewCaption: 'Tampilan asli dari dashboard 7Server — pilih kategori atau klik gambar untuk memperbesar.',
       heroTabs: [
         { id: 'matrix', label: 'Matriks 3D Fleet', image: '/screenshots/fleet-matrix.png', route: 'Fleet › Matrix 3D' },
         { id: 'overview', label: 'Telemetri Node', image: '/screenshots/server-overview.png', route: 'Fleet › prod-web-01 › Overview' },
@@ -459,9 +459,9 @@ export const COPY = {
       ],
     },
     how: {
-      eyebrow: 'Cara Kerja 7Server',
-      title: 'Tanpa agen di server Anda. Murni protokol SSH di balik layar.',
-      lead: 'Tools monitoring biasa mengharuskan Anda menginstal daemon root atau membuka port tambahan di setiap VPS. 7Server cukup dijalankan di satu mesin Anda sendiri dan berkomunikasi ke seluruh VPS lewat OpenSSH standar (port 22). Hapus server dari dashboard, dan tidak ada satu pun file atau proses yang tertinggal.',
+      eyebrow: 'Cara Kerja',
+      title: 'Tanpa agen di server. Cukup SSH.',
+      lead: 'Jalankan 7Server di satu mesin yang Anda kontrol. Koneksi ke server lain memakai OpenSSH standar (port 22). Hapus server dari dashboard, tidak ada file atau proses yang tertinggal.',
       modeWorkflow: 'Alur Kerja Interaktif',
       modeBench: 'Fig 1 · Simulasi Probe SSH',
       archNodes: [
@@ -572,7 +572,7 @@ export const COPY = {
       categories: [
         {
           id: 'fleet',
-          label: 'Fleet & Visual 3D',
+          label: 'Fleet & 3D',
           screens: [
             {
               id: 'fleet-matrix',
@@ -605,7 +605,7 @@ export const COPY = {
         },
         {
           id: 'node',
-          label: 'Node & Arsitektur',
+          label: 'Node',
           screens: [
             {
               id: 'server-overview',
@@ -638,7 +638,7 @@ export const COPY = {
         },
         {
           id: 'workloads',
-          label: 'Docker, App & Nginx',
+          label: 'App & Docker',
           screens: [
             {
               id: 'apps',
@@ -725,7 +725,7 @@ export const COPY = {
         },
         {
           id: 'terminal',
-          label: 'Terminal Browser',
+          label: 'Terminal',
           screens: [
             {
               id: 'web-terminal',
@@ -740,7 +740,7 @@ export const COPY = {
         },
         {
           id: 'ai',
-          label: 'AI Copilot & Gateway',
+          label: 'AI & Gateway',
           screens: [
             {
               id: 'copilot',
@@ -773,7 +773,7 @@ export const COPY = {
         },
         {
           id: 'security',
-          label: 'RBAC, Audit & Alert',
+          label: 'Akses & Alert',
           screens: [
             {
               id: 'roles',

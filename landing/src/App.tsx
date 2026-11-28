@@ -227,7 +227,6 @@ function Nav({ lang, toggleLang }: { lang: Lang; toggleLang: () => void }) {
         <nav className="hidden items-center gap-6 text-sm md:flex" aria-label="Sections">
           {[
             ['#how', t.how],
-            ['#showcase', t.showcase],
             ['#features', t.features],
             ['#ai', t.ai],
             ['#security', t.security],
@@ -293,40 +292,69 @@ function Hero({
   const shot = useShot();
   const { stars } = useProjectStats();
   const t = COPY[lang].hero;
-  const [activeTab, setActiveTab] = useState(0);
-  const currentPreview = t.heroTabs[activeTab] || t.heroTabs[0];
+  const showcase = COPY[lang].showcase;
+  const [catIdx, setCatIdx] = useState(0);
+  const [screenIdx, setScreenIdx] = useState(0);
+
+  const category = showcase.categories[catIdx] || showcase.categories[0];
+  const screen = category.screens[screenIdx] || category.screens[0];
+  const totalScreens = showcase.categories.reduce((sum, c) => sum + c.screens.length, 0);
+  const globalIndex =
+    showcase.categories.slice(0, catIdx).reduce((sum, c) => sum + c.screens.length, 0) + screenIdx + 1;
+
+  const selectCategory = (idx: number) => {
+    setCatIdx(idx);
+    setScreenIdx(0);
+  };
+
+  const stepScreen = (dir: -1 | 1) => {
+    const nextScreenIdx = screenIdx + dir;
+    if (nextScreenIdx >= 0 && nextScreenIdx < category.screens.length) {
+      setScreenIdx(nextScreenIdx);
+    } else if (dir === 1) {
+      const nextCat = (catIdx + 1) % showcase.categories.length;
+      setCatIdx(nextCat);
+      setScreenIdx(0);
+    } else {
+      const prevCat = (catIdx - 1 + showcase.categories.length) % showcase.categories.length;
+      setCatIdx(prevCat);
+      setScreenIdx(showcase.categories[prevCat].screens.length - 1);
+    }
+  };
+
+  const catIcons = [Layers, Activity, Boxes, Terminal, Sparkles, ShieldCheck];
 
   return (
-    <section id="top" className="relative isolate mx-auto max-w-6xl px-4 pb-12 pt-14 sm:px-6 sm:pt-20">
+    <section id="top" className="relative isolate mx-auto max-w-6xl px-4 pb-16 pt-14 sm:px-6 sm:pt-20">
       <div className="carbon" aria-hidden />
       <div className="max-w-3xl">
         <p className="metal reveal mb-5 inline-flex items-center gap-2 rounded-full px-3 py-1 font-mono text-[11px]">
           <span className="led breathe h-1.5 w-1.5 rounded-full" /> {t.badge}
         </p>
-        <h1 className="silver-text reveal text-balance text-4xl font-semibold leading-[1.05] tracking-tight sm:text-6xl" style={{ color: 'var(--anatomy-strong)', ...v(1) }}>
+        <h1 className="silver-text reveal text-balance text-4xl font-semibold leading-[1.06] tracking-tight sm:text-6xl" style={{ color: 'var(--anatomy-strong)', ...v(1) }}>
           {t.title}
         </h1>
-        <p className="reveal mt-6 max-w-2xl text-pretty text-lg leading-relaxed" style={v(2)}>
+        <p className="reveal mt-5 max-w-2xl text-pretty text-base leading-relaxed sm:text-lg" style={v(2)}>
           {t.lead}
         </p>
-        <div className="reveal mt-8 flex flex-col gap-3 sm:flex-row sm:items-center" style={v(3)}>
-          <a href="#start" className="btn-silver inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold">
+        <div className="reveal mt-7 flex flex-col gap-3 sm:flex-row sm:items-center" style={v(3)}>
+          <a href="#start" className="btn-silver inline-flex shrink-0 items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold">
             {t.ctaPrimary} <ArrowRight className="h-4 w-4" />
           </a>
           <a
             href="#how"
-            className="metal inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold"
+            className="metal inline-flex shrink-0 items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold"
             style={{ color: 'var(--anatomy-strong)' }}
           >
             {t.ctaSecondary}
           </a>
-          <div className="sm:ml-2 sm:flex-1 max-w-xs">
-            <CopyLine text="curl -fsSL https://raw.githubusercontent.com/nannndev/7server/main/install.sh | bash" label={t.quickInstall} />
+          <div className="min-w-0 sm:ml-1 sm:flex-1 sm:max-w-md">
+            <CopyLine text="curl -fsSL https://raw.githubusercontent.com/nannndev/7server/main/install.sh | sudo bash" label={t.quickInstall} />
           </div>
         </div>
 
-        {/* GitHub & Discord Community social proof */}
-        <div className="reveal mt-6 flex flex-wrap items-center gap-3 text-xs font-mono sm:gap-4" style={{ color: 'var(--anatomy-muted)', ...v(3) }}>
+        {/* GitHub & Discord links */}
+        <div className="reveal mt-5 flex flex-wrap items-center gap-3 text-xs font-mono sm:gap-4" style={{ color: 'var(--anatomy-muted)', ...v(3) }}>
           <a href={REPO} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-[var(--line)] hover:text-[var(--anatomy-strong)]">
             <Star className="h-3.5 w-3.5 fill-amber-400/20 text-amber-400" />
             <span className="font-semibold text-[var(--anatomy-strong)]">{stars !== null ? stars : 1}</span>
@@ -340,57 +368,95 @@ function Hero({
         </div>
       </div>
 
-      {/* Interactive Hero Dashboard Frame */}
-      <div className="core-glow reveal mt-12" style={v(4)}>
+      {/* Unified Interactive Dashboard Explorer (all 6 categories, 24 screens — single showcase) */}
+      <div id="showcase" className="core-glow reveal mt-12 scroll-mt-20" style={v(4)}>
+        {/* Single-row Category Bar */}
+        <div
+          className="mb-3 flex items-center gap-1.5 overflow-x-auto pb-1"
+          role="tablist"
+          aria-label="Dashboard categories"
+        >
+          {showcase.categories.map((cat, idx) => {
+            const Icon = catIcons[idx] || Layers;
+            const active = idx === catIdx;
+            return (
+              <button
+                key={cat.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => selectCategory(idx)}
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-medium transition-all ${
+                  active ? 'btn-silver font-semibold' : 'metal hover:text-[var(--anatomy-strong)]'
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                <span>{cat.label}</span>
+                <span className="font-mono text-[10px] opacity-70">{cat.screens.length}</span>
+              </button>
+            );
+          })}
+        </div>
+
         <div className="metal overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--line)' }}>
-          {/* Window Chrome + Quick View Switcher */}
+          {/* Window Chrome + Sub-view Switcher */}
           <div
-            className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-2.5"
+            className="flex flex-wrap items-center justify-between gap-2.5 border-b px-4 py-2.5"
             style={{ borderColor: 'var(--line)', background: 'color-mix(in srgb, var(--anatomy-page) 55%, transparent)' }}
           >
-            <div className="flex items-center gap-3">
-              <div className="flex gap-1.5" aria-hidden>
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex shrink-0 gap-1.5" aria-hidden>
                 <span className="h-2.5 w-2.5 rounded-full bg-zinc-600/80" />
                 <span className="h-2.5 w-2.5 rounded-full bg-zinc-600/80" />
                 <span className="h-2.5 w-2.5 rounded-full bg-zinc-600/80" />
               </div>
-              <div className="well hidden items-center gap-2 rounded-lg px-3 py-1 font-mono text-[11px] sm:flex">
-                <span className="led h-1.5 w-1.5 rounded-full" />
-                <span style={{ color: 'var(--anatomy-muted)' }}>127.0.0.1:5001</span>
+              <div className="well hidden min-w-0 items-center gap-2 rounded-lg px-2.5 py-1 font-mono text-[11px] sm:flex">
+                <span className="led h-1.5 w-1.5 shrink-0 rounded-full" />
+                <span className="shrink-0" style={{ color: 'var(--anatomy-muted)' }}>127.0.0.1:5001</span>
                 <span style={{ color: 'var(--line-strong)' }}>/</span>
-                <span style={{ color: 'var(--anatomy-strong)' }}>{currentPreview.route}</span>
+                <span className="truncate" style={{ color: 'var(--anatomy-strong)' }}>{screen.route}</span>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-1" role="tablist" aria-label="Dashboard preview tabs">
-              {t.heroTabs.map((tab, idx) => {
-                const selected = idx === activeTab;
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={selected}
-                    onClick={() => setActiveTab(idx)}
-                    className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-all ${selected ? 'btn-silver font-semibold' : 'hover:bg-[var(--line)] hover:text-[var(--anatomy-strong)]'
+            {category.screens.length > 1 && (
+              <div
+                className="flex max-w-full items-center gap-1 overflow-x-auto"
+                role="tablist"
+                aria-label="Category views"
+              >
+                {category.screens.map((sc, sIdx) => {
+                  const isSelected = sIdx === screenIdx;
+                  return (
+                    <button
+                      key={sc.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={isSelected}
+                      onClick={() => setScreenIdx(sIdx)}
+                      className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-medium transition-all ${
+                        isSelected
+                          ? 'btn-silver font-semibold'
+                          : 'well opacity-80 hover:opacity-100 hover:text-[var(--anatomy-strong)]'
                       }`}
-                  >
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </div>
+                    >
+                      {sc.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Screenshot Canvas */}
           <div
-            className="group relative cursor-zoom-in overflow-hidden bg-black/40"
-            onClick={() => onZoom({ src: currentPreview.image, title: currentPreview.label, route: currentPreview.route })}
+            className="group relative cursor-zoom-in overflow-hidden border-b bg-black/40"
+            style={{ borderColor: 'var(--line)' }}
+            onClick={() => onZoom({ src: screen.image, title: screen.title, route: screen.route })}
           >
             <img
-              key={currentPreview.image}
-              src={shot(currentPreview.image)}
-              alt={currentPreview.label}
+              key={screen.image}
+              src={shot(screen.image)}
+              alt={screen.title}
               className="block w-full object-cover transition-transform duration-500 group-hover:scale-[1.005]"
               loading="eager"
             />
@@ -398,19 +464,60 @@ function Hero({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                onZoom({ src: currentPreview.image, title: currentPreview.label, route: currentPreview.route });
+                onZoom({ src: screen.image, title: screen.title, route: screen.route });
               }}
               className="metal absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium opacity-90 shadow-lg transition-opacity group-hover:opacity-100"
               style={{ color: 'var(--anatomy-strong)' }}
             >
               <Expand className="h-3.5 w-3.5" style={{ color: 'var(--accent)' }} />
-              {COPY[lang].showcase.zoomHint}
+              {showcase.zoomHint}
             </button>
           </div>
+
+          {/* Caption, Highlights & Prev/Next Controls */}
+          <div className="flex flex-col justify-between gap-4 p-4 sm:flex-row sm:items-center sm:px-6 sm:py-5">
+            <div className="min-w-0 max-w-2xl">
+              <h2 className="text-base font-semibold sm:text-lg" style={{ color: 'var(--anatomy-strong)' }}>
+                {screen.title}
+              </h2>
+              <p className="mt-1 text-sm leading-relaxed">{screen.caption}</p>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {screen.highlights.map((h) => (
+                  <span
+                    key={h}
+                    className="well inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-mono text-[11px]"
+                    style={{ color: 'var(--anatomy-strong)' }}
+                  >
+                    <span className="led h-1.5 w-1.5 rounded-full" />
+                    {h}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-2 self-end sm:self-center">
+              <span className="mr-1 font-mono text-xs" style={{ color: 'var(--anatomy-muted)' }}>
+                {globalIndex} / {totalScreens}
+              </span>
+              <button
+                type="button"
+                onClick={() => stepScreen(-1)}
+                aria-label="Previous screenshot"
+                className="metal inline-flex h-9 w-9 items-center justify-center rounded-xl transition-colors hover:text-[var(--anatomy-strong)]"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => stepScreen(1)}
+                aria-label="Next screenshot"
+                className="metal inline-flex h-9 w-9 items-center justify-center rounded-xl transition-colors hover:text-[var(--anatomy-strong)]"
+              >
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
         </div>
-        <p className="mt-3 text-center font-mono text-xs" style={{ color: 'var(--anatomy-muted)' }}>
-          {t.previewCaption}
-        </p>
       </div>
     </section>
   );
@@ -640,240 +747,49 @@ function HowItWorks({
   );
 }
 
-// ---------------------------------------------------------------- Product Screenshot Showcase
-function ProductShowcase({
-  lang,
-  onZoom,
-}: {
-  lang: Lang;
-  onZoom: (item: { src: string; title: string; route?: string }) => void;
-}) {
-  const shot = useShot();
-  const t = COPY[lang].showcase;
-  const [catIdx, setCatIdx] = useState(0);
-  const [screenIdx, setScreenIdx] = useState(0);
-
-  const category = t.categories[catIdx] || t.categories[0];
-  const screen = category.screens[screenIdx] || category.screens[0];
-
-  const selectCategory = (idx: number) => {
-    setCatIdx(idx);
-    setScreenIdx(0);
-  };
-
-  const stepScreen = (dir: -1 | 1) => {
-    const nextScreenIdx = screenIdx + dir;
-    if (nextScreenIdx >= 0 && nextScreenIdx < category.screens.length) {
-      setScreenIdx(nextScreenIdx);
-    } else if (dir === 1) {
-      const nextCat = (catIdx + 1) % t.categories.length;
-      setCatIdx(nextCat);
-      setScreenIdx(0);
-    } else {
-      const prevCat = (catIdx - 1 + t.categories.length) % t.categories.length;
-      setCatIdx(prevCat);
-      setScreenIdx(t.categories[prevCat].screens.length - 1);
-    }
-  };
-
-  const catIcons = [Layers, Activity, Boxes, Terminal, Sparkles, ShieldCheck];
-
-  return (
-    <section id="showcase" className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-      <Eyebrow>{t.eyebrow}</Eyebrow>
-      <H2>{t.title}</H2>
-      <Lead>{t.lead}</Lead>
-
-      {/* Top Category Bar */}
-      <div className="reveal mt-8 flex flex-wrap gap-2" role="tablist" aria-label="Screenshot categories">
-        {t.categories.map((cat, idx) => {
-          const Icon = catIcons[idx] || Layers;
-          const active = idx === catIdx;
-          return (
-            <button
-              key={cat.id}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => selectCategory(idx)}
-              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all ${active ? 'btn-silver font-semibold' : 'metal hover:text-[var(--anatomy-strong)]'
-                }`}
-            >
-              <Icon className="h-4 w-4" />
-              <span>{cat.label}</span>
-              <span className="rounded-full px-1.5 py-0.2 font-mono text-[11px] opacity-75">
-                {cat.screens.length}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Main Showcase Stage */}
-      <div className="metal reveal mt-6 overflow-hidden rounded-2xl">
-        {/* Stage Header: Breadcrumb + Sub-screen Tabs */}
-        <div
-          className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 sm:px-6"
-          style={{ borderColor: 'var(--line)', background: 'color-mix(in srgb, var(--anatomy-page) 55%, transparent)' }}
-        >
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="flex gap-1.5" aria-hidden>
-              <span className="h-2.5 w-2.5 rounded-full bg-zinc-600/80" />
-              <span className="h-2.5 w-2.5 rounded-full bg-zinc-600/80" />
-              <span className="h-2.5 w-2.5 rounded-full bg-zinc-600/80" />
-            </div>
-            <span className="truncate font-mono text-xs" style={{ color: 'var(--anatomy-strong)' }}>
-              {screen.route}
-            </span>
-          </div>
-
-          {category.screens.length > 1 && (
-            <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Sub-views">
-              {category.screens.map((sc, sIdx) => {
-                const isSelected = sIdx === screenIdx;
-                return (
-                  <button
-                    key={sc.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={isSelected}
-                    onClick={() => setScreenIdx(sIdx)}
-                    className={`rounded-lg px-3 py-1 text-xs font-medium transition-all ${isSelected
-                      ? 'btn-silver font-semibold'
-                      : 'well opacity-80 hover:opacity-100 hover:text-[var(--anatomy-strong)]'
-                      }`}
-                  >
-                    {sc.label}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Screenshot Viewport */}
-        <div
-          className="group relative cursor-zoom-in overflow-hidden border-b bg-black/40"
-          style={{ borderColor: 'var(--line)' }}
-          onClick={() => onZoom({ src: screen.image, title: screen.title, route: screen.route })}
-        >
-          <img
-            key={screen.image}
-            src={shot(screen.image)}
-            alt={screen.title}
-            className="block w-full object-cover transition-transform duration-500 group-hover:scale-[1.006]"
-            loading="lazy"
-          />
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onZoom({ src: screen.image, title: screen.title, route: screen.route });
-            }}
-            className="metal absolute bottom-4 right-4 inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium opacity-90 shadow-lg transition-opacity group-hover:opacity-100"
-            style={{ color: 'var(--anatomy-strong)' }}
-          >
-            <Expand className="h-3.5 w-3.5" style={{ color: 'var(--accent)' }} />
-            {t.zoomHint}
-          </button>
-        </div>
-
-        {/* Stage Footer: Caption, Feature Pills & Prev/Next Controls */}
-        <div className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center sm:px-6">
-          <div className="max-w-2xl">
-            <h3 className="text-lg font-semibold" style={{ color: 'var(--anatomy-strong)' }}>
-              {screen.title}
-            </h3>
-            <p className="mt-1 text-sm leading-relaxed">
-              {screen.caption}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {screen.highlights.map((h) => (
-                <span
-                  key={h}
-                  className="well inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-mono text-[11px]"
-                  style={{ color: 'var(--anatomy-strong)' }}
-                >
-                  <span className="led h-1.5 w-1.5 rounded-full" />
-                  {h}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 self-end sm:self-center">
-            <button
-              type="button"
-              onClick={() => stepScreen(-1)}
-              aria-label="Previous screenshot"
-              className="metal inline-flex h-10 w-10 items-center justify-center rounded-xl transition-colors hover:text-[var(--anatomy-strong)]"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => stepScreen(1)}
-              aria-label="Next screenshot"
-              className="metal inline-flex h-10 w-10 items-center justify-center rounded-xl transition-colors hover:text-[var(--anatomy-strong)]"
-            >
-              <ArrowRight className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function Features({ lang }: { lang: Lang }) {
   const itemsEn: { icon: typeof Activity; title: string; body: string }[] = [
-    { icon: Activity, title: 'Fleet overview & 3D views', body: 'CPU, RAM, disk and uptime for every server, with history charts, a 3D rack, 3D resource matrix, topology view, and alerts sent to Discord.' },
-    { icon: Bot, title: 'Agentic Copilot chat', body: 'Chat with an AI agent on any server. It runs read-only checks by itself, loops through up to 8 steps per prompt, and waits for your approval before changing anything. Opt-in Auto mode only stops for destructive commands.' },
-    { icon: Wrench, title: 'Fix with AI', body: 'When a deploy fails, one click hands the failed stage and its logs to the Copilot, which inspects the server and proposes the fix for you to approve.' },
-    { icon: Sparkles, title: 'Skills, personalities & /compact', body: 'Paste custom SKILL.md playbooks with keyword triggers, add per-server notes, choose the agent\'s language, style and personality, and /compact long sessions to save tokens.' },
-    { icon: GitBranch, title: 'Git auto-discovery & deploy', body: 'Connect a GitHub Personal Access Token to browse repositories, auto-detect frameworks and monorepo root folders, and deploy with live streaming logs.' },
-    { icon: Network, title: 'Cloudflare Tunnels & Zero-Trust', body: 'Expose internal webapps behind NAT or Tailscale without opening any public ports. Includes 1-click Zero Trust token setup and visual ingress route mapping.' },
-    { icon: Globe, title: 'Nginx, SSL & DNS pre-flight', body: 'Which domain points to which port, Nginx sites with nginx -t syntax verification, automated Let\'s Encrypt certificates, and real-time DNS A-record pre-flight checks.' },
-    { icon: Boxes, title: 'Docker and Compose', body: 'See containers, images and stacks; start, stop and restart them; read logs; act on a whole Compose project.' },
-    { icon: Terminal, title: 'Browser terminal', body: 'A full multi-tab xterm.js shell over WebSocket with command shortcuts. htop, vim and nano work, and the window resizes with the session.' },
-    { icon: Database, title: 'Database workbench', body: 'PostgreSQL, MySQL, MongoDB, Redis and SQLite, including databases inside containers. Browse tables, run queries, see the ER diagram.' },
-    { icon: HardDrive, title: 'Backups', body: 'Database and file backups on demand or on a schedule, with retention, download and restore.' },
-    { icon: Clock, title: 'Cron, services and processes', body: 'Edit crontabs with visual presets, control systemd units and PM2 apps, and find the process that is eating the CPU.' },
-    { icon: FileText, title: 'Files and logs', body: 'Browse and edit files over SFTP, and search system and app logs without leaving the dashboard.' },
-    { icon: KeyRound, title: 'SSH keys, hardening and firewall', body: 'Manage authorized keys, check root login and password auth, and open or close UFW ports. It refuses to remove the last rule that keeps SSH open.' },
-    { icon: EyeOff, title: 'Screencast Privacy Mode', body: '1-click streamer privacy mode blurs all sensitive server IPs, public domains, application paths, local ports, and auth tokens with instant hover reveal.' },
+    { icon: Activity, title: 'Fleet monitoring & 3D views', body: 'Track CPU, RAM, disk, and uptime across servers with history charts, 3D rack/matrix views, topology maps, and Discord/Telegram alerts.' },
+    { icon: GitBranch, title: 'Git deploy & webhooks', body: 'Connect GitHub to deploy apps via Docker, Nixpacks, or PM2 with live logs, cancel support, deploy history, rollback, and auto-deploy webhooks.' },
+    { icon: Boxes, title: 'Docker & Compose', body: 'Manage containers, images, and Compose stacks. Start, stop, restart, and read logs from one view.' },
+    { icon: Globe, title: 'Nginx, SSL & DNS check', body: 'Configure Nginx sites with nginx -t checks, verify DNS A-records before issuing Let\'s Encrypt SSL, and map domains to local ports.' },
+    { icon: Network, title: 'Cloudflare Tunnels & API', body: 'Expose local services behind NAT without opening firewall ports, and manage Cloudflare DNS, tunnels, SSL mode, and cache.' },
+    { icon: Terminal, title: 'Browser terminal & SFTP', body: 'Multi-tab xterm.js SSH shell over WebSocket (htop, vim, nano work) plus an SFTP file browser and editor.' },
+    { icon: Database, title: 'Database workbench', body: 'Connect to PostgreSQL, MySQL, MongoDB, Redis, and SQLite (including inside Docker). Browse tables, run queries, and view ER diagrams.' },
+    { icon: HardDrive, title: 'Scheduled backups', body: 'Run database and file backups on demand or on a schedule, with retention limits, download, and restore.' },
+    { icon: Clock, title: 'Cron, systemd & PM2', body: 'Edit crontabs, manage systemd units and PM2 processes, and inspect high-CPU processes.' },
+    { icon: Bot, title: 'Approval-gated AI assistant', body: 'Ask questions about any server. Read-only checks run automatically; commands that change the server wait for your click.' },
+    { icon: Wrench, title: 'Fix failed deploys with AI', body: 'Send a failed deploy stage and its logs to the assistant to inspect the server and suggest a fix for your approval.' },
+    { icon: KeyRound, title: 'SSH keys, UFW & Privacy Mode', body: 'Manage authorized_keys and UFW firewall rules (protects your active SSH port), plus a 1-click privacy blur for demos.' },
   ];
 
   const itemsId: { icon: typeof Activity; title: string; body: string }[] = [
-    { icon: Activity, title: 'Ringkasan Fleet & Visual 3D', body: 'Pantau CPU, RAM, disk, dan uptime setiap server lengkap dengan grafik riwayat, rak 3D, matriks 3D, peta topologi, dan notifikasi Discord.' },
-    { icon: Bot, title: 'Chat Agen Copilot', body: 'Ngobrol dengan agen AI di server mana pun. Pengecekan read-only jalan sendiri, agen bekerja hingga 8 langkah per prompt, dan setiap perubahan menunggu persetujuan Anda. Mode Auto (opsional) hanya berhenti di perintah destruktif.' },
-    { icon: Wrench, title: 'Fix with AI', body: 'Saat deploy gagal, satu klik mengirim tahap yang gagal beserta log-nya ke Copilot, yang memeriksa server lalu mengusulkan perbaikan untuk Anda setujui.' },
-    { icon: Sparkles, title: 'Skill, Kepribadian & /compact', body: 'Tempel playbook SKILL.md kustom dengan kata pemicu, tambah catatan per server, atur bahasa, gaya, dan kepribadian agen, serta /compact sesi panjang agar hemat token.' },
-    { icon: GitBranch, title: 'Auto-Discovery & Deploy Git', body: 'Hubungkan GitHub Personal Access Token untuk memilih repositori, deteksi otomatis framework & subfolder monorepo, lalu deploy dengan log real-time.' },
-    { icon: Network, title: 'Cloudflare Tunnel & Ingress Zero-Trust', body: 'Buka akses webapp lokal di balik NAT atau Tailscale tanpa membuka port firewall publik. Dilengkapi setup token 1-klik dan peta visual rute ingress.' },
-    { icon: Globe, title: 'Nginx, SSL & DNS Pre-Flight', body: 'Pemetaan domain ke port lokal, konfigurasi Nginx dengan tes sintaks nginx -t, sertifikat Let’s Encrypt otomatis, dan validasi DNS record sebelum penerbitan SSL.' },
-    { icon: Boxes, title: 'Docker dan Compose', body: 'Pantau container, image, dan stack; start, stop, dan restart; baca log langsung; atau kelola seluruh proyek Docker Compose.' },
-    { icon: Terminal, title: 'Terminal Browser Multi-Tab', body: 'Shell xterm.js penuh melalui WebSocket dengan tombol pintasan perintah. htop, vim, dan nano berjalan lancar dan responsif.' },
-    { icon: Database, title: 'Database Workbench', body: 'Mendukung PostgreSQL, MySQL, MongoDB, Redis, dan SQLite—termasuk database di dalam container Docker. Jelajahi tabel, jalankan query, dan lihat diagram ER.' },
-    { icon: HardDrive, title: 'Backup Terjadwal', body: 'Backup database dan direktori file secara instan atau terjadwal, lengkap dengan retensi otomatis, unduh, dan restore.' },
-    { icon: Clock, title: 'Cron, Systemd & Proses PM2', body: 'Edit jadwal crontab dengan preset visual, kontrol unit systemd maupun worker PM2, serta lacak proses yang membebani CPU.' },
-    { icon: FileText, title: 'Manajer File SFTP & Log', body: 'Jelajahi dan edit file langsung lewat jalur SFTP, serta cari log sistem maupun aplikasi tanpa meninggalkan browser.' },
-    { icon: KeyRound, title: 'Kunci SSH, Hardening & Firewall', body: 'Kelola authorized_keys, audit konfigurasi login root, dan atur port UFW dengan proteksi anti-terkunci dari port SSH.' },
-    { icon: EyeOff, title: 'Mode Privasi untuk Screencast', body: 'Sensor instan sekali klik untuk menyamarkan IP server, domain publik, path aplikasi, port lokal, dan token saat presentasi atau rekaman video.' },
+    { icon: Activity, title: 'Monitoring Fleet & Visual 3D', body: 'Pantau CPU, RAM, disk, dan uptime semua server lewat grafik riwayat, tampilan rak/matriks 3D, peta topologi, serta alert Discord & Telegram.' },
+    { icon: GitBranch, title: 'Deploy Git & Webhook', body: 'Hubungkan GitHub untuk deploy lewat Docker, Nixpacks, atau PM2 dengan log live, tombol cancel, riwayat deploy, rollback, dan webhook auto-deploy.' },
+    { icon: Boxes, title: 'Docker & Compose', body: 'Kelola container, image, dan stack Docker Compose. Start, stop, restart, dan baca log dari satu tempat.' },
+    { icon: Globe, title: 'Nginx, SSL & Cek DNS', body: 'Atur site Nginx dengan validasi nginx -t, cek DNS A-record sebelum terbitkan SSL Let\'s Encrypt, dan arahkan domain ke port lokal.' },
+    { icon: Network, title: 'Cloudflare Tunnel & API', body: 'Ekspos layanan lokal di balik NAT tanpa buka port firewall, serta kelola DNS, tunnel, mode SSL, dan cache Cloudflare.' },
+    { icon: Terminal, title: 'Terminal Browser & SFTP', body: 'Shell SSH xterm.js multi-tab lewat WebSocket (mendukung htop, vim, nano) ditambah browser dan editor file SFTP.' },
+    { icon: Database, title: 'Database Workbench', body: 'Terhubung ke PostgreSQL, MySQL, MongoDB, Redis, dan SQLite (termasuk di dalam Docker). Lihat tabel, jalankan query, dan diagram ER.' },
+    { icon: HardDrive, title: 'Backup Terjadwal', body: 'Jalankan backup database dan file secara manual atau terjadwal, lengkap dengan retensi, unduh, dan restore.' },
+    { icon: Clock, title: 'Cron, Systemd & PM2', body: 'Edit jadwal crontab, kontrol layanan systemd dan worker PM2, serta cek proses yang memakai CPU tinggi.' },
+    { icon: Bot, title: 'Asisten AI dengan Persetujuan', body: 'Tanya kondisi server mana pun. Pengecekan read-only berjalan otomatis; perintah yang mengubah server menunggu klik Anda.' },
+    { icon: Wrench, title: 'Diagnosa Deploy Gagal', body: 'Kirim tahap deploy yang gagal beserta log-nya ke asisten AI untuk dicek dan diusulkan perbaikannya.' },
+    { icon: KeyRound, title: 'SSH Key, UFW & Mode Privasi', body: 'Kelola authorized_keys dan aturan firewall UFW (melindungi port SSH aktif), plus tombol blur privasi untuk demo/rekaman.' },
   ];
 
   const items = lang === 'id' ? itemsId : itemsEn;
 
   return (
     <section id="features" className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-      <Eyebrow>{lang === 'id' ? 'Fitur Lengkap' : 'Features'}</Eyebrow>
-      <H2>{lang === 'id' ? 'Seluruh operasional harian server Anda dalam satu tempat.' : 'The day-to-day work of running servers, in one place.'}</H2>
-      <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <Eyebrow>{lang === 'id' ? 'Fitur' : 'Features'}</Eyebrow>
+      <H2>{lang === 'id' ? 'Alat operasional harian server, dalam satu tempat.' : 'Day-to-day server tools, in one place.'}</H2>
+      <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {items.map(({ icon: Icon, title, body }, i) => (
-          <article key={title} className="metal reveal rounded-2xl p-6" style={v(i % 3)}>
+          <article key={title} className="metal reveal rounded-2xl p-5" style={v(i % 3)}>
             <Icon className="h-5 w-5" style={{ color: 'var(--anatomy-strong)' }} aria-hidden />
-            <h3 className="mt-4 font-semibold" style={{ color: 'var(--anatomy-strong)' }}>{title}</h3>
-            <p className="mt-2 text-[15px] leading-relaxed">{body}</p>
+            <h3 className="mt-3.5 font-semibold" style={{ color: 'var(--anatomy-strong)' }}>{title}</h3>
+            <p className="mt-1.5 text-sm leading-relaxed">{body}</p>
           </article>
         ))}
       </div>
@@ -884,18 +800,16 @@ function Features({ lang }: { lang: Lang }) {
 function AI({ lang }: { lang: Lang }) {
   const bullets = lang === 'id'
     ? [
-      ['Vibe-coding & develop langsung di server', 'Bangun aplikasi di /var/www, pasang runtime, atur Nginx/Cloudflare Tunnel, atau hubungkan Claude Code, Codex, OpenCode & Cursor langsung di atas VPS menggunakan satu kunci API Universal 7Server.'],
-      ['Multi-account & rotasi berurutan per provider', 'Hubungkan banyak akun Claude, ChatGPT/Codex, GitHub Copilot, Gemini, Kimi, Kilo, Muse, atau API key sekaligus. Saat akun #1 terkena rate-limit 429, request otomatis berputar ke akun #2.'],
-      ['Built-in DevOps Engineer & Custom SKILL.md', 'Dilengkapi playbook SRE/DevOps standar produksi secara default, plus dukungan menambahkan atau menempel file SKILL.md kustom di Pengaturan Agen.'],
-      ['Kompresi konteks (/compact) & hemat token', 'Ketik /compact atau gunakan auto-compaction bawaan yang merangkum output SSH lama secara otomatis agar sesi troubleshooting panjang tetap ringan dan hemat kuota.'],
-      ['Meminta izin & memproteksi dari prompt injection', 'Perintah read-only berjalan otomatis dan output log diisolasi ketat. Restart, edit, dan hapus wajib mendapat klik persetujuan Anda.'],
+      ['Minta izin sebelum mengubah server', 'Perintah read-only berjalan otomatis; perintah restart, edit, atau hapus selalu menunggu klik persetujuan Anda.'],
+      ['Bawa akun atau API key sendiri', 'Mendukung 8 provider OAuth dan 19 provider API-key dengan rotasi otomatis saat terkena rate-limit 429.'],
+      ['Gateway lokal untuk coding tool di VPS', 'Arahkan Claude Code, Codex, OpenCode, atau Cursor di VPS Anda ke satu endpoint AI Gateway lokal milik 7Server.'],
+      ['Custom SKILL.md & /compact', 'Tambahkan catatan playbook SKILL.md sendiri dan ringkas sesi panjang dengan /compact agar lebih hemat token.'],
     ]
     : [
-      ['Vibe-code & develop directly on your server', 'Scaffold apps in /var/www, wire up Nginx or Cloudflare Tunnels, or point Claude Code, Codex, OpenCode & Cursor running on your VPS straight to your 7Server Universal API Key.'],
-      ['Multi-account & ordered rotation per provider', 'Connect multiple Claude, ChatGPT/Codex, GitHub Copilot, Gemini, Kimi, Kilo, Muse, or API-key accounts. When account #1 hits a 429 rate limit, 7Server automatically rotates to account #2.'],
-      ['Built-in DevOps skill & custom SKILL.md', 'Ships with a production DevOps Engineer baseline and domain playbooks, plus support for pasting custom SKILL.md files with keyword triggers in Agent Settings.'],
-      ['Context compaction (/compact) for long sessions', 'Run /compact or let automatic backend compaction condense older SSH outputs so deep troubleshooting sessions never blow your token budget.'],
-      ['Asks before it acts & fences untrusted logs', 'Read-only commands run on their own while server logs are fenced against prompt injection. Restarts, edits, and deletes always wait for your approval.'],
+      ['Asks before changing anything', 'Read-only checks run automatically; restarts, edits, and deletes always wait for your approval.'],
+      ['Bring your own accounts or API keys', 'Supports 8 OAuth providers and 19 API-key providers, with automatic fallback when an account hits a 429 rate limit.'],
+      ['Local gateway for server coding tools', 'Point Claude Code, Codex, OpenCode, or Cursor running on your VPS to your own 7Server AI Gateway endpoint.'],
+      ['Custom SKILL.md & /compact', 'Add your own SKILL.md playbooks and condense long sessions with /compact to keep context small.'],
     ];
 
   const oauthProviders = ['Claude Pro/Max', 'ChatGPT / Codex', 'GitHub Copilot', 'Gemini CLI', 'Kimi Code', 'Kilo Code', 'Muse (Koda)', 'Nous Portal'];
@@ -905,12 +819,12 @@ function AI({ lang }: { lang: Lang }) {
     <section id="ai" className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
       <div className="grid gap-12 lg:grid-cols-2 lg:items-start">
         <div>
-          <Eyebrow>{lang === 'id' ? 'AI Copilot · Universal Gateway · Vibe-Code di Server' : 'AI Copilot · Universal Gateway · Vibe-Code on Server'}</Eyebrow>
-          <H2>{lang === 'id' ? 'Vibe-coding dan kelola langsung di atas server Anda.' : 'Vibe-code and operate directly on your server.'}</H2>
+          <Eyebrow>{lang === 'id' ? 'Asisten AI & Gateway' : 'AI Assistant & Gateway'}</Eyebrow>
+          <H2>{lang === 'id' ? 'Debug dan jalankan perintah dengan izin Anda.' : 'Debug and run commands with your approval.'}</H2>
           <Lead>
             {lang === 'id'
-              ? 'Dengan Universal AI Gateway dan AI SRE Copilot bawaan, Anda bisa langsung membangun aplikasi, men-debug layanan, atau menjalankan coding agent langsung di VPS—Copilot memeriksa kondisi server secara otomatis dan meminta persetujuan Anda sebelum mengubah apa pun.'
-              : 'With the built-in Universal AI Gateway and AI SRE Copilot, you can build apps, debug production services, and run coding agents directly on your VPS—Copilot inspects your server first and waits for your click before changing anything.'}
+              ? 'Asisten AI opsional yang memeriksa log dan metrik server lebih dulu, lalu menunggu klik Anda sebelum menjalankan perubahan. Gunakan akun atau API key Anda sendiri.'
+              : 'An optional AI assistant that checks logs and metrics first, then waits for your click before making changes. Runs with your own accounts or API keys.'}
           </Lead>
           <ul className="mt-8 space-y-4 text-[15px]">
             {bullets.map(([t, b], i) => (
@@ -1131,7 +1045,6 @@ export default function App() {
           <>
             <Hero lang={lang} onZoom={setLightbox} />
             <HowItWorks lang={lang} onZoom={setLightbox} />
-            <ProductShowcase lang={lang} onZoom={setLightbox} />
             <Features lang={lang} />
             <AI lang={lang} />
             <Security lang={lang} />
