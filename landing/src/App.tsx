@@ -2,9 +2,9 @@
 // pricing, users, uptime or features that are not built.
 import { useEffect, useState, type ReactNode } from 'react';
 import {
-  Activity, ArrowLeft, ArrowRight, Boxes, Check, ChevronLeft, ChevronRight, Clock, Copy, Cpu, Database,
+  Activity, ArrowLeft, ArrowRight, Bot, Boxes, Check, ChevronLeft, ChevronRight, Clock, Copy, Cpu, Database,
   Download, Expand, EyeOff, FileText, GitBranch, Globe, HardDrive, KeyRound, Languages, Layers, Lock, Moon, Network, Server,
-  ShieldCheck, Sparkles, Star, Sun, Terminal, X
+  ShieldCheck, Sparkles, Star, Sun, Terminal, Wrench, X
 } from 'lucide-react';
 import { Analytics } from '@vercel/analytics/react';
 import { AgentlessBench } from './figure/AgentlessBench';
@@ -828,6 +828,9 @@ function ProductShowcase({
 function Features({ lang }: { lang: Lang }) {
   const itemsEn: { icon: typeof Activity; title: string; body: string }[] = [
     { icon: Activity, title: 'Fleet overview & 3D views', body: 'CPU, RAM, disk and uptime for every server, with history charts, a 3D rack, 3D resource matrix, topology view, and alerts sent to Discord.' },
+    { icon: Bot, title: 'Agentic Copilot chat', body: 'Chat with an AI agent on any server. It runs read-only checks by itself, loops through up to 8 steps per prompt, and waits for your approval before changing anything. Opt-in Auto mode only stops for destructive commands.' },
+    { icon: Wrench, title: 'Fix with AI', body: 'When a deploy fails, one click hands the failed stage and its logs to the Copilot, which inspects the server and proposes the fix for you to approve.' },
+    { icon: Sparkles, title: 'Skills, personalities & /compact', body: 'Paste custom SKILL.md playbooks with keyword triggers, add per-server notes, choose the agent\'s language, style and personality, and /compact long sessions to save tokens.' },
     { icon: GitBranch, title: 'Git auto-discovery & deploy', body: 'Connect a GitHub Personal Access Token to browse repositories, auto-detect frameworks and monorepo root folders, and deploy with live streaming logs.' },
     { icon: Network, title: 'Cloudflare Tunnels & Zero-Trust', body: 'Expose internal webapps behind NAT or Tailscale without opening any public ports. Includes 1-click Zero Trust token setup and visual ingress route mapping.' },
     { icon: Globe, title: 'Nginx, SSL & DNS pre-flight', body: 'Which domain points to which port, Nginx sites with nginx -t syntax verification, automated Let\'s Encrypt certificates, and real-time DNS A-record pre-flight checks.' },
@@ -843,6 +846,9 @@ function Features({ lang }: { lang: Lang }) {
 
   const itemsId: { icon: typeof Activity; title: string; body: string }[] = [
     { icon: Activity, title: 'Ringkasan Fleet & Visual 3D', body: 'Pantau CPU, RAM, disk, dan uptime setiap server lengkap dengan grafik riwayat, rak 3D, matriks 3D, peta topologi, dan notifikasi Discord.' },
+    { icon: Bot, title: 'Chat Agen Copilot', body: 'Ngobrol dengan agen AI di server mana pun. Pengecekan read-only jalan sendiri, agen bekerja hingga 8 langkah per prompt, dan setiap perubahan menunggu persetujuan Anda. Mode Auto (opsional) hanya berhenti di perintah destruktif.' },
+    { icon: Wrench, title: 'Fix with AI', body: 'Saat deploy gagal, satu klik mengirim tahap yang gagal beserta log-nya ke Copilot, yang memeriksa server lalu mengusulkan perbaikan untuk Anda setujui.' },
+    { icon: Sparkles, title: 'Skill, Kepribadian & /compact', body: 'Tempel playbook SKILL.md kustom dengan kata pemicu, tambah catatan per server, atur bahasa, gaya, dan kepribadian agen, serta /compact sesi panjang agar hemat token.' },
     { icon: GitBranch, title: 'Auto-Discovery & Deploy Git', body: 'Hubungkan GitHub Personal Access Token untuk memilih repositori, deteksi otomatis framework & subfolder monorepo, lalu deploy dengan log real-time.' },
     { icon: Network, title: 'Cloudflare Tunnel & Ingress Zero-Trust', body: 'Buka akses webapp lokal di balik NAT atau Tailscale tanpa membuka port firewall publik. Dilengkapi setup token 1-klik dan peta visual rute ingress.' },
     { icon: Globe, title: 'Nginx, SSL & DNS Pre-Flight', body: 'Pemetaan domain ke port lokal, konfigurasi Nginx dengan tes sintaks nginx -t, sertifikat Let’s Encrypt otomatis, dan validasi DNS record sebelum penerbitan SSL.' },
